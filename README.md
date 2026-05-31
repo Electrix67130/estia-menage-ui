@@ -1,114 +1,66 @@
-# Buildr UI
+# Estia Ménage — App mobile
 
-Application mobile (Expo / React Native) pour la gestion de chantiers Buildr.
+Application mobile (iOS + Android) de gestion de prestations de ménage Estia, pour admins et prestataires. Front mobile de [l'API Estia](https://github.com/Electrix67130/estia-menage).
 
-**Stack** : Expo Router + React Native + TypeScript + TanStack Query
+## Stack
+
+- **Expo SDK 54** + **React Native** 0.81
+- **Expo Router** (file-based routing)
+- **TypeScript** strict
+- **TanStack Query** (cache & sync)
+- **react-native-reanimated** + **gesture-handler** (animations, swipe gestures)
+- **react-native-svg** (logo)
+- **AsyncStorage** (token persistence)
 
 ## Démarrage rapide
 
-### 1. Pré-requis
-
-- Node.js ≥ 20
-- L'API [`buildr-api`](https://github.com/Electrix67130/buildr-api) qui tourne (par défaut sur `http://localhost:3000`)
-- Pour iOS : Xcode + Simulator (macOS)
-- Pour Android : Android Studio + emulator
-- Ou l'app **Expo Go** sur ton téléphone pour tester sans builder
-
-### 2. Installation
+Prérequis : Node 20+, Expo CLI, simulateur iOS ou Android (ou Expo Go sur ton téléphone).
 
 ```bash
 npm install
-cp .env.example .env
-# édite .env avec l'URL de ton API
+npm start                  # ouvre Expo Dev Tools
+# puis 'i' pour iOS, 'a' pour Android, ou scan le QR avec Expo Go
 ```
 
-### 3. Lancer l'app
-
-```bash
-npm start              # menu interactif Metro
-npm run ios            # build + ouvre simulateur iOS
-npm run android        # build + ouvre emulator Android
-npm run web            # version web (limitée)
-npm run start:tunnel   # tunnel ngrok-like pour test sur device physique sans LAN
-```
-
-## Commandes
-
-| Commande | Description |
-|---|---|
-| `npm start` | Démarre Metro en mode dev |
-| `npm run ios` / `android` / `web` | Cible une plateforme spécifique |
-| `npm run start:tunnel` | Démarre via tunnel (utile en réseau bridé) |
-| `npm run lint` | Lint Expo |
-| `npm test` | Lance les tests (Jest) |
+Configure l'URL de l'API dans `.env` (cf. `.env.example`).
 
 ## Architecture
 
 ```
 src/
-├── api/             # Client HTTP + hooks TanStack Query par ressource
-│   ├── client.ts            # apiFetch (auth, refresh token, base URL)
-│   ├── services.ts          # Wrappers REST par module
-│   ├── types.ts             # Types partagés (Chantier, User…)
-│   └── hooks/               # useChantiers, useAuth, useComments…
-├── app/             # Pages (Expo Router — file-based routing)
-│   ├── (auth)/      # Login, register, reset password, accept invite
-│   ├── (tabs)/      # Tabs : accueil, chantiers, archives, profil…
-│   ├── chantier/    # Détail d'un chantier + édition
-│   └── templates/   # Templates de chantier
-├── components/      # Composants réutilisables (StatusBadge, PhotoGallery…)
-├── constants/       # Colors, Layout (spacing, radius, fontSize…)
-├── contexts/        # Auth, Theme, I18n
-├── hooks/           # useColorScheme, useKeyboardAwareModalStyle…
-├── i18n/            # Traductions (FR/EN/…)
-├── types/           # Types globaux
-├── utils/           # Helpers (optimizeImage, formatters…)
-└── assets/          # Logos, icônes, images
+├── api/             Client HTTP, hooks React Query, types partagés
+├── app/             Routes Expo Router (file-based)
+│   ├── (tabs)/      Tab nav principal (Ménages, Logements, Équipe…)
+│   ├── menage/      Fiche ménage + édition + création
+│   ├── logement/    Fiche logement + édition + création
+│   ├── client/      CRUD client
+│   └── …
+├── components/      Composants réutilisables (MenageCard, SheetHandle…)
+├── constants/       Colors, Layout, Urls
+├── contexts/        AuthContext, ThemeContext, DialogContext, I18nContext
+├── hooks/           useColorScheme, useSwipeToClose, useKeyboardAwareModalStyle…
+├── i18n/            Traductions (fr/en/de/es/it/pl/pt/tr)
+└── lib/             Helpers (date, geo, capture photo…)
 ```
 
-### Principes
+## Scripts npm
 
-- **TypeScript strict**, jamais de `any` non justifié.
-- **Path aliases** : `@/*` → `src/*` (configuré dans `tsconfig.json` + `babel.config.cts`).
-- **Theming** : palette dans `constants/Colors.ts`, thèmes light/dark/system gérés par `ThemeContext`.
-- **i18n** : `useTranslation()` depuis `contexts/I18nContext`, traductions dans `i18n/translations.ts`.
-- **Données serveur** : tout passe par TanStack Query (`useQuery` / `useMutation`), avec invalidation appropriée.
-- **Auth** : `AuthContext` expose `user`, `login`, `logout`. Token refresh transparent dans `api/client.ts`.
-
-## Variables d'environnement
-
-Voir [`.env.example`](.env.example).
-
-| Variable | Description |
+| Commande | Description |
 |---|---|
-| `EXPO_PUBLIC_API_URL` | URL de l'API Buildr (ex: `http://localhost:3000` en dev, ou l'URL ngrok pour tester sur device) |
+| `npm start` | Dev server Expo (Metro) |
+| `npm run ios` | Build + lance sur simulateur iOS |
+| `npm run android` | Build + lance sur émulateur Android |
+| `npm run lint` | Linter Expo |
+| `npm test` | Tests Jest |
 
-## Tests sur device physique
+## Conventions
 
-Pour tester sur ton téléphone en gardant l'API en local :
+- **Parité mobile ↔ dashboard** : toute modification fonctionnelle doit être appliquée sur les deux, sauf exceptions documentées (gestion d'abonnement = dashboard seul ; pointage photo géolocalisé = mobile seul).
+- Modales bottom-sheet : utiliser `<SheetHandle>` + `useSwipeToClose` pour cohérence visuelle et tap-outside-to-close.
+- Pas d'`any` en TypeScript. Path alias `@/*` → `src/*`.
 
-1. Démarre l'API (cf. [`buildr-api`](https://github.com/Electrix67130/buildr-api))
-2. Démarre un tunnel ngrok vers `localhost:3000` (voir `scripts/ngrok-start.sh` dans le repo API)
-3. Mets l'URL ngrok dans le `.env` de l'UI (`EXPO_PUBLIC_API_URL`)
-4. `npm run start:tunnel`
-5. Scanne le QR code avec Expo Go
+## Repos liés
 
-## Build production
-
-Via EAS Build (Expo Application Services) :
-
-```bash
-eas build --platform ios       # build iOS
-eas build --platform android   # build Android
-```
-
-(EAS doit être configuré avec un compte Expo et `eas.json`.)
-
-## Documentation
-
-- **[`CLAUDE.md`](CLAUDE.md)** — Guidelines projet pour les contributeurs
-- **[`.claude/`](.claude/)** — Guides détaillés (TypeScript, naming, components, state/API, style/theme, perf/a11y)
-
-## API
-
-Le backend est dans [`buildr-api`](https://github.com/Electrix67130/buildr-api). Les endpoints consommés sont documentés dans [`docs/API.md`](https://github.com/Electrix67130/buildr-api/blob/master/docs/API.md) côté API.
+- 🛠️ [estia-menage](https://github.com/Electrix67130/estia-menage) — API backend (Fastify + Knex).
+- 🖥️ [estia-menage-dashboard](https://github.com/Electrix67130/estia-menage-dashboard) — admin (Next.js).
+- 🌐 [estia-menage-website](https://github.com/Electrix67130/estia-menage-website) — site vitrine.

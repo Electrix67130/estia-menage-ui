@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { useDialog } from '@/contexts/DialogContext';
 import Animated, { LinearTransition, FadeInLeft, FadeOutLeft, FadeInDown, FadeOutUp } from 'react-native-reanimated';
@@ -21,7 +22,7 @@ import MenageMap from '@/components/MenageMap';
 import { useAuth } from '@/contexts/AuthContext';
 import AppHeader from '@/components/AppHeader';
 import PrestaUpcomingList from '@/components/PrestaUpcomingList';
-import { menageLogementLabel, type MenageStatus, type Menage } from '@/api/types';
+import { menageLogementLabel, menageSourceLabel, type MenageStatus, type Menage } from '@/api/types';
 import type { MenageFilter } from '@/components/FilterChips';
 
 type ViewMode = 'list' | 'map';
@@ -64,15 +65,21 @@ function AdminMenagesScreen() {
   const isAdmin = user?.role === 'admin';
   const dialog = useDialog();
 
-  const [statusFilter, setStatusFilter] = useState<MenageFilter>('all');
+  // Filtres persistés en AsyncStorage : reprend l'état précédent au prochain
+  // lancement de l'app. La searchQuery reste éphémère (jamais utile de la
+  // resaisir au démarrage).
+  const [statusFilter, setStatusFilter] = usePersistedState<MenageFilter>('menages.filter.status', 'all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [viewMode, setViewMode] = usePersistedState<ViewMode>('menages.filter.viewMode', 'list');
   // Filtres avancés (id sélectionné, '' = tous).
-  const [logementFilter, setLogementFilter] = useState('');
-  const [prestaFilter, setPrestaFilter] = useState('');
-  const [creatorFilter, setCreatorFilter] = useState('');
+  const [logementFilter, setLogementFilter] = usePersistedState('menages.filter.logement', '');
+  const [prestaFilter, setPrestaFilter] = usePersistedState('menages.filter.presta', '');
+  const [creatorFilter, setCreatorFilter] = usePersistedState('menages.filter.creator', '');
   const [openPicker, setOpenPicker] = useState<null | 'logement' | 'presta' | 'creator'>(null);
-  const [periodFilter, setPeriodFilter] = useState<'week' | 'month' | 'all'>('all');
+  const [periodFilter, setPeriodFilter] = usePersistedState<'week' | 'month' | 'all'>(
+    'menages.filter.period',
+    'all',
+  );
 
   // Filtre "À valider" = ménages terminés sans validation
   const isToValidate = statusFilter === 'to_validate';
@@ -121,7 +128,18 @@ function AdminMenagesScreen() {
         if (q && !menageLogementLabel(m).toLowerCase().includes(q)) return false;
         if (logementFilter && m.logement_id !== logementFilter) return false;
         if (prestaFilter && m.prestataire_user_id !== prestaFilter) return false;
-        if (creatorFilter && m.created_by !== creatorFilter) return false;
+        if (creatorFilter) {
+          if (creatorFilter.startsWith('src:')) {
+            const src = creatorFilter.slice(4);
+            const matches = src === 'manual' ? !m.external_source : m.external_source === src;
+            if (!matches) return false;
+          } else if (creatorFilter.startsWith('user:')) {
+            if (m.created_by !== creatorFilter.slice(5)) return false;
+          } else if (m.created_by !== creatorFilter) {
+            // Rétro-compat : valeurs sans préfixe = user_id brut.
+            return false;
+          }
+        }
         if (periodMin && m.date_prevue.slice(0, 10) < periodMin) return false;
         if (periodMax && m.date_prevue.slice(0, 10) > periodMax) return false;
         return true;
@@ -158,10 +176,30 @@ function AdminMenagesScreen() {
         .map((u) => ({ id: u.id, label: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email })),
     [allUsers],
   );
-  // Créateurs = users distincts qui ont créé un ménage chargé.
+  // "Créateur" inclut à la fois les users qui ont créé un ménage manuellement
+  // ET les sources externes (Airbnb, Booking, etc.) qui en ont créé via iCal.
+  // Conventions d'id : `user:<uuid>` pour un user, `src:<external_source>` pour
+  // une source externe, `src:manual` pour les ménages créés manuellement.
   const creatorOptions: FilterOption[] = React.useMemo(() => {
-    const ids = new Set((menagesQuery.data?.data ?? []).map((m) => m.created_by).filter(Boolean));
-    return Array.from(ids).map((id) => ({ id: id as string, label: userLabel(id as string) }));
+    const menages = menagesQuery.data?.data ?? [];
+    const userIds = new Set<string>();
+    const sources = new Set<string>();
+    let hasManual = false;
+    for (const m of menages) {
+      if (m.external_source) sources.add(m.external_source);
+      else hasManual = true;
+      if (m.created_by) userIds.add(m.created_by);
+    }
+    const sourceOpts: FilterOption[] = [];
+    if (hasManual) sourceOpts.push({ id: 'src:manual', label: 'Manuel' });
+    for (const s of Array.from(sources).sort()) {
+      sourceOpts.push({ id: `src:${s}`, label: menageSourceLabel(s) });
+    }
+    const userOpts: FilterOption[] = Array.from(userIds).map((id) => ({
+      id: `user:${id}`,
+      label: userLabel(id),
+    }));
+    return [...sourceOpts, ...userOpts];
   }, [menagesQuery.data, allUsers]);
 
   const deleteMutation = menageHooks.useRemove();

@@ -10,6 +10,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { useAllUsers } from '@/api/hooks/useLogementMembers';
 import { useInvitations, useCreateInvitation, useCancelInvitation } from '@/api/hooks/useInvitations';
 import { useClients, clientDisplayName } from '@/api/hooks/useClients';
@@ -51,7 +52,7 @@ export default function CollaborateursScreen() {
   const cancelInvitation = useCancelInvitation();
   const clientsQuery = useClients();
 
-  const [tab, setTab] = useState<Tab>('members');
+  const [tab, setTab] = usePersistedState<Tab>('team.tab', 'members');
   const [search, setSearch] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');

@@ -15,6 +15,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Wallet, CheckCircle2, Building2, User as UserIcon, ChevronRight } from 'lucide-react-native';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import SheetHandle from '@/components/SheetHandle';
 import { useEarnings, useAdminEarnings } from '@/api/hooks/useEarnings';
 import { useUserEarnings, useClientReport } from '@/api/hooks/useUserEarnings';
@@ -60,7 +61,7 @@ export default function EarningsScreen() {
   const colors = Colors[colorScheme];
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const [period, setPeriod] = useState<Period>('this-month');
+  const [period, setPeriod] = usePersistedState<Period>('earnings.filter.period', 'this-month');
   const range = periodToRange(period);
   const earnings = useEarnings({ from: range.from, to: range.to });
   const adminEarnings = useAdminEarnings({ from: range.from, to: range.to }, isAdmin);

@@ -17,8 +17,6 @@ export interface Organization {
   billing_email?: string | null;
   website?: string | null;
   logo_url?: string | null;
-  insurance_provider?: string | null;
-  insurance_number?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,8 +36,6 @@ export interface UpdateOrganizationInput {
   billing_email?: string | null;
   website?: string | null;
   logo_url?: string | null;
-  insurance_provider?: string | null;
-  insurance_number?: string | null;
 }
 
 export function useOrganization(enabled: boolean = true) {

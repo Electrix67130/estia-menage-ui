@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import {
   View,
   Text,
@@ -9,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Clock, Check, X, CheckCircle2, Play, CalendarCheck } from 'lucide-react-native';
+import { Clock, Check, X, CheckCircle2, Play, CalendarCheck, AlertTriangle } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -32,7 +33,10 @@ export default function PrestaUpcomingList() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
-  const [periodFilter, setPeriodFilter] = useState<'week' | 'month' | 'all' | 'past'>('all');
+  const [periodFilter, setPeriodFilter] = usePersistedState<'week' | 'month' | 'all' | 'past'>(
+    'presta.filter.period',
+    'all',
+  );
   // Quand on est sur "Passés", on fait un appel séparé en mode history pour
   // récupérer les ménages déjà faits (termine/valide).
   const list = useMyUpcomingMenages({ mode: periodFilter === 'past' ? 'history' : 'upcoming' });
@@ -143,6 +147,7 @@ export default function PrestaUpcomingList() {
         const startTime = item.horaire_prevu ? item.horaire_prevu.slice(0, 5) : null;
         const endTime = item.horaire_fin_prevu ? item.horaire_fin_prevu.slice(0, 5) : null;
         const duration = item.duree_estimee_min ? formatDurationMin(item.duree_estimee_min) : null;
+        const needsAttention = !!item.needs_attention;
         return (
           <TouchableOpacity
             activeOpacity={0.85}
@@ -150,7 +155,11 @@ export default function PrestaUpcomingList() {
             style={[
               styles.card,
               Shadow.sm,
-              { backgroundColor: colors.surface, borderColor: colors.border },
+              {
+                backgroundColor: needsAttention ? colors.red + '12' : colors.surface,
+                borderColor: needsAttention ? colors.red + '55' : colors.border,
+              },
+              needsAttention ? { borderLeftColor: colors.red, borderLeftWidth: 3 } : null,
             ]}
           >
             <View style={styles.cardTopRow}>
@@ -184,6 +193,15 @@ export default function PrestaUpcomingList() {
                   </Text>
                 </View>
                 <View style={styles.metaRow}>
+                  {needsAttention ? (
+                    <View
+                      style={[styles.lateBadge, { backgroundColor: colors.red + '20' }]}
+                      accessibilityLabel="Jour passé sans pointage"
+                    >
+                      <AlertTriangle size={12} color={colors.red} />
+                      <Text style={[styles.lateBadgeText, { color: colors.red }]}>Non pointé</Text>
+                    </View>
+                  ) : null}
                   {duration ? (
                     <View style={[styles.durationChip, { backgroundColor: colors.primary + '20' }]}>
                       <Clock size={14} color={colors.primary} />
@@ -401,6 +419,20 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   durationChipText: { fontSize: FontSize.xs, fontWeight: FontWeight.bold },
+  lateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+  },
+  lateBadgeText: {
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   timeRange: { fontSize: FontSize.xs, fontWeight: FontWeight.medium },
   responseRow: { flexDirection: 'row', gap: Spacing.sm },
   responseBtn: {

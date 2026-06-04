@@ -27,6 +27,8 @@ export interface MyUpcomingMenage {
   horaire_fin_prevu: string | null;
   duree_estimee_min: number | null;
   status: 'a_venir' | 'en_cours' | 'termine' | 'valide' | 'annule';
+  /** Calculé côté API : jour passé + aucun pointage + statut a_venir. */
+  needs_attention?: boolean;
   my_response: MenageResponseStatus | null;
   is_assigned: boolean;
   assigned_to_someone: boolean;

@@ -6,6 +6,7 @@ import { ArrowLeft, Save } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTranslation } from '@/contexts/I18nContext';
 import { useLogement, useUpdateLogement } from '@/api/hooks/useLogements';
 import { useClients, clientDisplayName } from '@/api/hooks/useClients';
 import CityAutocomplete from '@/components/CityAutocomplete';
@@ -80,6 +81,7 @@ export default function EditLogementScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
+  const { t: tr } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: logement, isLoading } = useLogement(id);
   const updateMutation = useUpdateLogement();
@@ -100,6 +102,10 @@ export default function EditLogementScreen() {
   const [nKitchens, setNKitchens] = useState(0);
   const [nLivingRooms, setNLivingRooms] = useState(0);
   const [nExteriorSpaces, setNExteriorSpaces] = useState(0);
+  const [nLitSimple, setNLitSimple] = useState(0);
+  const [nLitDouble, setNLitDouble] = useState(0);
+  const [nCanapeLit, setNCanapeLit] = useState(0);
+  const [nLitAppoint, setNLitAppoint] = useState(0);
   const [hasBasement, setHasBasement] = useState(false);
   const [hasLaundry, setHasLaundry] = useState(false);
   const [surfaceM2, setSurfaceM2] = useState('');
@@ -133,6 +139,10 @@ export default function EditLogementScreen() {
     setNKitchens(logement.n_kitchens);
     setNLivingRooms(logement.n_living_rooms);
     setNExteriorSpaces(logement.n_exterior_spaces);
+    setNLitSimple(logement.n_lit_simple ?? 0);
+    setNLitDouble(logement.n_lit_double ?? 0);
+    setNCanapeLit(logement.n_canape_lit ?? 0);
+    setNLitAppoint(logement.n_lit_appoint ?? 0);
     setHasBasement(logement.has_basement);
     setHasLaundry(logement.has_laundry);
     setSurfaceM2(logement.surface_m2 !== null ? String(logement.surface_m2) : '');
@@ -179,6 +189,10 @@ export default function EditLogementScreen() {
           n_kitchens: nKitchens,
           n_living_rooms: nLivingRooms,
           n_exterior_spaces: nExteriorSpaces,
+          n_lit_simple: nLitSimple,
+          n_lit_double: nLitDouble,
+          n_canape_lit: nCanapeLit,
+          n_lit_appoint: nLitAppoint,
           has_basement: hasBasement,
           has_laundry: hasLaundry,
           surface_m2: surface,
@@ -339,22 +353,31 @@ export default function EditLogementScreen() {
           }}
         />
 
-        <Text style={[styles.section, { color: colors.text2 }]}>PIÈCES</Text>
-        <RoomCounter label="Chambres" value={nBedrooms} onChange={setNBedrooms} />
-        <RoomCounter label="Salles de bain" value={nBathrooms} onChange={setNBathrooms} />
-        <RoomCounter label="WC" value={nWc} onChange={setNWc} />
-        <RoomCounter label="Cuisines" value={nKitchens} onChange={setNKitchens} />
-        <RoomCounter label="Salons" value={nLivingRooms} onChange={setNLivingRooms} />
-        <RoomCounter label="Espaces extérieurs" value={nExteriorSpaces} onChange={setNExteriorSpaces} />
+        <Text style={[styles.section, { color: colors.text2 }]}>{tr('logement.rooms.section').toUpperCase()}</Text>
+        <RoomCounter label={tr('logement.rooms.bedrooms')} value={nBedrooms} onChange={setNBedrooms} />
+        <RoomCounter label={tr('logement.rooms.bathrooms')} value={nBathrooms} onChange={setNBathrooms} />
+        <RoomCounter label={tr('logement.rooms.wc')} value={nWc} onChange={setNWc} />
+        <RoomCounter label={tr('logement.rooms.kitchens')} value={nKitchens} onChange={setNKitchens} />
+        <RoomCounter label={tr('logement.rooms.livingRooms')} value={nLivingRooms} onChange={setNLivingRooms} />
+        <RoomCounter label={tr('logement.rooms.exteriorSpaces')} value={nExteriorSpaces} onChange={setNExteriorSpaces} />
 
         <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Cave</Text>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{tr('logement.rooms.basement')}</Text>
           <Switch value={hasBasement} onValueChange={setHasBasement} trackColor={{ false: colors.border, true: colors.primary }} />
         </View>
         <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Buanderie</Text>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{tr('logement.rooms.laundry')}</Text>
           <Switch value={hasLaundry} onValueChange={setHasLaundry} trackColor={{ false: colors.border, true: colors.primary }} />
         </View>
+
+        <Text style={[styles.section, { color: colors.text2 }]}>{tr('beds.section').toUpperCase()}</Text>
+        <Text style={{ color: colors.text2, fontSize: FontSize.sm, marginBottom: Spacing.sm }}>
+          {tr('beds.hintLogement')}
+        </Text>
+        <RoomCounter label={tr('beds.simple')} value={nLitSimple} onChange={setNLitSimple} />
+        <RoomCounter label={tr('beds.double')} value={nLitDouble} onChange={setNLitDouble} />
+        <RoomCounter label={tr('beds.sofa')} value={nCanapeLit} onChange={setNCanapeLit} />
+        <RoomCounter label={tr('beds.extra')} value={nLitAppoint} onChange={setNLitAppoint} />
 
         <Text style={[styles.section, { color: colors.text2 }]}>CODE BOÎTE À CLEF</Text>
         <SecretCodeField

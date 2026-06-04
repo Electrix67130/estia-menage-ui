@@ -35,6 +35,7 @@ import {
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTranslation } from '@/contexts/I18nContext';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
 import { GestureDetector } from 'react-native-gesture-handler';
@@ -51,6 +52,7 @@ import { useLogement } from '@/api/hooks/useLogements';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/StatusBadge';
 import PhotoGallery from '@/components/PhotoGallery';
+import PhotoLightbox from '@/components/PhotoLightbox';
 import DatePickerField from '@/components/DatePickerField';
 import MenageDiscussions from '@/components/MenageDiscussions';
 import MenageCheckList from '@/components/MenageCheckList';
@@ -459,6 +461,8 @@ export default function MenageDetailScreen() {
         <PointageProofSection menage={menage} logement={logement} colors={colors} />
       ) : null}
 
+      <BedsSection menage={menage} colors={colors} />
+
       {/* Tabs */}
       <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
         {TABS.map((tab) => {
@@ -799,6 +803,58 @@ interface ProofView {
   distance: number | null;
 }
 
+function BedsSection({
+  menage,
+  colors,
+}: {
+  menage: Menage;
+  colors: typeof Colors.light;
+}) {
+  const { t } = useTranslation();
+  const total =
+    (menage.n_lit_simple ?? 0) +
+    (menage.n_lit_double ?? 0) +
+    (menage.n_canape_lit ?? 0) +
+    (menage.n_lit_appoint ?? 0);
+  if (total === 0) return null;
+  const items: { value: number; label: string }[] = [
+    { value: menage.n_lit_simple ?? 0, label: t('beds.simple') },
+    { value: menage.n_lit_double ?? 0, label: t('beds.double') },
+    { value: menage.n_canape_lit ?? 0, label: t('beds.sofa') },
+    { value: menage.n_lit_appoint ?? 0, label: t('beds.extra') },
+  ];
+  return (
+    <View style={{ paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm }}>
+      <Text style={{ color: colors.text2, fontSize: FontSize.xs, fontWeight: FontWeight.semibold, marginBottom: Spacing.xs, letterSpacing: 0.5 }}>
+        {t('beds.section').toUpperCase()}
+      </Text>
+      <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+        {items.map((it) => (
+          <View
+            key={it.label}
+            style={{
+              flex: 1,
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderWidth: 1,
+              borderRadius: 8,
+              paddingVertical: Spacing.sm,
+              alignItems: 'center',
+            }}
+          >
+            <Text style={{ color: colors.text, fontSize: FontSize.xl, fontWeight: FontWeight.bold }}>
+              {it.value}
+            </Text>
+            <Text style={{ color: colors.text2, fontSize: 11, marginTop: 2, textAlign: 'center' }}>
+              {it.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function PointageProofSection({
   menage,
   logement,
@@ -876,18 +932,14 @@ function PointageProofSection({
         {renderProof(buildProof('Départ', menage.departure_photo_url, menage.departure_lat, menage.departure_lng, menage.departed_at))}
       </View>
 
-      <Modal visible={!!lightbox} transparent animationType="fade" onRequestClose={() => setLightbox(null)}>
-        <View style={proofStyles.lightboxOverlay}>
-          <View style={proofStyles.lightboxHeader}>
-            <Text style={proofStyles.lightboxTitle}>
-              {lightbox?.label}
-              {lightbox?.at ? ` · ${formatDateFr(lightbox.at, 'time')}` : ''}
-            </Text>
-          </View>
-          {lightbox ? (
-            <Image source={{ uri: lightbox.photoUrl }} style={proofStyles.lightboxImage} resizeMode="contain" />
-          ) : null}
-          {lightbox?.lat != null && lightbox?.lng != null ? (
+      <PhotoLightbox
+        visible={!!lightbox}
+        onClose={() => setLightbox(null)}
+        photoUrl={lightbox?.photoUrl ?? null}
+        title={lightbox?.label}
+        subtitle={lightbox?.at ? formatDateFr(lightbox.at, 'time') : undefined}
+        footer={
+          lightbox?.lat != null && lightbox?.lng != null ? (
             <TouchableOpacity
               style={proofStyles.mapBtn}
               onPress={() =>
@@ -902,9 +954,9 @@ function PointageProofSection({
                 {lightbox.distance != null ? ` · ${formatDistance(lightbox.distance)} du logement` : ''}
               </Text>
             </TouchableOpacity>
-          ) : null}
-        </View>
-      </Modal>
+          ) : null
+        }
+      />
     </View>
   );
 }
@@ -1240,21 +1292,6 @@ const proofStyles = StyleSheet.create({
     borderRadius: Radius.pill,
     alignSelf: 'flex-start',
   },
-  lightboxOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.92)',
-    paddingTop: 60,
-    paddingBottom: 40,
-    paddingHorizontal: Spacing.lg,
-    gap: Spacing.md,
-  },
-  lightboxHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  lightboxTitle: { color: '#FFFFFF', fontSize: FontSize.md, fontWeight: FontWeight.semibold },
-  lightboxImage: { flex: 1, width: '100%', borderRadius: Radius.md },
   mapBtn: {
     flexDirection: 'row',
     alignItems: 'center',

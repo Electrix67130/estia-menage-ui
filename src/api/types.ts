@@ -102,6 +102,10 @@ export interface Logement {
   n_kitchens: number;
   n_living_rooms: number;
   n_exterior_spaces: number;
+  n_lit_simple: number;
+  n_lit_double: number;
+  n_canape_lit: number;
+  n_lit_appoint: number;
   has_basement: boolean;
   has_laundry: boolean;
   surface_m2: number | null;
@@ -148,6 +152,10 @@ export interface CreateLogementInput {
   n_kitchens?: number;
   n_living_rooms?: number;
   n_exterior_spaces?: number;
+  n_lit_simple?: number;
+  n_lit_double?: number;
+  n_canape_lit?: number;
+  n_lit_appoint?: number;
   has_basement?: boolean;
   has_laundry?: boolean;
   surface_m2?: number;
@@ -213,6 +221,10 @@ export interface Menage {
   laundry_included?: boolean;
   laundry_client_price_ht?: number | string | null;
   laundry_provider_price?: number | string | null;
+  n_lit_simple: number;
+  n_lit_double: number;
+  n_canape_lit: number;
+  n_lit_appoint: number;
   validated_at: string | null;
   validated_by: string | null;
   validated_price: number | string | null;
@@ -233,6 +245,8 @@ export interface Menage {
   logement_color?: string | null;
   /** True s'il existe au moins une demande de report `pending` sur ce ménage. */
   has_pending_reschedule?: boolean;
+  /** Calculé côté API : jour passé + aucun pointage + statut a_venir. */
+  needs_attention?: boolean;
 }
 
 /** Libellé d'origine d'un ménage pour affichage (badge). */
@@ -263,6 +277,10 @@ export interface CreateMenageInput {
   laundry_included?: boolean;
   laundry_client_price_ht?: number;
   laundry_provider_price?: number;
+  n_lit_simple?: number;
+  n_lit_double?: number;
+  n_canape_lit?: number;
+  n_lit_appoint?: number;
   notes_intervention?: string;
 }
 
@@ -280,6 +298,10 @@ export interface UpdateMenageInput {
   laundry_included?: boolean;
   laundry_client_price_ht?: number | null;
   laundry_provider_price?: number | null;
+  n_lit_simple?: number;
+  n_lit_double?: number;
+  n_canape_lit?: number;
+  n_lit_appoint?: number;
   notes_intervention?: string | null;
   status?: MenageStatus;
   arrived_at?: string | null;

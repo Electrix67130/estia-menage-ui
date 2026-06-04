@@ -15,7 +15,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Search, X, AlertTriangle } from 'lucide-react-native';
 import { useMenages } from '@/api/hooks/useMenages';
 import { useAllUsers } from '@/api/hooks/useLogementMembers';
 import { useLogements } from '@/api/hooks/useLogements';
@@ -23,6 +23,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, FontSize, FontWeight, Radius, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
+import { usePersistedState } from '@/hooks/usePersistedState';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Menage, MenageStatus } from '@/api/types';
 import { menagePrestataireLabel, menageLogementLabel } from '@/api/types';
@@ -75,8 +76,14 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
     void allUsers.refetch();
   }, [refetch, allUsers]);
 
-  const [prestataireFilter, setPrestataireFilter] = useState<string>(PRESTATAIRE_ALL);
-  const [logementFilter, setLogementFilter] = useState<string>(LOGEMENT_ALL);
+  const [prestataireFilter, setPrestataireFilter] = usePersistedState<string>(
+    'calendar.filter.prestataire',
+    PRESTATAIRE_ALL,
+  );
+  const [logementFilter, setLogementFilter] = usePersistedState<string>(
+    'calendar.filter.logement',
+    LOGEMENT_ALL,
+  );
   const [prestataireSheetOpen, setPrestataireSheetOpen] = useState(false);
   const [logementSheetOpen, setLogementSheetOpen] = useState(false);
 
@@ -364,12 +371,16 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         ) : (
           selectedItems.map((m) => {
             const unassigned = !m.prestataire_user_id;
+            const needsAttention = !!m.needs_attention;
             return (
               <TouchableOpacity
                 key={m.id}
                 style={[
                   styles.itemRow,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
+                  {
+                    backgroundColor: needsAttention ? colors.red + '12' : colors.surface,
+                    borderColor: needsAttention ? colors.red + '55' : colors.border,
+                  },
                 ]}
                 onPress={() => router.push(`/menage/${m.id}` as never)}
                 activeOpacity={0.7}
@@ -387,6 +398,15 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
                     <Text style={{ color: colors.text2 }}>{menageLogementLabel(m)}</Text>
                   </Text>
                   <View style={styles.itemMetaRow}>
+                    {needsAttention ? (
+                      <View
+                        style={[styles.badgeLate, { backgroundColor: colors.red + '20' }]}
+                        accessibilityLabel="Jour passé sans pointage"
+                      >
+                        <AlertTriangle size={11} color={colors.red} />
+                        <Text style={[styles.badgeLateText, { color: colors.red }]}>Non pointé</Text>
+                      </View>
+                    ) : null}
                     {unassigned ? (
                       <View style={styles.badgeUnassigned}>
                         <Text style={styles.badgeUnassignedText}>NON ASSIGNÉ</Text>
@@ -662,6 +682,20 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     fontWeight: FontWeight.bold,
     color: '#9A3412',
+    letterSpacing: 0.5,
+  },
+  badgeLate: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+    marginRight: Spacing.xs,
+  },
+  badgeLateText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
     letterSpacing: 0.5,
   },
 });

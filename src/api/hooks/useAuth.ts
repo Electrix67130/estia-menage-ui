@@ -134,8 +134,6 @@ export interface CreateOrganizationInput {
   phone?: string | null;
   billing_email?: string | null;
   website?: string | null;
-  insurance_provider?: string | null;
-  insurance_number?: string | null;
 }
 
 export function useCreateOrganization() {

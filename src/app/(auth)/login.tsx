@@ -57,7 +57,7 @@ export default function LoginScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <EstiaLogo size={80} color={colors.primary} />
+            <EstiaLogo size={200} color={colors.primary} />
             <Text style={[styles.subtitle, { color: colors.text2 }]}>Gestion de menages</Text>
           </View>
 

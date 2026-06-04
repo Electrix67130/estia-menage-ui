@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Clock, Lock } from 'lucide-react-native';
+import { Clock, Lock, AlertTriangle } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -27,6 +27,7 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected })
   const year = menage.date_prevue.slice(0, 4);
   const time = menage.horaire_prevu ? menage.horaire_prevu.slice(0, 5) : null;
   const duration = menage.duree_estimee_min ? formatDurationMin(menage.duree_estimee_min) : null;
+  const needsAttention = !!menage.needs_attention;
 
   return (
     <TouchableOpacity
@@ -34,10 +35,13 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected })
         styles.card,
         Shadow.sm,
         {
-          backgroundColor: colors.surface,
+          backgroundColor: needsAttention && !selected ? colors.red + '12' : colors.surface,
           borderColor: selected ? colors.primary : colors.border,
           borderWidth: selected ? 2 : 1,
         },
+        needsAttention && !selected
+          ? { borderLeftColor: colors.red, borderLeftWidth: 3 }
+          : null,
       ]}
       onPress={() => onPress(menage.id)}
       onLongPress={() => onLongPress?.(menage)}
@@ -69,6 +73,15 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected })
             </Text>
           </View>
           <View style={styles.badgesRow}>
+            {needsAttention ? (
+              <View
+                style={[styles.lateBadge, { backgroundColor: colors.red + '20' }]}
+                accessibilityLabel="Jour passé sans pointage"
+              >
+                <AlertTriangle size={11} color={colors.red} />
+                <Text style={[styles.lateBadgeText, { color: colors.red }]}>Non pointé</Text>
+              </View>
+            ) : null}
             {menage.has_pending_reschedule ? (
               <View
                 style={[styles.reschedulePill, { backgroundColor: colors.statusEnCours + '25' }]}
@@ -127,7 +140,21 @@ const styles = StyleSheet.create({
   logementRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, flex: 1 },
   logementDot: { width: 10, height: 10, borderRadius: 5 },
   logement: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, flex: 1, letterSpacing: -0.2 },
-  badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 },
+  lateBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+  },
+  lateBadgeText: {
+    fontSize: 9,
+    fontWeight: FontWeight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   reschedulePill: {
     width: 22,
     height: 22,

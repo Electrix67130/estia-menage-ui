@@ -15,6 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "fr.estiamenage.app",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Nous avons besoin d'accéder à vos photos pour les ajouter aux ménages.",
         "NSCameraUsageDescription": "Nous avons besoin de la caméra pour prendre des photos lors des prestations.",
@@ -22,6 +23,7 @@
       }
     },
     "android": {
+      "package": "fr.estiamenage.app",
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/images/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"

@@ -31,6 +31,8 @@ import {
   RefreshCw,
   MapPin,
   Lock,
+  PackageCheck,
+  AlertTriangle,
 } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
@@ -49,6 +51,11 @@ import {
 } from '@/api/hooks/useMenageResponses';
 import { useCreateRescheduleRequest } from '@/api/hooks/useReschedule';
 import { useLogement } from '@/api/hooks/useLogements';
+import {
+  useMenageConsommables,
+  useSetMenageConsommables,
+  type ConsommableLine,
+} from '@/api/hooks/useConsommables';
 import { useAuth } from '@/contexts/AuthContext';
 import StatusBadge from '@/components/StatusBadge';
 import PhotoGallery from '@/components/PhotoGallery';
@@ -101,6 +108,9 @@ export default function MenageDetailScreen() {
   const [proposedTime, setProposedTime] = useState('');
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [showPointageModal, setShowPointageModal] = useState(false);
+  const [showConsommables, setShowConsommables] = useState(false);
+  const consommables = useMenageConsommables(id);
+  const hasConsommables = (consommables.data?.length ?? 0) > 0;
   const validateModalStyle = useKeyboardAwareModalStyle({ visible: showValidateModal });
   const rescheduleModalStyle = useKeyboardAwareModalStyle({ visible: showRescheduleModal });
   const validateSwipe = useSwipeToClose(() => setShowValidateModal(false), showValidateModal);
@@ -143,7 +153,7 @@ export default function MenageDetailScreen() {
         (kind === 'arrival' ? 'Le statut passera à "en cours".' : 'Le statut passera à "terminé".'),
       confirmLabel: 'Prendre la photo',
     });
-    if (!ok) return;
+    if (!ok) return false;
     // iOS ne présente pas deux modals natifs en même temps : on attend que la
     // modal de confirmation soit totalement fermée avant d'ouvrir la caméra,
     // sinon `launchCameraAsync` échoue silencieusement. 650ms = marge sûre même
@@ -152,21 +162,30 @@ export default function MenageDetailScreen() {
     try {
       const { photoUrl, lat, lng } = await captureGeoPhoto();
       await mutateAsync({ id: id!, photo_url: photoUrl, lat, lng });
+      return true;
     } catch (err) {
       if (err instanceof GeoPhotoError) {
-        if (err.code === 'cancelled') return;
+        if (err.code === 'cancelled') return false;
         void dialog.alert({ title: 'Pointage impossible', message: err.message });
-        return;
+        return false;
       }
       void dialog.alert({
         title: 'Erreur',
         message: err instanceof Error ? err.message : 'Échec du pointage',
       });
+      return false;
     }
   };
 
   const handleArrival = () => runPointage('arrival', arrivalMutation.mutateAsync);
-  const handleDeparture = () => runPointage('departure', departureMutation.mutateAsync);
+  const handleDeparture = async () => {
+    const ok = await runPointage('departure', departureMutation.mutateAsync);
+    // Après le pointage de fin, on invite le presta à relever les consommables.
+    if (ok && hasConsommables) {
+      await new Promise((r) => setTimeout(r, 400));
+      setShowConsommables(true);
+    }
+  };
 
   const handleValidate = async () => {
     // Pas de dialog.confirm ici : on est déjà DANS la modal de validation
@@ -394,6 +413,17 @@ export default function MenageDetailScreen() {
           >
             <Square size={IconSize.md} color="#FFFFFF" />
             <Text style={styles.actionText}>Pointer le départ</Text>
+          </TouchableOpacity>
+        ) : null}
+        {hasConsommables && (isPrestataire || isAdmin) ? (
+          <TouchableOpacity
+            style={[styles.actionBtnOutline, { borderColor: colors.border }]}
+            onPress={() => setShowConsommables(true)}
+          >
+            <PackageCheck size={IconSize.md} color={colors.primary} />
+            <Text style={[styles.actionText, { color: colors.primary }]}>
+              Relevé des consommables
+            </Text>
           </TouchableOpacity>
         ) : null}
         {canRequestReschedule ? (
@@ -687,7 +717,148 @@ export default function MenageDetailScreen() {
         menage={menage}
         onClose={() => setShowPointageModal(false)}
       />
+
+      <ConsommablesReleveModal
+        visible={showConsommables}
+        menageId={menage.id}
+        onClose={() => setShowConsommables(false)}
+      />
     </SafeAreaView>
+  );
+}
+
+/**
+ * Relevé des consommables au pointage de fin : le presta saisit la quantité
+ * restante de chaque consommable (0 = rupture). La quantité est obligatoire.
+ */
+function ConsommablesReleveModal({
+  visible,
+  menageId,
+  onClose,
+}: {
+  visible: boolean;
+  menageId: string;
+  onClose: () => void;
+}) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const dialog = useDialog();
+  const consommables = useMenageConsommables(visible ? menageId : undefined);
+  const setReleve = useSetMenageConsommables(menageId);
+  const [qty, setQty] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!visible || !consommables.data) return;
+    const init: Record<string, string> = {};
+    for (const c of consommables.data) {
+      init[c.logement_consommable_id] = c.qty === null ? '' : String(c.qty);
+    }
+    setQty(init);
+  }, [visible, consommables.data]);
+
+  const lines = consommables.data ?? [];
+
+  const handleSave = async () => {
+    const items: { logement_consommable_id: string; qty: number }[] = [];
+    for (const c of lines) {
+      const raw = (qty[c.logement_consommable_id] ?? '').trim();
+      const n = parseInt(raw, 10);
+      if (raw === '' || Number.isNaN(n) || n < 0) {
+        void dialog.alert({
+          title: 'Quantité manquante',
+          message: `Indique la quantité restante pour « ${c.label} » (0 s'il n'en reste plus).`,
+        });
+        return;
+      }
+      items.push({ logement_consommable_id: c.logement_consommable_id, qty: n });
+    }
+    try {
+      await setReleve.mutateAsync(items);
+      onClose();
+    } catch (err) {
+      void dialog.alert({
+        title: 'Erreur',
+        message: err instanceof Error ? err.message : 'Échec de l’enregistrement',
+      });
+    }
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.consoSheet, { backgroundColor: colors.surface }]}>
+          <View style={styles.consoHeader}>
+            <Text style={[styles.consoTitle, { color: colors.text }]}>Relevé des consommables</Text>
+            <TouchableOpacity onPress={onClose} hitSlop={8}>
+              <X size={22} color={colors.text2} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[styles.consoSub, { color: colors.text2 }]}>
+            Indique la quantité restante de chaque consommable (0 = rupture).
+          </Text>
+
+          {consommables.isLoading ? (
+            <ActivityIndicator color={colors.primary} style={{ marginVertical: Spacing.lg }} />
+          ) : lines.length === 0 ? (
+            <Text style={{ color: colors.mutedText, paddingVertical: Spacing.md }}>
+              Aucun consommable pour ce logement.
+            </Text>
+          ) : (
+            <ScrollView style={{ maxHeight: 380 }}>
+              {lines.map((c: ConsommableLine) => {
+                const val = qty[c.logement_consommable_id] ?? '';
+                const n = parseInt(val, 10);
+                const low = val.trim() !== '' && !Number.isNaN(n) && n <= c.seuil_alerte;
+                return (
+                  <View key={c.logement_consommable_id} style={[styles.consoRow, { borderColor: colors.border }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.text, fontWeight: FontWeight.semibold }}>{c.label}</Text>
+                      <Text style={{ color: colors.text2, fontSize: FontSize.xs }}>
+                        Seuil : {c.seuil_alerte}
+                        {c.unit ? ` ${c.unit}` : ''}
+                      </Text>
+                    </View>
+                    {low ? (
+                      <AlertTriangle size={16} color={colors.red} style={{ marginRight: 6 }} />
+                    ) : null}
+                    <TextInput
+                      style={[
+                        styles.consoInput,
+                        { color: colors.text, borderColor: low ? colors.red : colors.border },
+                      ]}
+                      keyboardType="number-pad"
+                      value={val}
+                      onChangeText={(t) =>
+                        setQty((prev) => ({ ...prev, [c.logement_consommable_id]: t.replace(/[^0-9]/g, '') }))
+                      }
+                      placeholder="0"
+                      placeholderTextColor={colors.mutedText}
+                    />
+                    {c.unit ? (
+                      <Text style={{ color: colors.text2, fontSize: FontSize.xs, width: 56 }} numberOfLines={1}>
+                        {c.unit}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })}
+            </ScrollView>
+          )}
+
+          {lines.length > 0 ? (
+            <TouchableOpacity
+              style={[styles.consoSaveBtn, { backgroundColor: colors.primary }]}
+              onPress={handleSave}
+              disabled={setReleve.isPending}
+            >
+              <Text style={styles.actionText}>
+                {setReleve.isPending ? 'Enregistrement…' : 'Enregistrer le relevé'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
@@ -1446,6 +1617,48 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   actionText: { color: '#FFFFFF', fontWeight: FontWeight.semibold, fontSize: FontSize.sm },
+  actionBtnOutline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+  },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  consoSheet: {
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+    padding: Spacing.lg,
+    paddingBottom: Spacing.xl,
+    gap: Spacing.xs,
+  },
+  consoHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  consoTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.bold },
+  consoSub: { fontSize: FontSize.sm, marginBottom: Spacing.sm },
+  consoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  consoInput: {
+    width: 64,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    textAlign: 'center',
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
+  },
+  consoSaveBtn: {
+    marginTop: Spacing.md,
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.pill,
+  },
   timestamp: {
     flexDirection: 'row',
     alignItems: 'center',

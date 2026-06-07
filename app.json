@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Estia Menage",
-    "slug": "estia-menage",
+    "name": "Estia Clean Connect",
+    "slug": "estia-clean-connect",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./src/assets/images/icon.png",
-    "scheme": "estia-menage",
+    "scheme": "estia-clean-connect",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "fr.estiamenage.app",
+      "bundleIdentifier": "fr.estiacleanconnect.app",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Nous avons besoin d'accéder à vos photos pour les ajouter aux ménages.",
         "NSCameraUsageDescription": "Nous avons besoin de la caméra pour prendre des photos lors des prestations.",
@@ -23,7 +23,7 @@
       }
     },
     "android": {
-      "package": "fr.estiamenage.app",
+      "package": "fr.estiacleanconnect.app",
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/images/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"

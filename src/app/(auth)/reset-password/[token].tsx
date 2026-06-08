@@ -34,8 +34,8 @@ export default function ResetPasswordScreen() {
       setError('Veuillez entrer un nouveau mot de passe.');
       return;
     }
-    if (password.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères.');
+    if (password.length < 12 || !/\p{L}/u.test(password) || !/[0-9]/.test(password)) {
+      setError('Le mot de passe doit faire au moins 12 caractères et contenir une lettre et un chiffre.');
       return;
     }
     if (password !== confirmPassword) {
@@ -93,7 +93,7 @@ export default function ResetPasswordScreen() {
               <Text style={[styles.label, { color: colors.text }]}>Nouveau mot de passe</Text>
               <AutoScrollInput
                 style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
-                placeholder="8 caractères minimum"
+                placeholder="12 caractères, dont une lettre et un chiffre"
                 placeholderTextColor={colors.placeholder}
                 value={password}
                 onChangeText={setPassword}

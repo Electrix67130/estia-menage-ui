@@ -131,8 +131,8 @@ export default function ProfilScreen() {
 
   const handleChangePassword = async () => {
     setPasswordError('');
-    if (newPassword.length < 8) {
-      setPasswordError('Le mot de passe doit contenir au moins 8 caractères.');
+    if (newPassword.length < 12 || !/\p{L}/u.test(newPassword) || !/[0-9]/.test(newPassword)) {
+      setPasswordError('Le mot de passe doit faire au moins 12 caractères et contenir une lettre et un chiffre.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -546,7 +546,7 @@ export default function ProfilScreen() {
               value={newPassword}
               onChangeText={setNewPassword}
               secureTextEntry
-              placeholder="8 caractères minimum"
+              placeholder="12 caractères, dont une lettre et un chiffre"
               placeholderTextColor={colors.placeholder}
               accessibilityLabel="Nouveau mot de passe"
             />

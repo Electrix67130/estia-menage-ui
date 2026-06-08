@@ -79,8 +79,8 @@ export default function InviteScreen() {
       setFormError('Veuillez remplir les champs obligatoires.');
       return;
     }
-    if (password.length < 8) {
-      setFormError('Le mot de passe doit contenir au moins 8 caractères.');
+    if (password.length < 12 || !/\p{L}/u.test(password) || !/[0-9]/.test(password)) {
+      setFormError('Le mot de passe doit faire au moins 12 caractères et contenir une lettre et un chiffre.');
       return;
     }
 
@@ -189,7 +189,7 @@ export default function InviteScreen() {
             <Text style={[styles.label, { color: colors.text }]}>Mot de passe *</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
-              placeholder="8 caractères minimum"
+              placeholder="12 caractères, dont une lettre et un chiffre"
               placeholderTextColor={colors.placeholder}
               value={password}
               onChangeText={setPassword}

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useQueryClient } from '@tanstack/react-query';
 import { getAccessToken, clearTokens } from '@/api/client';
 import { useMe, useLogin, useRegister, useLogout } from '@/api/hooks/useAuth';
+import { unregisterPushToken } from '@/hooks/usePushRegistration';
 import type { MeResponse, LoginInput, RegisterInput } from '@/api/types';
 
 interface AuthContextValue {
@@ -56,6 +57,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    // Ne plus recevoir de push sur cet appareil après déconnexion.
+    await unregisterPushToken();
     try {
       await logoutMutation.mutateAsync();
     } catch {

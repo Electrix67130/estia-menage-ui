@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Estia Clean Connect",
-    "slug": "estia-clean-connect",
+    "slug": "estia-clean-connect-",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./src/assets/images/icon.png",
@@ -17,6 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "fr.estiacleanconnect.app",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Nous avons besoin d'accéder à vos photos pour les ajouter aux ménages.",
         "NSCameraUsageDescription": "Nous avons besoin de la caméra pour prendre des photos lors des prestations.",
         "NSLocationWhenInUseUsageDescription": "Nous avons besoin de votre position pour localiser les logements."
@@ -29,14 +30,15 @@
         "backgroundColor": "#FFFFFF"
       },
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -78,6 +80,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e6fd6612-b500-4dd1-b754-5f10e4479369"
+      }
+    },
+    "owner": "electrix67"
   }
 }

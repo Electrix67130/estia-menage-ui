@@ -5,13 +5,25 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { Asset } from 'expo-asset';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { I18nProvider } from '@/contexts/I18nContext';
 import { DialogProvider } from '@/contexts/DialogContext';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
+import { usePushRegistration } from '@/hooks/usePushRegistration';
 
 SplashScreen.preventAutoHideAsync();
+
+// Afficher les notifications même quand l'app est au premier plan.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,6 +48,24 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       logout();
     },
   });
+
+  // Notifications push : enregistrement du token une fois authentifié.
+  usePushRegistration(isAuthenticated);
+
+  // Au tap sur une notification → ouvrir le ménage concerné.
+  useEffect(() => {
+    const goToMenage = (response: Notifications.NotificationResponse | null) => {
+      const menageId = response?.notification.request.content.data?.menage_id;
+      if (typeof menageId === 'string') {
+        router.push(`/menage/${menageId}`);
+      }
+    };
+    // App lancée depuis une notification (cold start).
+    Notifications.getLastNotificationResponseAsync().then(goToMenage);
+    // App déjà ouverte / en arrière-plan.
+    const sub = Notifications.addNotificationResponseReceivedListener(goToMenage);
+    return () => sub.remove();
+  }, [router]);
 
   useEffect(() => {
     if (isLoading) return;

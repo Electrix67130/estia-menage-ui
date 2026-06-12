@@ -166,8 +166,6 @@ export default function InviteScreen() {
                 <Text style={[styles.label, { color: colors.text }]}>Prénom *</Text>
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
-                  placeholder="Julien"
-                  placeholderTextColor={colors.placeholder}
                   value={firstName}
                   onChangeText={setFirstName}
                   accessibilityLabel="Prénom"
@@ -177,8 +175,6 @@ export default function InviteScreen() {
                 <Text style={[styles.label, { color: colors.text }]}>Nom *</Text>
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
-                  placeholder="Dupont"
-                  placeholderTextColor={colors.placeholder}
                   value={lastName}
                   onChangeText={setLastName}
                   accessibilityLabel="Nom"
@@ -200,8 +196,6 @@ export default function InviteScreen() {
             <Text style={[styles.label, { color: colors.text }]}>Téléphone *</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
-              placeholder="06 12 34 56 78"
-              placeholderTextColor={colors.placeholder}
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, setTokens, clearTokens, getRefreshToken } from '../client';
 import type { LoginInput, RegisterInput, AuthResponse, MeResponse } from '../types';
+import { registerPushToken, unregisterPushToken } from '@/hooks/usePushRegistration';
 
 export function useMe(enabled: boolean) {
   return useQuery({
@@ -58,7 +59,16 @@ export function useUpdateProfile() {
 export function useUpdatePushPreference() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (enabled: boolean) => ({ push_enabled: enabled }),
+    // Active/désactive la réception des push sur CET appareil en
+    // enregistrant ou supprimant son device token côté API.
+    mutationFn: async (enabled: boolean) => {
+      if (enabled) {
+        await registerPushToken();
+      } else {
+        await unregisterPushToken();
+      }
+      return { push_enabled: enabled };
+    },
     onMutate: async (enabled) => {
       await queryClient.cancelQueries({ queryKey: ['auth', 'me'] });
       const previous = queryClient.getQueryData<MeResponse>(['auth', 'me']);

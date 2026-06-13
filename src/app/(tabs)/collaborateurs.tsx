@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, RefreshControl, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, RefreshControl, ActivityIndicator, Pressable, Image } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
@@ -187,10 +187,14 @@ export default function CollaborateursScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={[styles.avatar, { backgroundColor: roleColor + '20' }]}>
-                    <Text style={[styles.avatarText, { color: roleColor }]}>
-                      {item.first_name[0]}
-                      {item.last_name[0]}
-                    </Text>
+                    {item.avatar_url ? (
+                      <Image source={{ uri: item.avatar_url }} style={styles.avatarImage} />
+                    ) : (
+                      <Text style={[styles.avatarText, { color: roleColor }]}>
+                        {item.first_name[0]}
+                        {item.last_name[0]}
+                      </Text>
+                    )}
                   </View>
                   <View style={styles.info}>
                     <Text style={[styles.name, { color: colors.text }]}>
@@ -340,7 +344,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     borderWidth: 1,
   },
-  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarImage: { width: 44, height: 44, borderRadius: 22 },
   avatarText: { fontWeight: FontWeight.bold, fontSize: FontSize.md },
   info: { flex: 1 },
   name: { fontSize: FontSize.md, fontWeight: FontWeight.semibold },

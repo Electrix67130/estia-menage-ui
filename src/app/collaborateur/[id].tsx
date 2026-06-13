@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { useDialog } from '@/contexts/DialogContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -111,9 +112,13 @@ export default function CollaborateurDetailScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.identityRow}>
           <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-            <Text style={styles.avatarText}>
-              {(user.first_name?.[0] ?? '') + (user.last_name?.[0] ?? '')}
-            </Text>
+            {user.avatar_url ? (
+              <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>
+                {(user.first_name?.[0] ?? '') + (user.last_name?.[0] ?? '')}
+              </Text>
+            )}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.name, { color: colors.text }]}>
@@ -390,7 +395,9 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  avatarImage: { width: 56, height: 56, borderRadius: 28 },
   avatarText: { color: '#fff', fontSize: FontSize.xl, fontWeight: FontWeight.bold },
   name: { fontSize: FontSize.xl, fontWeight: FontWeight.bold },
   me: { fontSize: FontSize.sm, fontWeight: FontWeight.regular },

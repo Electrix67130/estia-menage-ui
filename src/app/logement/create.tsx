@@ -98,18 +98,10 @@ export default function CreateLogementScreen() {
   const [postalCode, setPostalCode] = useState('');
   const [latitude, setLatitude] = useState<number | undefined>();
   const [longitude, setLongitude] = useState<number | undefined>();
-  const [nBedrooms, setNBedrooms] = useState(1);
-  const [nBathrooms, setNBathrooms] = useState(1);
-  const [nWc, setNWc] = useState(1);
-  const [nKitchens, setNKitchens] = useState(1);
-  const [nLivingRooms, setNLivingRooms] = useState(1);
-  const [nExteriorSpaces, setNExteriorSpaces] = useState(0);
   const [nLitSimple, setNLitSimple] = useState(0);
   const [nLitDouble, setNLitDouble] = useState(0);
   const [nCanapeLit, setNCanapeLit] = useState(0);
   const [nLitAppoint, setNLitAppoint] = useState(0);
-  const [hasBasement, setHasBasement] = useState(false);
-  const [hasLaundry, setHasLaundry] = useState(false);
   const [notes, setNotes] = useState('');
   const [keySafeCode, setKeySafeCode] = useState('');
   const [surfaceM2, setSurfaceM2] = useState('');
@@ -152,18 +144,10 @@ export default function CreateLogementScreen() {
         postal_code: postalCode.trim() || undefined,
         latitude,
         longitude,
-        n_bedrooms: nBedrooms,
-        n_bathrooms: nBathrooms,
-        n_wc: nWc,
-        n_kitchens: nKitchens,
-        n_living_rooms: nLivingRooms,
-        n_exterior_spaces: nExteriorSpaces,
         n_lit_simple: nLitSimple,
         n_lit_double: nLitDouble,
         n_canape_lit: nCanapeLit,
         n_lit_appoint: nLitAppoint,
-        has_basement: hasBasement,
-        has_laundry: hasLaundry,
         surface_m2: surfaceM2.trim() ? parseIntOrUndef(surfaceM2) : undefined,
         notes: notes.trim() || undefined,
         key_safe_code: keySafeCode.trim() || undefined,
@@ -309,23 +293,6 @@ export default function CreateLogementScreen() {
             setCreateClientOpen(false);
           }}
         />
-
-        <Text style={[styles.section, { color: colors.text2 }]}>{tr('logement.rooms.section').toUpperCase()}</Text>
-        <RoomCounter label={tr('logement.rooms.bedrooms')} value={nBedrooms} onChange={setNBedrooms} />
-        <RoomCounter label={tr('logement.rooms.bathrooms')} value={nBathrooms} onChange={setNBathrooms} />
-        <RoomCounter label={tr('logement.rooms.wc')} value={nWc} onChange={setNWc} />
-        <RoomCounter label={tr('logement.rooms.kitchens')} value={nKitchens} onChange={setNKitchens} />
-        <RoomCounter label={tr('logement.rooms.livingRooms')} value={nLivingRooms} onChange={setNLivingRooms} />
-        <RoomCounter label={tr('logement.rooms.exteriorSpaces')} value={nExteriorSpaces} onChange={setNExteriorSpaces} />
-
-        <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{tr('logement.rooms.basement')}</Text>
-          <Switch value={hasBasement} onValueChange={setHasBasement} trackColor={{ false: colors.border, true: colors.primary }} />
-        </View>
-        <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{tr('logement.rooms.laundry')}</Text>
-          <Switch value={hasLaundry} onValueChange={setHasLaundry} trackColor={{ false: colors.border, true: colors.primary }} />
-        </View>
 
         <Text style={[styles.section, { color: colors.text2 }]}>{tr('beds.section').toUpperCase()}</Text>
         <Text style={{ color: colors.text2, fontSize: FontSize.sm, marginBottom: Spacing.sm }}>

@@ -425,6 +425,28 @@ export default function ProfilScreen() {
                 </>
               )}
 
+              {/* Réglages */}
+              <Text style={[styles.sectionTitle, { color: colors.text2 }]}>RÉGLAGES</Text>
+              <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <TouchableOpacity
+                  style={styles.notifRow}
+                  onPress={() => router.push('/notification-preferences' as never)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Notifications"
+                >
+                  <View style={[styles.notifIcon, { backgroundColor: colors.primary + '15' }]}>
+                    <Bell size={IconSize.md} color={colors.primary} />
+                  </View>
+                  <View style={styles.notifInfo}>
+                    <Text style={[styles.notifTitle, { color: colors.text }]}>Notifications</Text>
+                    <Text style={[styles.notifHint, { color: colors.mutedText }]}>
+                      Gérer les notifications que tu reçois
+                    </Text>
+                  </View>
+                  <ChevronRight size={IconSize.sm} color={colors.mutedText} />
+                </TouchableOpacity>
+              </View>
+
               {/* Settings — Apparence */}
               <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('profile.appearance')}</Text>
               <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>

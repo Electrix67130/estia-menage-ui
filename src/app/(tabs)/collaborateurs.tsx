@@ -5,14 +5,14 @@ import { GestureDetector } from 'react-native-gesture-handler';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
 import SheetHandle from '@/components/SheetHandle';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { UserPlus, Mail, X, Search, Plus, Building2 } from 'lucide-react-native';
+import { UserPlus, Mail, X, Search, Plus, Building2, RefreshCw, Trash2 } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useAllUsers } from '@/api/hooks/useLogementMembers';
-import { useInvitations, useCreateInvitation, useCancelInvitation } from '@/api/hooks/useInvitations';
+import { useInvitations, useCreateInvitation, useCancelInvitation, useResendInvitation } from '@/api/hooks/useInvitations';
 import { useClients, clientDisplayName } from '@/api/hooks/useClients';
 import { useAuth } from '@/contexts/AuthContext';
 import AppHeader from '@/components/AppHeader';
@@ -50,6 +50,7 @@ export default function CollaborateursScreen() {
   const invitationsQuery = useInvitations();
   const createInvitation = useCreateInvitation();
   const cancelInvitation = useCancelInvitation();
+  const resendInvitation = useResendInvitation();
   const clientsQuery = useClients();
 
   const [tab, setTab] = usePersistedState<Tab>('team.tab', 'members');
@@ -95,6 +96,26 @@ export default function CollaborateursScreen() {
     } catch (err) {
       void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Envoi impossible' });
     }
+  };
+
+  const pendingInvites = (invitationsQuery.data?.data ?? []).filter((i) => i.status === 'pending');
+
+  const handleResendInvite = async (id: string, email: string) => {
+    try {
+      await resendInvitation.mutateAsync(id);
+      void dialog.alert({ title: 'Invitation renvoyée', message: `${email} va recevoir un nouvel email.` });
+    } catch (err) {
+      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Renvoi impossible' });
+    }
+  };
+
+  const handleCancelInvite = async (id: string, email: string) => {
+    const ok = await dialog.confirm({
+      title: "Annuler l'invitation ?",
+      message: `L'invitation de ${email} sera supprimée.`,
+    });
+    if (!ok) return;
+    await cancelInvitation.mutateAsync(id);
   };
 
   return (
@@ -166,6 +187,46 @@ export default function CollaborateursScreen() {
             keyExtractor={(item) => item.id}
             contentContainerStyle={{ padding: Spacing.lg }}
             ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
+            ListHeaderComponent={
+              isAdmin && pendingInvites.length > 0 ? (
+                <View style={{ marginBottom: Spacing.lg, gap: Spacing.sm }}>
+                  <Text style={[styles.inviteSectionTitle, { color: colors.mutedText }]}>
+                    INVITATIONS EN ATTENTE
+                  </Text>
+                  {pendingInvites.map((inv) => (
+                    <View
+                      key={inv.id}
+                      style={[styles.inviteCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    >
+                      <Mail size={IconSize.md} color={colors.mutedText} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.inviteEmail, { color: colors.text }]} numberOfLines={1}>
+                          {inv.email}
+                        </Text>
+                        <Text style={[styles.inviteRole, { color: colors.mutedText }]}>
+                          {ROLE_LABELS[inv.role] || inv.role}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleResendInvite(inv.id, inv.email)}
+                        disabled={resendInvitation.isPending}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        accessibilityLabel="Renvoyer l'invitation"
+                      >
+                        <RefreshCw size={IconSize.md} color={colors.primary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleCancelInvite(inv.id, inv.email)}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        accessibilityLabel="Annuler l'invitation"
+                      >
+                        <Trash2 size={IconSize.md} color={colors.red} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
               <Text style={{ color: colors.mutedText, textAlign: 'center', marginTop: Spacing.xl }}>
                 Aucun membre.
@@ -348,6 +409,17 @@ const styles = StyleSheet.create({
   avatarImage: { width: 44, height: 44, borderRadius: 22 },
   avatarText: { fontWeight: FontWeight.bold, fontSize: FontSize.md },
   info: { flex: 1 },
+  inviteSectionTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, letterSpacing: 0.5 },
+  inviteCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+  },
+  inviteEmail: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
+  inviteRole: { fontSize: FontSize.xs, marginTop: 2 },
   name: { fontSize: FontSize.md, fontWeight: FontWeight.semibold },
   email: { fontSize: FontSize.sm, marginTop: 2 },
   roleBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 4, borderRadius: Radius.pill },

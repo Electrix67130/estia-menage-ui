@@ -31,6 +31,17 @@ export function useCreateInvitation() {
   });
 }
 
+export function useResendInvitation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<Invitation>(`/invitations/${id}/resend`, { method: 'POST' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invitations'] });
+    },
+  });
+}
+
 export function useCancelInvitation() {
   const queryClient = useQueryClient();
   return useMutation({

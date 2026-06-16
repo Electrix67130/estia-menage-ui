@@ -13,7 +13,7 @@ import Animated from 'react-native-reanimated';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Wallet, CheckCircle2, Building2, User as UserIcon, ChevronRight } from 'lucide-react-native';
+import { ArrowLeft, Wallet, CheckCircle2, Building2, User as UserIcon, ChevronRight, ChevronLeft } from 'lucide-react-native';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import SheetHandle from '@/components/SheetHandle';
@@ -25,34 +25,42 @@ import { Spacing, FontSize, FontWeight, Radius, IconSize } from '@/constants/Lay
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { formatDateFr, formatCurrencyFr } from '@/lib/date-fr';
 
-type Period = 'all' | 'this-month' | 'last-month' | 'this-year';
+type Granularity = 'week' | 'month' | 'year' | 'all';
 
-const PERIOD_OPTIONS: { key: Period; label: string }[] = [
-  { key: 'this-month', label: 'Ce mois-ci' },
-  { key: 'last-month', label: 'Mois dernier' },
-  { key: 'this-year', label: 'Cette année' },
+const PERIOD_OPTIONS: { key: Granularity; label: string }[] = [
+  { key: 'week', label: 'Semaine' },
+  { key: 'month', label: 'Mois' },
+  { key: 'year', label: 'Année' },
   { key: 'all', label: 'Tout' },
 ];
 
-function periodToRange(period: Period): { from?: string; to?: string } {
+const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** Bornes + libellé d'une période selon granularité et décalage (0 = courante). */
+function computeRange(g: Granularity, offset: number): { from?: string; to?: string; label: string } {
+  if (g === 'all') return { label: '' };
   const now = new Date();
-  const toIso = (d: Date) => d.toISOString().slice(0, 10);
-  if (period === 'this-month') {
-    const from = new Date(now.getFullYear(), now.getMonth(), 1);
-    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return { from: toIso(from), to: toIso(to) };
+  if (g === 'week') {
+    const dow = (now.getDay() + 6) % 7;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - dow + offset * 7);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    const f = (d: Date) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    return { from: ymd(monday), to: ymd(sunday), label: `${f(monday)} – ${f(sunday)} ${sunday.getFullYear()}` };
   }
-  if (period === 'last-month') {
-    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const to = new Date(now.getFullYear(), now.getMonth(), 0);
-    return { from: toIso(from), to: toIso(to) };
+  if (g === 'month') {
+    const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    const last = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+    return {
+      from: ymd(first),
+      to: ymd(last),
+      label: first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+    };
   }
-  if (period === 'this-year') {
-    const from = new Date(now.getFullYear(), 0, 1);
-    const to = new Date(now.getFullYear(), 11, 31);
-    return { from: toIso(from), to: toIso(to) };
-  }
-  return {};
+  const y = now.getFullYear() + offset;
+  return { from: `${y}-01-01`, to: `${y}-12-31`, label: String(y) };
 }
 
 export default function EarningsScreen() {
@@ -61,8 +69,12 @@ export default function EarningsScreen() {
   const colors = Colors[colorScheme];
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const [period, setPeriod] = usePersistedState<Period>('earnings.filter.period', 'this-month');
-  const range = periodToRange(period);
+  const [granularity, setGranularity] = usePersistedState<Granularity>(
+    'earnings.filter.granularity',
+    'month',
+  );
+  const [periodOffset, setPeriodOffset] = useState(0);
+  const range = computeRange(granularity, periodOffset);
   const earnings = useEarnings({ from: range.from, to: range.to });
   const adminEarnings = useAdminEarnings({ from: range.from, to: range.to }, isAdmin);
   const [detail, setDetail] = useState<{ kind: 'client' | 'presta'; id: string; name: string } | null>(null);
@@ -115,12 +127,15 @@ export default function EarningsScreen() {
           {PERIOD_OPTIONS.map((opt) => (
             <TouchableOpacity
               key={opt.key}
-              onPress={() => setPeriod(opt.key)}
+              onPress={() => {
+                setGranularity(opt.key);
+                setPeriodOffset(0);
+              }}
               style={[
                 styles.filterChip,
                 {
                   backgroundColor:
-                    period === opt.key ? colors.primary : colors.surface,
+                    granularity === opt.key ? colors.primary : colors.surface,
                   borderColor: colors.border,
                 },
               ]}
@@ -129,7 +144,7 @@ export default function EarningsScreen() {
                 style={[
                   styles.filterChipLabel,
                   {
-                    color: period === opt.key ? '#fff' : colors.text,
+                    color: granularity === opt.key ? '#fff' : colors.text,
                   },
                 ]}
               >
@@ -138,6 +153,33 @@ export default function EarningsScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {granularity !== 'all' ? (
+          <View style={styles.periodNav}>
+            <TouchableOpacity
+              onPress={() => setPeriodOffset((o) => o - 1)}
+              style={[styles.periodNavBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              accessibilityLabel="Période précédente"
+            >
+              <ChevronLeft size={IconSize.md} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.periodNavLabel, { color: colors.text }]} numberOfLines={1}>
+              {range.label}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setPeriodOffset((o) => o + 1)}
+              style={[styles.periodNavBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              accessibilityLabel="Période suivante"
+            >
+              <ChevronRight size={IconSize.md} color={colors.text} />
+            </TouchableOpacity>
+            {periodOffset !== 0 ? (
+              <TouchableOpacity onPress={() => setPeriodOffset(0)} style={styles.periodNavToday}>
+                <Text style={[styles.periodNavTodayLabel, { color: colors.primary }]}>Aujourd&apos;hui</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        ) : null}
 
         {isAdmin ? (
           <AdminBreakdown
@@ -449,6 +491,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   filterChipLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
+  periodNav: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm },
+  periodNavBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  periodNavLabel: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    textTransform: 'capitalize',
+  },
+  periodNavToday: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs },
+  periodNavTodayLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   sectionTitle: {
     fontSize: FontSize.xs,
     textTransform: 'uppercase',

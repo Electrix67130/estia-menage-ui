@@ -5,7 +5,7 @@ import { useDialog } from '@/contexts/DialogContext';
 import Animated, { LinearTransition, FadeInLeft, FadeOutLeft, FadeInDown, FadeOutUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Plus, Trash2, X, Check, List, MapIcon, CalendarClock } from 'lucide-react-native';
+import { Plus, Trash2, X, Check, List, MapIcon, CalendarClock, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -76,10 +76,38 @@ function AdminMenagesScreen() {
   const [prestaFilter, setPrestaFilter] = usePersistedState('menages.filter.presta', '');
   const [creatorFilter, setCreatorFilter] = usePersistedState('menages.filter.creator', '');
   const [openPicker, setOpenPicker] = useState<null | 'logement' | 'presta' | 'creator'>(null);
-  const [periodFilter, setPeriodFilter] = usePersistedState<'week' | 'month' | 'all'>(
+  const [periodFilter, setPeriodFilter] = usePersistedState<'week' | 'month' | 'year' | 'all'>(
     'menages.filter.period',
     'all',
   );
+  const [periodOffset, setPeriodOffset] = useState(0);
+
+  const period = React.useMemo<{ min: string | null; max: string | null; label: string }>(() => {
+    if (periodFilter === 'all') return { min: null, max: null, label: '' };
+    const ymd = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const now = new Date();
+    if (periodFilter === 'week') {
+      const dow = (now.getDay() + 6) % 7;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - dow + periodOffset * 7);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const f = (d: Date) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+      return { min: ymd(monday), max: ymd(sunday), label: `${f(monday)} – ${f(sunday)} ${sunday.getFullYear()}` };
+    }
+    if (periodFilter === 'month') {
+      const first = new Date(now.getFullYear(), now.getMonth() + periodOffset, 1);
+      const last = new Date(now.getFullYear(), now.getMonth() + periodOffset + 1, 0);
+      return {
+        min: ymd(first),
+        max: ymd(last),
+        label: first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+      };
+    }
+    const y = now.getFullYear() + periodOffset;
+    return { min: `${y}-01-01`, max: `${y}-12-31`, label: String(y) };
+  }, [periodFilter, periodOffset]);
 
   // Filtre "À valider" = ménages terminés sans validation
   const isToValidate = statusFilter === 'to_validate';
@@ -106,23 +134,8 @@ function AdminMenagesScreen() {
     const q = searchQuery.trim().toLowerCase();
     const todayDate = new Date();
     const today = todayDate.toISOString().slice(0, 10);
-    let periodMin: string | null = null;
-    let periodMax: string | null = null;
-    if (periodFilter === 'week') {
-      const d = new Date(todayDate);
-      const dow = (d.getDay() + 6) % 7; // 0 = lundi
-      const monday = new Date(d);
-      monday.setDate(d.getDate() - dow);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      periodMin = monday.toISOString().slice(0, 10);
-      periodMax = sunday.toISOString().slice(0, 10);
-    } else if (periodFilter === 'month') {
-      const y = todayDate.getFullYear();
-      const m = todayDate.getMonth();
-      periodMin = new Date(y, m, 1).toISOString().slice(0, 10);
-      periodMax = new Date(y, m + 1, 0).toISOString().slice(0, 10);
-    }
+    const periodMin = period.min;
+    const periodMax = period.max;
     return all
       .filter((m) => {
         if (q && !menageLogementLabel(m).toLowerCase().includes(q)) return false;
@@ -153,7 +166,7 @@ function AdminMenagesScreen() {
         if (!aUp && !bUp) return bd.localeCompare(ad);
         return aUp ? -1 : 1;
       });
-  }, [menagesQuery.data, searchQuery, logementFilter, prestaFilter, creatorFilter, periodFilter]);
+  }, [menagesQuery.data, searchQuery, logementFilter, prestaFilter, creatorFilter, period.min, period.max]);
   const isLoading = menagesQuery.isLoading;
 
   // Options pour les pickers.
@@ -417,6 +430,7 @@ function AdminMenagesScreen() {
             {([
               { key: 'week' as const, label: 'Semaine' },
               { key: 'month' as const, label: 'Mois' },
+              { key: 'year' as const, label: 'Année' },
               { key: 'all' as const, label: 'Tout' },
             ]).map((p) => {
               const active = periodFilter === p.key;
@@ -427,7 +441,10 @@ function AdminMenagesScreen() {
                     styles.periodTab,
                     { backgroundColor: active ? colors.surface : 'transparent' },
                   ]}
-                  onPress={() => setPeriodFilter(p.key)}
+                  onPress={() => {
+                    setPeriodFilter(p.key);
+                    setPeriodOffset(0);
+                  }}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: active }}
                 >
@@ -446,6 +463,32 @@ function AdminMenagesScreen() {
               );
             })}
           </View>
+          {periodFilter !== 'all' ? (
+            <View style={styles.periodNav}>
+              <TouchableOpacity
+                onPress={() => setPeriodOffset((o) => o - 1)}
+                style={[styles.periodNavBtn, { backgroundColor: colors.itemBackground }]}
+                accessibilityLabel="Période précédente"
+              >
+                <ChevronLeft size={IconSize.md} color={colors.text} />
+              </TouchableOpacity>
+              <Text style={[styles.periodNavLabel, { color: colors.text }]} numberOfLines={1}>
+                {period.label}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setPeriodOffset((o) => o + 1)}
+                style={[styles.periodNavBtn, { backgroundColor: colors.itemBackground }]}
+                accessibilityLabel="Période suivante"
+              >
+                <ChevronRight size={IconSize.md} color={colors.text} />
+              </TouchableOpacity>
+              {periodOffset !== 0 ? (
+                <TouchableOpacity onPress={() => setPeriodOffset(0)} style={styles.periodNavToday}>
+                  <Text style={[styles.periodNavTodayLabel, { color: colors.primary }]}>Aujourd&apos;hui</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
           <FilterChips
             selected={statusFilter}
             onSelect={setStatusFilter}
@@ -606,6 +649,23 @@ const styles = StyleSheet.create({
   },
   reschedBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: FontWeight.bold },
   periodToggle: { flexDirection: 'row', padding: 4, borderRadius: Radius.pill, gap: 2 },
+  periodNav: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm },
+  periodNavBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  periodNavLabel: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.semibold,
+    textTransform: 'capitalize',
+  },
+  periodNavToday: { paddingHorizontal: Spacing.sm, paddingVertical: 4 },
+  periodNavTodayLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   periodTab: { flex: 1, alignItems: 'center', paddingVertical: Spacing.xs, borderRadius: Radius.pill },
   periodTabText: { fontSize: FontSize.sm },
   selectionBar: {

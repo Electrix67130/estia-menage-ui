@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../client';
 import type { PaginatedResponse } from '../types';
 
-interface Invitation {
+export interface Invitation {
   id: string;
   email: string;
   invited_by: string;

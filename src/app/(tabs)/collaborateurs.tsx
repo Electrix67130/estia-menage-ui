@@ -12,7 +12,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useAllUsers } from '@/api/hooks/useLogementMembers';
-import { useInvitations, useCreateInvitation, useCancelInvitation, useResendInvitation } from '@/api/hooks/useInvitations';
+import { useInvitations, useCreateInvitation, useCancelInvitation, useResendInvitation, type Invitation } from '@/api/hooks/useInvitations';
 import { useClients, clientDisplayName } from '@/api/hooks/useClients';
 import { useAuth } from '@/contexts/AuthContext';
 import AppHeader from '@/components/AppHeader';
@@ -98,7 +98,19 @@ export default function CollaborateursScreen() {
     }
   };
 
-  const pendingInvites = (invitationsQuery.data?.data ?? []).filter((i) => i.status === 'pending');
+  // Invitations en attente, dédupliquées par email (on garde la plus récente).
+  const pendingInvites = [
+    ...(invitationsQuery.data?.data ?? [])
+      .filter((i) => i.status === 'pending')
+      .reduce((map, inv) => {
+        const existing = map.get(inv.email);
+        if (!existing || new Date(inv.created_at) > new Date(existing.created_at)) {
+          map.set(inv.email, inv);
+        }
+        return map;
+      }, new Map<string, Invitation>())
+      .values(),
+  ];
 
   const handleResendInvite = async (id: string, email: string) => {
     try {

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Pressable, FlatList, StyleSheet, Modal, Keyboard, Platform, Animated, RefreshControl, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, TextInput, TouchableOpacity, Pressable, FlatList, StyleSheet, Modal, Keyboard, Platform, RefreshControl, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Reanimated from 'react-native-reanimated';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { Send, Trash2, Pencil, X } from 'lucide-react-native';
@@ -61,8 +61,6 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
   const animatedEditModalStyle = useKeyboardAwareModalStyle({ visible: isEditing });
 
   const flatListRef = useRef<FlatList>(null);
-  const keyboardPadding = useRef(new Animated.Value(0)).current;
-  const insets = useSafeAreaInsets();
   // Auto-scroll only quand l'utilisateur est deja proche du bas. Si il a scrolle pour relire
   // d'anciens messages, on respecte sa position (clavier qui s'ouvre, nouveau message, etc.).
   const isNearBottomRef = useRef(true);
@@ -76,39 +74,19 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
     isNearBottomRef.current = distanceFromBottom < NEAR_BOTTOM_THRESHOLD;
   }, []);
 
-  // Listen to keyboard events and animate padding
+  // La montée au-dessus du clavier est gérée par <KeyboardAvoidingView> (lib
+  // react-native-keyboard-controller, robuste cross-device/edge-to-edge). Ici on
+  // ne gère QUE le suivi de conversation : si on était déjà en bas, on recolle au
+  // dernier message à l'ouverture du clavier.
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      // Subtract bottom safe area + tab bar to avoid double spacing
-      const offset = e.endCoordinates.height - insets.bottom;
-      Animated.timing(keyboardPadding, {
-        toValue: Math.max(0, offset),
-        duration: Platform.OS === 'ios' ? e.duration : 200,
-        useNativeDriver: false,
-      }).start();
-      // Suit la conversation uniquement si on etait deja en bas — sinon on respecte
-      // la position de lecture de l'utilisateur.
+    const showSub = Keyboard.addListener(showEvent, () => {
       if (isNearBottomRef.current) {
         setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
       }
     });
-
-    const hideSub = Keyboard.addListener(hideEvent, () => {
-      Animated.timing(keyboardPadding, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: false,
-      }).start();
-    });
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, [keyboardPadding]);
+    return () => showSub.remove();
+  }, []);
 
   const handleSend = useCallback(async () => {
     if (!text.trim()) return;
@@ -185,7 +163,7 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
 
   return (
     <>
-      <Animated.View style={[styles.container, { paddingBottom: keyboardPadding }]}>
+      <KeyboardAvoidingView style={styles.container} behavior="padding" keyboardVerticalOffset={0}>
         <Pressable style={styles.flex} onPress={() => Keyboard.dismiss()}>
           <FlatList
             ref={flatListRef}
@@ -241,7 +219,7 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
             <Send size={IconSize.md} color={text.trim() ? '#FFFFFF' : colors.mutedText} />
           </TouchableOpacity>
         </View>}
-      </Animated.View>
+      </KeyboardAvoidingView>
 
       {/* Action sheet */}
       <Modal visible={!!selectedComment && !isEditing} transparent animationType="fade">

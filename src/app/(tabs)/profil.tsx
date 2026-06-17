@@ -13,7 +13,7 @@ import {
   Switch} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
-import { LogOut, User, Sun, Moon, Smartphone, Save, Mail, Phone, Building2, Check, Globe, Lock, KeyRound, X, Camera, Plus, ArrowRightLeft, Bell, FileText, ChevronRight, ExternalLink, Wallet } from 'lucide-react-native';
+import { LogOut, User, Sun, Moon, Smartphone, Save, Mail, Phone, Building2, Check, Globe, Lock, KeyRound, X, Camera, Plus, ArrowRightLeft, Bell, FileText, ChevronRight, ExternalLink, Wallet, Search, MapPin, Receipt } from 'lucide-react-native';
 import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { DASHBOARD_CREATE_ORG_URL } from '@/constants/Urls';
@@ -32,6 +32,7 @@ import { useTranslation } from '@/contexts/I18nContext';
 import { LOCALES, Locale } from '@/i18n/translations';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateProfile, useUpdatePassword, useSwitchOrganization, useCreateOrganization } from '@/api/hooks/useAuth';
+import { useCompanyLookup } from '@/api/hooks/useCompanyLookup';
 import { Colors } from '@/constants/Colors';
 import AppHeader from '@/components/AppHeader';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
@@ -59,6 +60,7 @@ export default function ProfilScreen() {
   const updatePassword = useUpdatePassword();
   const switchOrg = useSwitchOrganization();
   const createOrg = useCreateOrganization();
+  const companyLookup = useCompanyLookup();
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
@@ -74,6 +76,9 @@ export default function ProfilScreen() {
   const [phone, setPhone] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [providerCompany, setProviderCompany] = useState('');
+  const [providerSiret, setProviderSiret] = useState('');
+  const [providerVat, setProviderVat] = useState('');
+  const [providerAddress, setProviderAddress] = useState('');
   const [savedFlash, setSavedFlash] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -96,6 +101,9 @@ export default function ProfilScreen() {
       setPhone(user.phone || '');
       setCompanyName(user.company_name || '');
       setProviderCompany(user.provider_company || '');
+      setProviderSiret(user.provider_siret || '');
+      setProviderVat(user.provider_vat_number || '');
+      setProviderAddress(user.provider_address || '');
     }
   }, [user]);
 
@@ -128,11 +136,34 @@ export default function ProfilScreen() {
         phone: phone.trim() || undefined,
         ...(user.role === 'admin'
           ? { company_name: companyName.trim() || undefined }
-          : { provider_company: providerCompany.trim() || null }),
+          : {
+              provider_company: providerCompany.trim() || null,
+              provider_siret: providerSiret.trim() || null,
+              provider_vat_number: providerVat.trim() || null,
+              provider_address: providerAddress.trim() || null,
+            }),
       },
     });
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 2000);
+  };
+
+  // Lookup SIRET → pré-remplit raison sociale, adresse et n° TVA.
+  const handleSiretLookup = async () => {
+    const siret = providerSiret.replace(/\s/g, '');
+    if (!/^\d{14}$/.test(siret)) {
+      void dialog.alert({ title: 'SIRET invalide', message: 'Le SIRET doit comporter 14 chiffres.' });
+      return;
+    }
+    try {
+      const r = await companyLookup.mutateAsync(siret);
+      setProviderCompany(r.name || providerCompany);
+      setProviderAddress(r.address || providerAddress);
+      setProviderVat(r.vat_number || providerVat);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Entreprise introuvable';
+      void dialog.alert({ title: 'Introuvable', message: msg });
+    }
   };
 
   const handleChangePassword = async () => {
@@ -165,7 +196,10 @@ export default function ProfilScreen() {
     phone !== (user.phone || '') ||
     (user.role === 'admin'
       ? companyName !== (user.company_name || '')
-      : providerCompany !== (user.provider_company || ''))
+      : providerCompany !== (user.provider_company || '') ||
+        providerSiret !== (user.provider_siret || '') ||
+        providerVat !== (user.provider_vat_number || '') ||
+        providerAddress !== (user.provider_address || ''))
   );
 
   return (
@@ -267,27 +301,101 @@ export default function ProfilScreen() {
                   />
                 </View>
 
-                <Text style={[styles.label, { color: colors.text2 }]}>{t('auth.company')}</Text>
-                <View style={styles.inputRow}>
-                  <Building2 size={IconSize.md} color={colors.mutedText} style={styles.inputIcon} />
-                  <AutoScrollInput
-                    style={[styles.inputWithIcon, {
-                      backgroundColor: colors.itemBackground,
-                      color: colors.text,
-                      borderColor: colors.border,
-                    }]}
-                    value={user.role === 'admin' ? companyName : providerCompany}
-                    onChangeText={user.role === 'admin' ? setCompanyName : setProviderCompany}
-                    editable
-                    placeholder={user.role === 'admin' ? 'EIFFAGE, Bouygues...' : 'Ta propre entreprise (optionnel)'}
-                    placeholderTextColor={colors.placeholder}
-                    accessibilityLabel={t('auth.company')}
-                  />
-                </View>
-                {user.role !== 'admin' && (
-                  <Text style={[styles.hint, { color: colors.mutedText }]}>
-                    Ta propre entreprise. L&apos;organisation pour laquelle tu travailles apparaît dans « Mes organisations ».
-                  </Text>
+                {user.role === 'admin' ? (
+                  <>
+                    <Text style={[styles.label, { color: colors.text2 }]}>{t('auth.company')}</Text>
+                    <View style={styles.inputRow}>
+                      <Building2 size={IconSize.md} color={colors.mutedText} style={styles.inputIcon} />
+                      <AutoScrollInput
+                        style={[styles.inputWithIcon, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
+                        value={companyName}
+                        onChangeText={setCompanyName}
+                        editable
+                        placeholder="EIFFAGE, Bouygues..."
+                        placeholderTextColor={colors.placeholder}
+                        accessibilityLabel={t('auth.company')}
+                      />
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    {/* Entreprise du prestataire — renseignée via SIRET (facturation). */}
+                    <Text style={[styles.label, { color: colors.text2 }]}>SIRET de ton entreprise</Text>
+                    <View style={styles.inputRow}>
+                      <Receipt size={IconSize.md} color={colors.mutedText} style={styles.inputIcon} />
+                      <AutoScrollInput
+                        style={[styles.inputWithIcon, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border, paddingRight: 48 }]}
+                        value={providerSiret}
+                        onChangeText={setProviderSiret}
+                        editable
+                        keyboardType="number-pad"
+                        placeholder="14 chiffres"
+                        placeholderTextColor={colors.placeholder}
+                        accessibilityLabel="SIRET"
+                      />
+                      <TouchableOpacity
+                        onPress={handleSiretLookup}
+                        disabled={companyLookup.isPending}
+                        style={styles.siretLookupBtn}
+                        accessibilityLabel="Rechercher l'entreprise par SIRET"
+                      >
+                        {companyLookup.isPending ? (
+                          <ActivityIndicator size="small" color={colors.primary} />
+                        ) : (
+                          <Search size={IconSize.md} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={[styles.hint, { color: colors.mutedText }]}>
+                      Renseigne ton SIRET puis appuie sur la loupe pour pré-remplir.
+                    </Text>
+
+                    <Text style={[styles.label, { color: colors.text2 }]}>Raison sociale</Text>
+                    <View style={styles.inputRow}>
+                      <Building2 size={IconSize.md} color={colors.mutedText} style={styles.inputIcon} />
+                      <AutoScrollInput
+                        style={[styles.inputWithIcon, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
+                        value={providerCompany}
+                        onChangeText={setProviderCompany}
+                        editable
+                        placeholder="Ton entreprise"
+                        placeholderTextColor={colors.placeholder}
+                        accessibilityLabel="Raison sociale"
+                      />
+                    </View>
+
+                    <Text style={[styles.label, { color: colors.text2 }]}>Adresse</Text>
+                    <View style={styles.inputRow}>
+                      <MapPin size={IconSize.md} color={colors.mutedText} style={styles.inputIcon} />
+                      <AutoScrollInput
+                        style={[styles.inputWithIcon, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
+                        value={providerAddress}
+                        onChangeText={setProviderAddress}
+                        editable
+                        placeholder="Adresse de l'entreprise"
+                        placeholderTextColor={colors.placeholder}
+                        accessibilityLabel="Adresse"
+                      />
+                    </View>
+
+                    <Text style={[styles.label, { color: colors.text2 }]}>N° TVA</Text>
+                    <View style={styles.inputRow}>
+                      <FileText size={IconSize.md} color={colors.mutedText} style={styles.inputIcon} />
+                      <AutoScrollInput
+                        style={[styles.inputWithIcon, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
+                        value={providerVat}
+                        onChangeText={setProviderVat}
+                        editable
+                        autoCapitalize="characters"
+                        placeholder="FR…"
+                        placeholderTextColor={colors.placeholder}
+                        accessibilityLabel="Numéro de TVA"
+                      />
+                    </View>
+                    <Text style={[styles.hint, { color: colors.mutedText }]}>
+                      L&apos;organisation pour laquelle tu travailles apparaît dans « Mes organisations ».
+                    </Text>
+                  </>
                 )}
 
                 {hasChanges && (
@@ -711,6 +819,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xs,
   },
   inputRow: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.xs, position: 'relative' },
+  siretLookupBtn: { position: 'absolute', right: Spacing.sm, height: 44, width: 36, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   inputIcon: { position: 'absolute', left: Spacing.md, zIndex: 1 },
   inputWithIcon: {
     flex: 1,

@@ -51,7 +51,7 @@ import {
 } from '@/api/hooks/useMenageResponses';
 import { useCreateRescheduleRequest } from '@/api/hooks/useReschedule';
 import { useLogement } from '@/api/hooks/useLogements';
-import { useMarkTabViewed } from '@/api/hooks/useMenageViews';
+import { useMarkTabViewed, useUnreadCounts } from '@/api/hooks/useMenageViews';
 import {
   useMenageConsommables,
   useSetMenageConsommables,
@@ -112,6 +112,16 @@ export default function MenageDetailScreen() {
     else if (activeTab === 'check') markTab.mutate({ menage_id: id, tab: 'comments_steps' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, id]);
+
+  // Non-lus par onglet → petite pastille pour montrer d'où vient la notif.
+  const unreadCounts = useUnreadCounts(id).data;
+  const unreadForTab = (key: TabKey): number => {
+    if (!unreadCounts) return 0;
+    if (key === 'comments') return unreadCounts.comments;
+    if (key === 'photos') return unreadCounts.photos;
+    if (key === 'check') return unreadCounts.comments_steps;
+    return 0;
+  };
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [overridePrice, setOverridePrice] = useState('');
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
@@ -509,6 +519,7 @@ export default function MenageDetailScreen() {
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
           const TabIcon = tab.icon;
+          const unread = unreadForTab(tab.key);
           return (
             <TouchableOpacity
               key={tab.key}
@@ -518,7 +529,12 @@ export default function MenageDetailScreen() {
               ]}
               onPress={() => setActiveTab(tab.key)}
             >
-              <TabIcon size={IconSize.md} color={isActive ? colors.primary : colors.text2} />
+              <View>
+                <TabIcon size={IconSize.md} color={isActive ? colors.primary : colors.text2} />
+                {unread > 0 && !isActive ? (
+                  <View style={[styles.tabUnreadDot, { backgroundColor: colors.red, borderColor: colors.surface }]} />
+                ) : null}
+              </View>
               <Text style={[styles.tabLabel, { color: isActive ? colors.primary : colors.text2 }]}>
                 {tab.label}
               </Text>
@@ -1682,6 +1698,15 @@ const styles = StyleSheet.create({
   tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: Spacing.sm },
   tabLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.medium },
+  tabUnreadDot: {
+    position: 'absolute',
+    top: -3,
+    right: -5,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    borderWidth: 1.5,
+  },
   section: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, letterSpacing: 0.5 },
   card: { padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, gap: Spacing.xs },
   logementName: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold },

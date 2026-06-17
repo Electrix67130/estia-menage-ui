@@ -73,6 +73,7 @@ export default function ProfilScreen() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [providerCompany, setProviderCompany] = useState('');
   const [savedFlash, setSavedFlash] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -94,6 +95,7 @@ export default function ProfilScreen() {
       setEmail(user.email || '');
       setPhone(user.phone || '');
       setCompanyName(user.company_name || '');
+      setProviderCompany(user.provider_company || '');
     }
   }, [user]);
 
@@ -115,6 +117,8 @@ export default function ProfilScreen() {
 
   const handleSave = async () => {
     if (!user) return;
+    // L'admin gère le nom de l'entreprise de l'org (company_name, propagé) ;
+    // le prestataire gère sa propre entreprise (provider_company).
     await updateProfile.mutateAsync({
       id: user.id,
       body: {
@@ -122,7 +126,9 @@ export default function ProfilScreen() {
         last_name: lastName.trim(),
         email: email.trim(),
         phone: phone.trim() || undefined,
-        company_name: companyName.trim() || undefined,
+        ...(user.role === 'admin'
+          ? { company_name: companyName.trim() || undefined }
+          : { provider_company: providerCompany.trim() || null }),
       },
     });
     setSavedFlash(true);
@@ -157,7 +163,9 @@ export default function ProfilScreen() {
     lastName !== (user.last_name || '') ||
     email !== (user.email || '') ||
     phone !== (user.phone || '') ||
-    companyName !== (user.company_name || '')
+    (user.role === 'admin'
+      ? companyName !== (user.company_name || '')
+      : providerCompany !== (user.provider_company || ''))
   );
 
   return (
@@ -264,20 +272,22 @@ export default function ProfilScreen() {
                   <Building2 size={IconSize.md} color={colors.mutedText} style={styles.inputIcon} />
                   <AutoScrollInput
                     style={[styles.inputWithIcon, {
-                      backgroundColor: user.role === 'admin' ? colors.itemBackground : colors.border + '30',
+                      backgroundColor: colors.itemBackground,
                       color: colors.text,
                       borderColor: colors.border,
                     }]}
-                    value={companyName}
-                    onChangeText={setCompanyName}
-                    editable={user.role === 'admin'}
-                    placeholder="EIFFAGE, Bouygues..."
+                    value={user.role === 'admin' ? companyName : providerCompany}
+                    onChangeText={user.role === 'admin' ? setCompanyName : setProviderCompany}
+                    editable
+                    placeholder={user.role === 'admin' ? 'EIFFAGE, Bouygues...' : 'Ta propre entreprise (optionnel)'}
                     placeholderTextColor={colors.placeholder}
                     accessibilityLabel={t('auth.company')}
                   />
                 </View>
                 {user.role !== 'admin' && (
-                  <Text style={[styles.hint, { color: colors.mutedText }]}>Seul un administrateur peut modifier le nom de l'entreprise.</Text>
+                  <Text style={[styles.hint, { color: colors.mutedText }]}>
+                    Ta propre entreprise. L&apos;organisation pour laquelle tu travailles apparaît dans « Mes organisations ».
+                  </Text>
                 )}
 
                 {hasChanges && (

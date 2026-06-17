@@ -73,6 +73,8 @@ export interface MeResponse {
   avatar_url?: string;
   role: UserRole;
   company_name?: string;
+  /** Entreprise propre du prestataire (indépendante de l'org). */
+  provider_company?: string | null;
   is_active: boolean;
   push_enabled?: boolean;
   created_at: string;

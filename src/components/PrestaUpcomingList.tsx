@@ -10,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Clock, Check, X, CheckCircle2, Play, CalendarCheck, AlertTriangle } from 'lucide-react-native';
+import { Clock, Check, X, CheckCircle2, Play, CalendarCheck, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -21,6 +21,11 @@ import {
   type MenageResponseStatus,
 } from '@/api/hooks/useMenageResponses';
 import { formatDateFr, formatDurationMin } from '@/lib/date-fr';
+
+/** Date locale au format YYYY-MM-DD (sans décalage UTC). */
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 /**
  * Liste agenda des prochains ménages du prestataire connecté.
@@ -33,39 +38,69 @@ export default function PrestaUpcomingList() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
-  const [periodFilter, setPeriodFilter] = usePersistedState<'week' | 'month' | 'all' | 'past'>(
+  const [periodFilter, setPeriodFilter] = usePersistedState<'week' | 'month' | 'year' | 'all' | 'past'>(
     'presta.filter.period',
     'all',
   );
-  // Quand on est sur "Passés", on fait un appel séparé en mode history pour
-  // récupérer les ménages déjà faits (termine/valide).
-  const list = useMyUpcomingMenages({ mode: periodFilter === 'past' ? 'history' : 'upcoming' });
-  const respond = useRespondToMenageOptimistic();
+  // Décalage de période (0 = courante, -1 = précédente, +1 = suivante).
+  const [periodOffset, setPeriodOffset] = useState(0);
 
-  // Filtre période + tri. Pas de headers de date — déjà sur chaque card.
-  // "Passés" : tri descendant (plus récents d'abord). Autres : ascendant.
-  const items = useMemo(() => {
-    const today = new Date();
-    let periodMin: string | null = null;
-    let periodMax: string | null = null;
+  // Bornes + libellé + mode de la période sélectionnée (date locale).
+  // mode 'history' dès que la période est entièrement passée → on récupère les
+  // ménages termine/valide ; sinon 'upcoming' (à venir). "Passés"/"Tout" : pas
+  // de bornes, on garde les fenêtres par défaut de l'API.
+  const period = useMemo<{
+    from: string | null;
+    to: string | null;
+    mode: 'upcoming' | 'history';
+    label: string;
+  }>(() => {
+    const now = new Date();
+    const todayYmd = ymd(now);
     if (periodFilter === 'week') {
-      const dow = (today.getDay() + 6) % 7;
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - dow);
+      const dow = (now.getDay() + 6) % 7;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - dow + periodOffset * 7);
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
-      periodMin = monday.toISOString().slice(0, 10);
-      periodMax = sunday.toISOString().slice(0, 10);
-    } else if (periodFilter === 'month') {
-      const y = today.getFullYear();
-      const m = today.getMonth();
-      periodMin = new Date(y, m, 1).toISOString().slice(0, 10);
-      periodMax = new Date(y, m + 1, 0).toISOString().slice(0, 10);
+      const to = ymd(sunday);
+      const f = (d: Date) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+      return { from: ymd(monday), to, mode: to < todayYmd ? 'history' : 'upcoming', label: `${f(monday)} – ${f(sunday)}` };
     }
+    if (periodFilter === 'month') {
+      const first = new Date(now.getFullYear(), now.getMonth() + periodOffset, 1);
+      const last = new Date(now.getFullYear(), now.getMonth() + periodOffset + 1, 0);
+      const to = ymd(last);
+      return {
+        from: ymd(first),
+        to,
+        mode: to < todayYmd ? 'history' : 'upcoming',
+        label: first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+      };
+    }
+    if (periodFilter === 'year') {
+      const y = now.getFullYear() + periodOffset;
+      const to = `${y}-12-31`;
+      return { from: `${y}-01-01`, to, mode: to < todayYmd ? 'history' : 'upcoming', label: String(y) };
+    }
+    if (periodFilter === 'past') return { from: null, to: null, mode: 'history', label: '' };
+    return { from: null, to: null, mode: 'upcoming', label: '' };
+  }, [periodFilter, periodOffset]);
+
+  const list = useMyUpcomingMenages({
+    from: period.from ?? undefined,
+    to: period.to ?? undefined,
+    mode: period.mode,
+  });
+  const respond = useRespondToMenageOptimistic();
+
+  // Filtre période (sécurité : le mode upcoming ajoute les ménages en retard
+  // hors fenêtre) + tri. "Passés" : tri descendant. Autres : ascendant.
+  const items = useMemo(() => {
     const filtered = (list.data ?? []).filter((m) => {
       const d = m.date_prevue.slice(0, 10);
-      if (periodMin && d < periodMin) return false;
-      if (periodMax && d > periodMax) return false;
+      if (period.from && d < period.from) return false;
+      if (period.to && d > period.to) return false;
       return true;
     });
     const desc = periodFilter === 'past';
@@ -76,7 +111,7 @@ export default function PrestaUpcomingList() {
         const bd = b.date_prevue.slice(0, 10);
         return desc ? bd.localeCompare(ad) : ad.localeCompare(bd);
       });
-  }, [list.data, periodFilter]);
+  }, [list.data, period, periodFilter]);
 
   const handleRespond = (menageId: string, status: MenageResponseStatus) => {
     respond.mutate({ menageId, status });
@@ -96,39 +131,73 @@ export default function PrestaUpcomingList() {
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.listContent}
       ListHeaderComponent={
-        <View style={[styles.periodToggle, { backgroundColor: colors.itemBackground }]}>
-          {([
-            { key: 'week' as const, label: 'Semaine' },
-            { key: 'month' as const, label: 'Mois' },
-            { key: 'all' as const, label: 'Tout' },
-            { key: 'past' as const, label: 'Passés' },
-          ]).map((p) => {
-            const active = periodFilter === p.key;
-            return (
-              <TouchableOpacity
-                key={p.key}
-                style={[
-                  styles.periodTab,
-                  { backgroundColor: active ? colors.surface : 'transparent' },
-                ]}
-                onPress={() => setPeriodFilter(p.key)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-              >
-                <Text
+        <View>
+          <View style={[styles.periodToggle, { backgroundColor: colors.itemBackground }]}>
+            {([
+              { key: 'week' as const, label: 'Semaine' },
+              { key: 'month' as const, label: 'Mois' },
+              { key: 'year' as const, label: 'Année' },
+              { key: 'all' as const, label: 'Tout' },
+              { key: 'past' as const, label: 'Passés' },
+            ]).map((p) => {
+              const active = periodFilter === p.key;
+              return (
+                <TouchableOpacity
+                  key={p.key}
                   style={[
-                    styles.periodTabText,
-                    {
-                      color: active ? colors.text : colors.mutedText,
-                      fontWeight: active ? FontWeight.semibold : FontWeight.medium,
-                    },
+                    styles.periodTab,
+                    { backgroundColor: active ? colors.surface : 'transparent' },
                   ]}
+                  onPress={() => {
+                    setPeriodFilter(p.key);
+                    setPeriodOffset(0);
+                  }}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
                 >
-                  {p.label}
-                </Text>
+                  <Text
+                    style={[
+                      styles.periodTabText,
+                      {
+                        color: active ? colors.text : colors.mutedText,
+                        fontWeight: active ? FontWeight.semibold : FontWeight.medium,
+                      },
+                    ]}
+                  >
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {periodFilter === 'week' || periodFilter === 'month' || periodFilter === 'year' ? (
+            <View style={styles.periodNav}>
+              <TouchableOpacity
+                onPress={() => setPeriodOffset((o) => o - 1)}
+                style={styles.periodNavBtn}
+                accessibilityLabel="Période précédente"
+              >
+                <ChevronLeft size={IconSize.md} color={colors.text} />
               </TouchableOpacity>
-            );
-          })}
+              <Text style={[styles.periodNavLabel, { color: colors.text }]} numberOfLines={1}>
+                {period.label}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setPeriodOffset((o) => o + 1)}
+                style={styles.periodNavBtn}
+                accessibilityLabel="Période suivante"
+              >
+                <ChevronRight size={IconSize.md} color={colors.text} />
+              </TouchableOpacity>
+              {periodOffset !== 0 ? (
+                <TouchableOpacity onPress={() => setPeriodOffset(0)} style={styles.periodNavToday}>
+                  <Text style={[styles.periodNavTodayLabel, { color: colors.primary }]}>
+                    Aujourd&apos;hui
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       }
       ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
@@ -256,12 +325,14 @@ export default function PrestaUpcomingList() {
         <View style={styles.empty}>
           <Text style={[styles.emptyText, { color: colors.mutedText }]}>
             {periodFilter === 'week'
-              ? 'Aucun ménage cette semaine.'
+              ? 'Aucun ménage sur cette semaine.'
               : periodFilter === 'month'
-                ? 'Aucun ménage ce mois-ci.'
-                : periodFilter === 'past'
-                  ? 'Aucun ménage déjà effectué.'
-                  : 'Aucun ménage à venir sur les logements où tu es prestataire.'}
+                ? 'Aucun ménage sur ce mois.'
+                : periodFilter === 'year'
+                  ? 'Aucun ménage sur cette année.'
+                  : periodFilter === 'past'
+                    ? 'Aucun ménage déjà effectué.'
+                    : 'Aucun ménage à venir sur les logements où tu es prestataire.'}
           </Text>
         </View>
       }
@@ -377,6 +448,23 @@ const styles = StyleSheet.create({
   },
   periodTab: { flex: 1, alignItems: 'center', paddingVertical: Spacing.xs, borderRadius: Radius.pill },
   periodTabText: { fontSize: FontSize.sm },
+  periodNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  periodNavBtn: { padding: Spacing.xs },
+  periodNavLabel: {
+    fontSize: FontSize.md,
+    fontWeight: FontWeight.semibold,
+    textAlign: 'center',
+    minWidth: 150,
+    textTransform: 'capitalize',
+  },
+  periodNavToday: { paddingHorizontal: Spacing.sm, paddingVertical: 2 },
+  periodNavTodayLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
   card: {
     marginTop: Spacing.sm,
     paddingVertical: Spacing.sm,

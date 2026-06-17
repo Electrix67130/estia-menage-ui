@@ -18,6 +18,7 @@ import SearchBar from '@/components/SearchBar';
 import FilterChips from '@/components/FilterChips';
 import FilterPickerSheet, { type FilterOption } from '@/components/FilterPickerSheet';
 import MenageCard from '@/components/MenageCard';
+import { useUnreadSummary } from '@/api/hooks/useMenageViews';
 import MenageMap from '@/components/MenageMap';
 import { useAuth } from '@/contexts/AuthContext';
 import AppHeader from '@/components/AppHeader';
@@ -64,6 +65,8 @@ function AdminMenagesScreen() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const dialog = useDialog();
+  // Non-lus par ménage → pastille sur chaque carte.
+  const unreadByMenage = useUnreadSummary(!!user).data?.by_menage ?? {};
 
   // Filtres persistés en AsyncStorage : reprend l'état précédent au prochain
   // lancement de l'app. La searchQuery reste éphémère (jamais utile de la
@@ -308,12 +311,13 @@ function AdminMenagesScreen() {
               onLongPress={isAdmin ? handleMenageLongPress : undefined}
               selectionMode={selectionMode}
               selected={isSelected}
+              unread={unreadByMenage[item.id] ?? 0}
             />
           </Animated.View>
         </Animated.View>
       );
     },
-    [handleMenagePress, handleMenageLongPress, isAdmin, selectionMode, selectedIds, toggleSelection, colors],
+    [handleMenagePress, handleMenageLongPress, isAdmin, selectionMode, selectedIds, toggleSelection, colors, unreadByMenage],
   );
 
   const renderEmpty = () => {

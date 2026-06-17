@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Clock, Lock, AlertTriangle } from 'lucide-react-native';
+import { Clock, Lock, AlertTriangle, Bell } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -17,7 +17,7 @@ interface Props {
   unread?: number;
 }
 
-const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected }) => {
+const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, unread = 0 }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
 
@@ -73,6 +73,15 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected })
             </Text>
           </View>
           <View style={styles.badgesRow}>
+            {unread > 0 ? (
+              <View
+                style={[styles.unreadBadge, { backgroundColor: colors.red }]}
+                accessibilityLabel={`${unread} élément(s) non lu(s)`}
+              >
+                <Bell size={10} color="#FFFFFF" />
+                <Text style={styles.unreadBadgeText}>{unread > 99 ? '99+' : unread}</Text>
+              </View>
+            ) : null}
             {needsAttention ? (
               <View
                 style={[styles.lateBadge, { backgroundColor: colors.red + '20' }]}
@@ -141,6 +150,15 @@ const styles = StyleSheet.create({
   logementDot: { width: 10, height: 10, borderRadius: 5 },
   logement: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, flex: 1, letterSpacing: -0.2 },
   badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 },
+  unreadBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+  },
+  unreadBadgeText: { fontSize: 9, fontWeight: FontWeight.bold, color: '#FFFFFF' },
   lateBadge: {
     flexDirection: 'row',
     alignItems: 'center',

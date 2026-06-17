@@ -8,6 +8,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useComments, useCreateComment, useUpdateComment, useDeleteComment } from '@/api/hooks/useComments';
+import { useUnreadCounts, useMarkTabViewed } from '@/api/hooks/useMenageViews';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Comment } from '@/api/types';
 import { formatDateFr } from '@/lib/date-fr';
@@ -34,6 +35,24 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
   const createMutation = useCreateComment();
   const updateMutation = useUpdateComment();
   const deleteMutation = useDeleteComment();
+
+  // Pastille « non lu » : on traite uniquement la discussion générale (onglet
+  // `comments`). On fige le seuil de lecture à l'ouverture (pour garder les
+  // pastilles visibles pendant la lecture) puis on marque l'onglet comme lu.
+  const isGeneralThread = !sectionFilter || sectionFilter === 'general';
+  const unreadCounts = useUnreadCounts(isGeneralThread ? menageId : undefined);
+  const markViewed = useMarkTabViewed();
+  const [readThreshold, setReadThreshold] = useState<string | null | undefined>(undefined);
+  const markedRef = useRef(false);
+  useEffect(() => {
+    if (!isGeneralThread || !unreadCounts.data) return;
+    setReadThreshold((prev) => (prev === undefined ? unreadCounts.data!.comments_last_viewed_at : prev));
+    if (!markedRef.current) {
+      markedRef.current = true;
+      markViewed.mutate({ menage_id: menageId, tab: 'comments' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGeneralThread, unreadCounts.data, menageId]);
 
   const [text, setText] = useState('');
   const [selectedComment, setSelectedComment] = useState<CommentWithAuthor | null>(null);
@@ -130,6 +149,11 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
   const renderItem = useCallback(
     ({ item }: { item: CommentWithAuthor }) => {
       const isOwn = item.author_id === user?.id;
+      const isUnread =
+        !isOwn &&
+        readThreshold !== undefined &&
+        (readThreshold === null ||
+          new Date(item.created_at).getTime() > new Date(readThreshold).getTime());
       return (
         <TouchableOpacity
           activeOpacity={isOwn ? 0.7 : 1}
@@ -139,16 +163,24 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
           style={[styles.bubble, { backgroundColor: isOwn ? colors.primary + '15' : colors.itemBackground }]}
         >
           <View style={styles.bubbleHeader}>
-            <Text style={[styles.author, { color: colors.primary }]}>
-              {isOwn ? 'Vous' : `${item.first_name} ${item.last_name}`}
-            </Text>
+            <View style={styles.authorRow}>
+              {isUnread ? (
+                <View
+                  style={[styles.unreadDot, { backgroundColor: colors.red }]}
+                  accessibilityLabel="Nouveau message non lu"
+                />
+              ) : null}
+              <Text style={[styles.author, { color: colors.primary }]}>
+                {isOwn ? 'Vous' : `${item.first_name} ${item.last_name}`}
+              </Text>
+            </View>
             <Text style={[styles.time, { color: colors.mutedText }]}>{formatTime(item.created_at)}</Text>
           </View>
           <Text style={[styles.content, { color: colors.text }]}>{item.content}</Text>
         </TouchableOpacity>
       );
     },
-    [user, colors],
+    [user, colors, readThreshold],
   );
 
   return (
@@ -279,6 +311,8 @@ const styles = StyleSheet.create({
   list: { padding: Spacing.lg, paddingBottom: Spacing.sm },
   bubble: { borderRadius: Radius.lg, padding: Spacing.md },
   bubbleHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.xs },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4 },
   author: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   time: { fontSize: FontSize.xs },
   content: { fontSize: FontSize.base, lineHeight: 20 },

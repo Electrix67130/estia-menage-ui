@@ -10,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Clock, Check, X, CheckCircle2, Play, CalendarCheck, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Clock, Check, X, CheckCircle2, Play, CalendarCheck, AlertTriangle, ChevronLeft, ChevronRight, Bell } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -20,6 +20,7 @@ import {
   type MyUpcomingMenage,
   type MenageResponseStatus,
 } from '@/api/hooks/useMenageResponses';
+import { useUnreadSummary } from '@/api/hooks/useMenageViews';
 import { formatDateFr, formatDurationMin } from '@/lib/date-fr';
 
 /** Date locale au format YYYY-MM-DD (sans décalage UTC). */
@@ -93,6 +94,8 @@ export default function PrestaUpcomingList() {
     mode: period.mode,
   });
   const respond = useRespondToMenageOptimistic();
+  // Non-lus par ménage → pastille sur la carte concernée (commentaires/photos…).
+  const unreadByMenage = useUnreadSummary().data?.by_menage ?? {};
 
   // Filtre période (sécurité : le mode upcoming ajoute les ménages en retard
   // hors fenêtre) + tri. "Passés" : tri descendant. Autres : ascendant.
@@ -217,6 +220,7 @@ export default function PrestaUpcomingList() {
         const endTime = item.horaire_fin_prevu ? item.horaire_fin_prevu.slice(0, 5) : null;
         const duration = item.duree_estimee_min ? formatDurationMin(item.duree_estimee_min) : null;
         const needsAttention = !!item.needs_attention;
+        const unread = unreadByMenage[item.id] ?? 0;
         return (
           <TouchableOpacity
             activeOpacity={0.85}
@@ -262,6 +266,15 @@ export default function PrestaUpcomingList() {
                   </Text>
                 </View>
                 <View style={styles.metaRow}>
+                  {unread > 0 ? (
+                    <View
+                      style={[styles.unreadBadge, { backgroundColor: colors.red }]}
+                      accessibilityLabel={`${unread} élément(s) non lu(s)`}
+                    >
+                      <Bell size={11} color="#FFFFFF" />
+                      <Text style={styles.unreadBadgeText}>{unread > 99 ? '99+' : unread}</Text>
+                    </View>
+                  ) : null}
                   {needsAttention ? (
                     <View
                       style={[styles.lateBadge, { backgroundColor: colors.red + '20' }]}
@@ -522,6 +535,19 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   timeRange: { fontSize: FontSize.xs, fontWeight: FontWeight.medium },
+  unreadBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+  },
+  unreadBadgeText: {
+    fontSize: 10,
+    fontWeight: FontWeight.bold,
+    color: '#FFFFFF',
+  },
   responseRow: { flexDirection: 'row', gap: Spacing.sm },
   responseBtn: {
     flex: 1,

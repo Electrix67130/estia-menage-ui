@@ -51,6 +51,7 @@ import {
 } from '@/api/hooks/useMenageResponses';
 import { useCreateRescheduleRequest } from '@/api/hooks/useReschedule';
 import { useLogement } from '@/api/hooks/useLogements';
+import { useMarkTabViewed } from '@/api/hooks/useMenageViews';
 import {
   useMenageConsommables,
   useSetMenageConsommables,
@@ -101,6 +102,16 @@ export default function MenageDetailScreen() {
 
   const [activeTab, setActiveTab] = useState<TabKey>('check');
   const [showValidateModal, setShowValidateModal] = useState(false);
+
+  // Marque l'onglet ouvert comme lu → vide la pastille de non-lus correspondante
+  // (la discussion `comments` est marquée par CommentThread lui-même).
+  const markTab = useMarkTabViewed();
+  useEffect(() => {
+    if (!id) return;
+    if (activeTab === 'photos') markTab.mutate({ menage_id: id, tab: 'photos' });
+    else if (activeTab === 'check') markTab.mutate({ menage_id: id, tab: 'comments_steps' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, id]);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [overridePrice, setOverridePrice] = useState('');
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);

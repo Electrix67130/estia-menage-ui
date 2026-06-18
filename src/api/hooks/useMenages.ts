@@ -22,6 +22,8 @@ interface ListParams extends PaginationParams {
   prestataire_user_id?: string;
   logement_id?: string;
   validated?: boolean;
+  /** true = clôturés (valide/annule) → archives ; false = worklist active. */
+  closed?: boolean;
   manager?: 'me';
   from?: string;
   to?: string;
@@ -35,6 +37,7 @@ export function useMenages(params?: ListParams) {
   if (params?.prestataire_user_id) query.set('prestataire_user_id', params.prestataire_user_id);
   if (params?.logement_id) query.set('logement_id', params.logement_id);
   if (params?.validated !== undefined) query.set('validated', String(params.validated));
+  if (params?.closed !== undefined) query.set('closed', String(params.closed));
   if (params?.manager) query.set('manager', params.manager);
   if (params?.from) query.set('from', params.from);
   if (params?.to) query.set('to', params.to);

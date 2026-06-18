@@ -120,6 +120,9 @@ function AdminMenagesScreen() {
   const menagesQuery = useMenages({
     status: isToValidate ? 'termine' : activeStatus,
     validated: isToValidate ? false : undefined,
+    // Vue « Tous » = worklist active : on exclut les clôturés (validé/annulé),
+    // qui vivent dans les archives (cohérent avec le dashboard).
+    closed: statusFilter === 'all' ? false : undefined,
     // Limite haute pour ne pas tronquer silencieusement la liste (le défaut
     // API de 20 coupait les ménages les plus anciens en tri décroissant).
     limit: 200,

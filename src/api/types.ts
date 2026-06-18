@@ -204,6 +204,10 @@ export interface Menage {
   prestataire_user_id: string | null;
   status: MenageStatus;
   date_prevue: string;
+  /** Prochain check-in du logement (arrivée du prochain voyageur, via iCal). */
+  next_checkin_at?: string | null;
+  /** Nb de nuits du séjour nettoyé (via iCal). */
+  stay_nights?: number | null;
   /** True quand la date a été manuellement override (reschedule appliqué ou PATCH admin sur un ménage iCal) → la sync iCal ne l'écrase plus. */
   date_locked?: boolean;
   horaire_prevu: string | null;

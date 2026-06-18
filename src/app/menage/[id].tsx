@@ -33,6 +33,9 @@ import {
   Lock,
   PackageCheck,
   AlertTriangle,
+  KeyRound,
+  Moon,
+  CalendarClock,
 } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
@@ -511,6 +514,8 @@ export default function MenageDetailScreen() {
       {isAdmin && (menage.arrival_photo_url || menage.departure_photo_url) ? (
         <PointageProofSection menage={menage} logement={logement} colors={colors} />
       ) : null}
+
+      <AccessInfoSection menage={menage} logement={logement} colors={colors} />
 
       <BedsSection menage={menage} colors={colors} />
 
@@ -999,6 +1004,51 @@ interface ProofView {
   lng: number | null;
   at: string | null;
   distance: number | null;
+}
+
+function AccessInfoSection({
+  menage,
+  logement,
+  colors,
+}: {
+  menage: Menage;
+  logement: Logement | undefined;
+  colors: typeof Colors.light;
+}) {
+  const code = logement?.key_safe_code;
+  const nights = menage.stay_nights ?? null;
+  const checkin = menage.next_checkin_at ? menage.next_checkin_at.slice(0, 10) : null;
+  const sameDay = checkin !== null && checkin === menage.date_prevue.slice(0, 10);
+  if (!code && !nights && !checkin) return null;
+  return (
+    <View style={[styles.accessCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {code ? (
+        <View style={styles.accessRow}>
+          <KeyRound size={IconSize.sm} color={colors.primary} />
+          <Text style={[styles.accessLabel, { color: colors.text2 }]}>Boîte à clés</Text>
+          <Text style={[styles.accessValue, { color: colors.text }]}>{code}</Text>
+        </View>
+      ) : null}
+      {nights ? (
+        <View style={styles.accessRow}>
+          <Moon size={IconSize.sm} color={colors.text2} />
+          <Text style={[styles.accessLabel, { color: colors.text2 }]}>Séjour</Text>
+          <Text style={[styles.accessValue, { color: colors.text }]}>
+            {nights} nuit{nights > 1 ? 's' : ''}
+          </Text>
+        </View>
+      ) : null}
+      {checkin ? (
+        <View style={styles.accessRow}>
+          <CalendarClock size={IconSize.sm} color={sameDay ? colors.statusEnCours : colors.text2} />
+          <Text style={[styles.accessLabel, { color: colors.text2 }]}>Prochain check-in</Text>
+          <Text style={[styles.accessValue, { color: sameDay ? colors.statusEnCours : colors.text }]}>
+            {formatDateFr(checkin, 'dayShort')}{sameDay ? ' · jour même' : ''}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 function BedsSection({
@@ -1695,6 +1745,18 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   timestampText: { fontSize: FontSize.xs },
+  accessCard: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.xs,
+  },
+  accessRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  accessLabel: { fontSize: FontSize.sm, flex: 1 },
+  accessValue: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, letterSpacing: 0.5 },
   tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
   tab: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: Spacing.sm },
   tabLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.medium },

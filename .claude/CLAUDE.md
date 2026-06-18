@@ -43,6 +43,7 @@ src/
 - **Theme** : `useColorScheme()` + `Colors[colorScheme]`
 - **Accessibilite** : `accessibilityRole`, `accessibilityLabel` sur tous les elements interactifs
 - **Performance** : `React.memo`, `useCallback`, `useMemo`, `FlatList`
+- **Confirmations & alertes** : JAMAIS de `Alert.alert` natif ni de `confirm()`/`alert()`. Toujours `useDialog()` (`@/contexts/DialogContext`) : `await confirm({ title, message?, destructive })` / `await alert({ title, message })`. (Même règle côté dashboard avec son propre `useDialog`.)
 
 ## Guidelines detaillees
 

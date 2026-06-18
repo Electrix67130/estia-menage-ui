@@ -13,7 +13,7 @@ import {
   Switch} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
-import { LogOut, User, Sun, Moon, Smartphone, Save, Mail, Phone, Building2, Check, Globe, Lock, KeyRound, X, Camera, Plus, ArrowRightLeft, Bell, FileText, ChevronRight, ExternalLink, Wallet, Search, MapPin, Receipt } from 'lucide-react-native';
+import { LogOut, User, Sun, Moon, Smartphone, Save, Mail, Phone, Building2, Check, Globe, Lock, KeyRound, X, Camera, Plus, ArrowRightLeft, Bell, FileText, ChevronRight, ExternalLink, Wallet, Search, MapPin, Receipt, Archive } from 'lucide-react-native';
 import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { DASHBOARD_CREATE_ORG_URL } from '@/constants/Urls';
@@ -439,6 +439,26 @@ export default function ProfilScreen() {
                   <ChevronRight size={IconSize.sm} color={colors.mutedText} />
                 </TouchableOpacity>
               </View>
+
+              {isAdmin ? (
+                <>
+                  <Text style={[styles.sectionTitle, { color: colors.text2 }]}>ARCHIVES</Text>
+                  <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <TouchableOpacity
+                      style={[styles.securityBtn, { borderColor: colors.border }]}
+                      onPress={() => router.push('/(tabs)/archives' as never)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Ménages archivés"
+                    >
+                      <Archive size={IconSize.md} color={colors.primary} />
+                      <Text style={[styles.securityBtnText, { color: colors.text }]}>
+                        Ménages archivés
+                      </Text>
+                      <ChevronRight size={IconSize.sm} color={colors.mutedText} />
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : null}
 
               <Text style={[styles.sectionTitle, { color: colors.text2 }]}>SÉCURITÉ</Text>
               <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>

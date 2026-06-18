@@ -21,13 +21,14 @@ export interface ExtraChip {
   onPress: () => void;
 }
 
+// Validés/Annulés ne sont plus des filtres ici : les ménages clôturés vivent
+// dans les Archives. La liste = worklist active.
 const CHIPS: Chip[] = [
   { key: 'all', label: 'Tous' },
   { key: 'a_venir', label: 'À venir' },
   { key: 'en_cours', label: 'En cours' },
   { key: 'termine', label: 'Terminés' },
   { key: 'to_validate', label: 'À valider' },
-  { key: 'valide', label: 'Validés' },
 ];
 
 interface Props {

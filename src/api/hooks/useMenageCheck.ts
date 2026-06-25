@@ -94,3 +94,29 @@ export function useToggleItem(menageId: string | undefined) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['menage-check', menageId] }),
   });
 }
+
+/** Coche/décoche tous les items d'une section d'un coup. */
+export function useToggleSection(menageId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sectionId, validated }: { sectionId: string; validated: boolean }) =>
+      apiFetch<MenageCheckTree>(`/menage-check-sections/${sectionId}/toggle-all`, {
+        method: 'POST',
+        body: { validated },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['menage-check', menageId] }),
+  });
+}
+
+/** Coche/décoche toute la checklist du ménage. */
+export function useToggleAll(menageId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (validated: boolean) =>
+      apiFetch<MenageCheckTree>(`/menages/${menageId}/check/toggle-all`, {
+        method: 'POST',
+        body: { validated },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['menage-check', menageId] }),
+  });
+}

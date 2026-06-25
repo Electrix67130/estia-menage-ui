@@ -74,3 +74,39 @@ export function useDeleteTemplateItem(logementId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: [...KEY, logementId] }),
   });
 }
+
+export function useUpdateTemplateSection(logementId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, label }: { id: string; label: string }) =>
+      apiFetch<CheckTemplateSection>(`/logement-check-template-sections/${id}`, {
+        method: 'PATCH',
+        body: { label },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...KEY, logementId] }),
+  });
+}
+
+export function useUpdateTemplateItem(logementId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, label }: { id: string; label: string }) =>
+      apiFetch<CheckTemplateItem>(`/logement-check-template-items/${id}`, {
+        method: 'PATCH',
+        body: { label },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...KEY, logementId] }),
+  });
+}
+
+export function useReorderTemplateSections(logementId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderedIds: string[]) =>
+      apiFetch<void>(`/logement-check-templates/${logementId}/reorder-sections`, {
+        method: 'POST',
+        body: { ordered_ids: orderedIds },
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...KEY, logementId] }),
+  });
+}

@@ -10,6 +10,11 @@ import {
   Pressable,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import DraggableFlatList, {
+  ScaleDecorator,
+  type RenderItemParams,
+} from 'react-native-draggable-flatlist';
 import {
   Plus,
   Trash2,
@@ -18,6 +23,8 @@ import {
   ListChecks,
   Check,
   X,
+  Pencil,
+  GripVertical,
 } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import {
@@ -34,14 +41,18 @@ import { useDialog } from '@/contexts/DialogContext';
 import {
   useCheckTemplate,
   useCreateTemplateSection,
+  useUpdateTemplateSection,
   useDeleteTemplateSection,
   useCreateTemplateItem,
+  useUpdateTemplateItem,
   useDeleteTemplateItem,
+  useReorderTemplateSections,
   type CheckTemplateSection,
 } from '@/api/hooks/useCheckTemplate';
 import {
   useChecklistTemplates,
   useApplyChecklistTemplate,
+  useCreateChecklistTemplate,
 } from '@/api/hooks/useChecklistTemplates';
 
 /**
@@ -61,12 +72,37 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
   const dialog = useDialog();
   const template = useCheckTemplate(logementId);
   const createSection = useCreateTemplateSection(logementId);
+  const updateSection = useUpdateTemplateSection(logementId);
   const deleteSection = useDeleteTemplateSection(logementId);
+  const updateItem = useUpdateTemplateItem(logementId);
+  const reorderSections = useReorderTemplateSections(logementId);
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [addingSection, setAddingSection] = useState(false);
   const [addingItemFor, setAddingItemFor] = useState<CheckTemplateSection | null>(null);
   const [applyOpen, setApplyOpen] = useState(false);
+  const [reorderOpen, setReorderOpen] = useState(false);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const createOrgTemplate = useCreateChecklistTemplate();
+  // Cible d'édition de label (section ou item)
+  const [editTarget, setEditTarget] = useState<
+    { type: 'section' | 'item'; id: string; label: string } | null
+  >(null);
+
+  const handleSaveLabel = async (label: string) => {
+    const target = editTarget;
+    setEditTarget(null);
+    if (!target) return;
+    try {
+      if (target.type === 'section') {
+        await updateSection.mutateAsync({ id: target.id, label });
+      } else {
+        await updateItem.mutateAsync({ id: target.id, label });
+      }
+    } catch (err) {
+      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+    }
+  };
   const checklistTemplates = useChecklistTemplates();
   const applyTemplate = useApplyChecklistTemplate();
 
@@ -75,6 +111,20 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
     try {
       await applyTemplate.mutateAsync({ logementId, templateId });
       void dialog.alert({ title: 'Modèle appliqué', message: `"${name}" a été ajouté à la checklist.` });
+    } catch (err) {
+      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+    }
+  };
+
+  const handleSaveAsTemplate = async (name: string) => {
+    setSaveTemplateOpen(false);
+    const payloadSections = (template.data ?? []).map((s) => ({
+      label: s.label,
+      items: s.items.map((it) => ({ label: it.label, required: it.required })),
+    }));
+    try {
+      await createOrgTemplate.mutateAsync({ name, sections: payloadSections });
+      void dialog.alert({ title: 'Modèle créé', message: `"${name}" est disponible comme modèle réutilisable.` });
     } catch (err) {
       void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
     }
@@ -147,16 +197,28 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
                   </Text>
                 </View>
                 {isAdmin ? (
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handleDeleteSection(s.id, s.label);
-                    }}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel={`Supprimer ${s.label}`}
-                  >
-                    <Trash2 size={IconSize.sm} color={colors.red} />
-                  </TouchableOpacity>
+                  <>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setEditTarget({ type: 'section', id: s.id, label: s.label });
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityLabel={`Renommer ${s.label}`}
+                    >
+                      <Pencil size={IconSize.sm} color={colors.text2} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSection(s.id, s.label);
+                      }}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityLabel={`Supprimer ${s.label}`}
+                    >
+                      <Trash2 size={IconSize.sm} color={colors.red} />
+                    </TouchableOpacity>
+                  </>
                 ) : null}
               </TouchableOpacity>
 
@@ -175,6 +237,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
                         required={it.required}
                         logementId={logementId}
                         isAdmin={isAdmin}
+                        onEdit={() => setEditTarget({ type: 'item', id: it.id, label: it.label })}
                       />
                     ))
                   )}
@@ -211,6 +274,29 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
             <Plus size={IconSize.sm} color="#FFFFFF" />
             <Text style={styles.addSectionText}>Ajouter une section</Text>
           </TouchableOpacity>
+          {sections.length > 1 ? (
+            <TouchableOpacity
+              style={[styles.applyTemplateBtn, { borderColor: colors.primary }]}
+              onPress={() => setReorderOpen(true)}
+            >
+              <GripVertical size={IconSize.sm} color={colors.primary} />
+              <Text style={[styles.applyTemplateText, { color: colors.primary }]}>
+                Réorganiser les sections
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+          {sections.length > 0 ? (
+            <TouchableOpacity
+              style={[styles.applyTemplateBtn, { borderColor: colors.primary }]}
+              onPress={() => setSaveTemplateOpen(true)}
+              disabled={createOrgTemplate.isPending}
+            >
+              <ListChecks size={IconSize.sm} color={colors.primary} />
+              <Text style={[styles.applyTemplateText, { color: colors.primary }]}>
+                {createOrgTemplate.isPending ? 'Enregistrement…' : 'Enregistrer comme modèle'}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
           {(checklistTemplates.data ?? []).length > 0 ? (
             <TouchableOpacity
               style={[styles.applyTemplateBtn, { borderColor: colors.primary }]}
@@ -251,9 +337,263 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
         logementId={logementId}
         onClose={() => setAddingItemFor(null)}
       />
+
+      <EditLabelModal
+        target={editTarget}
+        onClose={() => setEditTarget(null)}
+        onSubmit={handleSaveLabel}
+      />
+
+      <ReorderSectionsModal
+        visible={reorderOpen}
+        sections={sections}
+        saving={reorderSections.isPending}
+        onClose={() => setReorderOpen(false)}
+        onSave={async (orderedIds) => {
+          setReorderOpen(false);
+          try {
+            await reorderSections.mutateAsync(orderedIds);
+          } catch (err) {
+            void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+          }
+        }}
+      />
+
+      <SaveAsTemplateModal
+        visible={saveTemplateOpen}
+        sectionCount={sections.length}
+        onClose={() => setSaveTemplateOpen(false)}
+        onSubmit={handleSaveAsTemplate}
+      />
     </View>
   );
 };
+
+// =============================================================================
+// SaveAsTemplateModal — nomme et crée un modèle d'organisation réutilisable
+// =============================================================================
+
+function SaveAsTemplateModal({
+  visible,
+  sectionCount,
+  onClose,
+  onSubmit,
+}: {
+  visible: boolean;
+  sectionCount: number;
+  onClose: () => void;
+  onSubmit: (name: string) => void;
+}) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const [name, setName] = useState('');
+  const animatedModalStyle = useKeyboardAwareModalStyle({ visible });
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onShow={() => setName('')}>
+      <View style={sheetStyles.overlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Animated.View
+          style={[sheetStyles.sheet, { backgroundColor: colors.surface }, Shadow.lg, animatedModalStyle]}
+        >
+          <View style={sheetStyles.handle}>
+            <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
+          </View>
+          <View style={sheetStyles.header}>
+            <Text style={[sheetStyles.title, { color: colors.text }]}>Enregistrer comme modèle</Text>
+          </View>
+          <Text style={{ color: colors.text2, fontSize: FontSize.sm, marginBottom: Spacing.md }}>
+            Crée un modèle réutilisable (applicable à d&apos;autres logements) à partir des {sectionCount} section
+            {sectionCount > 1 ? 's' : ''} de cette checklist.
+          </Text>
+          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>NOM DU MODÈLE</Text>
+          <TextInput
+            style={[
+              sheetStyles.input,
+              { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground },
+            ]}
+            value={name}
+            onChangeText={setName}
+            placeholder="Ex : Appartement T2 standard"
+            placeholderTextColor={colors.placeholder}
+            autoFocus
+            onSubmitEditing={() => name.trim() && onSubmit(name.trim())}
+            returnKeyType="done"
+          />
+          <TouchableOpacity
+            style={[sheetStyles.submit, { backgroundColor: colors.primary, opacity: name.trim() ? 1 : 0.5 }]}
+            onPress={() => name.trim() && onSubmit(name.trim())}
+            disabled={!name.trim()}
+          >
+            <Check size={IconSize.sm} color="#FFFFFF" />
+            <Text style={sheetStyles.submitText}>Créer le modèle</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+// =============================================================================
+// EditLabelModal — bottom sheet pour renommer une section ou un item
+// =============================================================================
+
+function EditLabelModal({
+  target,
+  onClose,
+  onSubmit,
+}: {
+  target: { type: 'section' | 'item'; id: string; label: string } | null;
+  onClose: () => void;
+  onSubmit: (label: string) => void;
+}) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const [label, setLabel] = useState('');
+  const visible = !!target;
+  const animatedModalStyle = useKeyboardAwareModalStyle({ visible });
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      onShow={() => setLabel(target?.label ?? '')}
+    >
+      <View style={sheetStyles.overlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Animated.View
+          style={[sheetStyles.sheet, { backgroundColor: colors.surface }, Shadow.lg, animatedModalStyle]}
+        >
+          <View style={sheetStyles.handle}>
+            <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
+          </View>
+          <View style={sheetStyles.header}>
+            <Text style={[sheetStyles.title, { color: colors.text }]}>
+              {target?.type === 'section' ? 'Renommer la section' : 'Renommer l’item'}
+            </Text>
+          </View>
+          <TextInput
+            style={[
+              sheetStyles.input,
+              { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground },
+            ]}
+            value={label}
+            onChangeText={setLabel}
+            placeholder="Nouveau nom"
+            placeholderTextColor={colors.placeholder}
+            autoFocus
+            onSubmitEditing={() => label.trim() && onSubmit(label.trim())}
+            returnKeyType="done"
+          />
+          <TouchableOpacity
+            style={[sheetStyles.submit, { backgroundColor: colors.primary, opacity: label.trim() ? 1 : 0.5 }]}
+            onPress={() => label.trim() && onSubmit(label.trim())}
+            disabled={!label.trim()}
+          >
+            <Check size={IconSize.sm} color="#FFFFFF" />
+            <Text style={sheetStyles.submitText}>Enregistrer</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+// =============================================================================
+// ReorderSectionsModal — plein écran, drag-and-drop des sections
+// =============================================================================
+
+function ReorderSectionsModal({
+  visible,
+  sections,
+  saving,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  sections: CheckTemplateSection[];
+  saving: boolean;
+  onClose: () => void;
+  onSave: (orderedIds: string[]) => void;
+}) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const [order, setOrder] = useState<CheckTemplateSection[]>(sections);
+
+  const renderRow = ({ item, drag, isActive }: RenderItemParams<CheckTemplateSection>) => (
+    <ScaleDecorator>
+      <TouchableOpacity
+        onLongPress={drag}
+        delayLongPress={120}
+        activeOpacity={0.8}
+        style={[
+          styles.reorderRow,
+          { backgroundColor: colors.surface, borderColor: colors.border, opacity: isActive ? 0.85 : 1 },
+        ]}
+      >
+        <GripVertical size={IconSize.md} color={colors.mutedText} />
+        <Text style={{ flex: 1, color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.medium }} numberOfLines={1}>
+          {item.label}
+        </Text>
+        <View style={[styles.countBadge, { backgroundColor: colors.itemBackground }]}>
+          <Text style={{ color: colors.text2, fontSize: FontSize.xs, fontWeight: FontWeight.semibold }}>
+            {item.items.length}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    </ScaleDecorator>
+  );
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      onShow={() => setOrder(sections)}
+    >
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={sheetStyles.overlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+          <View style={[sheetStyles.sheet, { backgroundColor: colors.surface, maxHeight: '80%' }, Shadow.lg]}>
+            <View style={sheetStyles.handle}>
+              <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
+            </View>
+            <View style={sheetStyles.header}>
+              <Text style={[sheetStyles.title, { color: colors.text }]}>Réorganiser les sections</Text>
+            </View>
+            <Text style={{ color: colors.text2, fontSize: FontSize.sm, marginBottom: Spacing.md }}>
+              Maintiens une section appuyée puis glisse-la pour changer l&apos;ordre.
+            </Text>
+            <DraggableFlatList
+              data={order}
+              onDragEnd={({ data }) => setOrder(data)}
+              keyExtractor={(item) => item.id}
+              renderItem={renderRow}
+              contentContainerStyle={{ gap: Spacing.sm, paddingBottom: Spacing.md }}
+            />
+            <TouchableOpacity
+              style={[sheetStyles.submit, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]}
+              onPress={() => onSave(order.map((s) => s.id))}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Check size={IconSize.sm} color="#FFFFFF" />
+                  <Text style={sheetStyles.submitText}>Enregistrer l&apos;ordre</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </GestureHandlerRootView>
+    </Modal>
+  );
+}
 
 // =============================================================================
 // ItemRow — une ligne d'item dans une section dépliée
@@ -265,12 +605,14 @@ function ItemRow({
   required,
   logementId,
   isAdmin,
+  onEdit,
 }: {
   itemId: string;
   label: string;
   required: boolean;
   logementId: string;
   isAdmin: boolean;
+  onEdit: () => void;
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
@@ -307,13 +649,22 @@ function ItemRow({
         ) : null}
       </Text>
       {isAdmin ? (
-        <TouchableOpacity
-          onPress={handleDelete}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel={`Supprimer ${label}`}
-        >
-          <Trash2 size={12} color={colors.mutedText} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+          <TouchableOpacity
+            onPress={onEdit}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={`Renommer ${label}`}
+          >
+            <Pencil size={12} color={colors.mutedText} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleDelete}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={`Supprimer ${label}`}
+          >
+            <Trash2 size={12} color={colors.mutedText} />
+          </TouchableOpacity>
+        </View>
       ) : null}
     </View>
   );
@@ -636,6 +987,14 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingVertical: Spacing.sm,
     borderTopWidth: 1,
+  },
+  reorderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
   },
   itemBullet: { width: 16, alignItems: 'center' },
   dot: { width: 6, height: 6, borderRadius: 3 },

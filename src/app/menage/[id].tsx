@@ -71,6 +71,9 @@ import { formatDateFr } from '@/lib/date-fr';
 import { useDialog } from '@/contexts/DialogContext';
 import TimePickerField from '@/components/TimePickerField';
 import { captureGeoPhoto, GeoPhotoError } from '@/lib/captureGeoPhoto';
+import ArrivalDeclarationModal, { type ArrivalDeclaration } from '@/components/ArrivalDeclarationModal';
+import { uploadFile } from '@/api/upload';
+import { optimizeImage } from '@/utils/optimizeImage';
 import { haversineMeters, formatDistance, POINTAGE_DISTANCE_WARN_M } from '@/lib/geo-distance';
 import type { Menage, Logement } from '@/api/types';
 
@@ -132,6 +135,8 @@ export default function MenageDetailScreen() {
   const [proposedTime, setProposedTime] = useState('');
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [showPointageModal, setShowPointageModal] = useState(false);
+  const [arrivalProof, setArrivalProof] = useState<{ photoUrl: string; lat: number; lng: number } | null>(null);
+  const [arrivalSubmitting, setArrivalSubmitting] = useState(false);
   const [showConsommables, setShowConsommables] = useState(false);
   const consommables = useMenageConsommables(id);
   const hasConsommables = (consommables.data?.length ?? 0) > 0;
@@ -201,7 +206,58 @@ export default function MenageDetailScreen() {
     }
   };
 
-  const handleArrival = () => runPointage('arrival', arrivalMutation.mutateAsync);
+  // Arrivée : on capture la photo géolocalisée, puis on demande la déclaration
+  // (note voyageurs + dégradation) avant de pointer réellement l'arrivée.
+  const handleArrival = async () => {
+    const ok = await dialog.confirm({
+      title: "Pointer l'arrivée ?",
+      message: 'Une photo géolocalisée va être prise pour confirmer ta présence sur place.',
+      confirmLabel: 'Prendre la photo',
+    });
+    if (!ok) return;
+    await new Promise((r) => setTimeout(r, 650));
+    try {
+      const proof = await captureGeoPhoto();
+      setArrivalProof(proof);
+    } catch (err) {
+      if (err instanceof GeoPhotoError) {
+        if (err.code !== 'cancelled') void dialog.alert({ title: 'Pointage impossible', message: err.message });
+        return;
+      }
+      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec du pointage' });
+    }
+  };
+
+  const submitArrival = async (decl: ArrivalDeclaration) => {
+    if (!arrivalProof) return;
+    setArrivalSubmitting(true);
+    try {
+      let degradation_photos: { url: string; file_size?: number; mime_type?: string }[] | undefined;
+      if (decl.hasDegradation && decl.assets.length > 0) {
+        degradation_photos = [];
+        for (const a of decl.assets) {
+          const optimized = await optimizeImage(a.uri, a.width, a.height);
+          const uploaded = await uploadFile(optimized.uri, `degradation-${Date.now()}.jpg`, optimized.mimeType);
+          degradation_photos.push({ url: uploaded.url, file_size: uploaded.file_size, mime_type: uploaded.mime_type });
+        }
+      }
+      await arrivalMutation.mutateAsync({
+        id: id!,
+        photo_url: arrivalProof.photoUrl,
+        lat: arrivalProof.lat,
+        lng: arrivalProof.lng,
+        traveler_rating: decl.rating,
+        has_degradation: decl.hasDegradation,
+        degradation_note: decl.hasDegradation ? decl.note : undefined,
+        degradation_photos,
+      });
+      setArrivalProof(null);
+    } catch (err) {
+      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec du pointage' });
+    } finally {
+      setArrivalSubmitting(false);
+    }
+  };
   const handleDeparture = async () => {
     const ok = await runPointage('departure', departureMutation.mutateAsync);
     // Après le pointage de fin, on invite le presta à relever les consommables.
@@ -754,6 +810,13 @@ export default function MenageDetailScreen() {
         visible={showConsommables}
         menageId={menage.id}
         onClose={() => setShowConsommables(false)}
+      />
+
+      <ArrivalDeclarationModal
+        visible={!!arrivalProof}
+        submitting={arrivalSubmitting}
+        onClose={() => setArrivalProof(null)}
+        onSubmit={submitArrival}
       />
     </SafeAreaView>
   );

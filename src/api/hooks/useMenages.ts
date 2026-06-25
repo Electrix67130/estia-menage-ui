@@ -96,13 +96,27 @@ export interface PointagePayload {
   lng: number;
 }
 
+export interface DegradationPhotoInput {
+  url: string;
+  thumbnail_url?: string;
+  file_size?: number;
+  mime_type?: string;
+}
+
+export interface ArrivalPayload extends PointagePayload {
+  traveler_rating?: number;
+  has_degradation?: boolean;
+  degradation_note?: string;
+  degradation_photos?: DegradationPhotoInput[];
+}
+
 export function useArrival() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, photo_url, lat, lng }: PointagePayload) =>
+    mutationFn: ({ id, ...body }: ArrivalPayload) =>
       apiFetch<Menage>(`/menages/${id}/arrival`, {
         method: 'POST',
-        body: { photo_url, lat, lng },
+        body,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['menages'] }),
   });

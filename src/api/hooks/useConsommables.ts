@@ -20,6 +20,58 @@ export function useMenageConsommables(menageId: string | undefined) {
   });
 }
 
+// ---------- Gestion admin (niveau logement) ----------
+
+/** Liste des consommables d'un logement + stock courant (dernier relevé). */
+export function useLogementConsommables(logementId: string | undefined) {
+  return useQuery({
+    queryKey: ['logement-consommables', logementId],
+    queryFn: () => apiFetch<ConsommableLine[]>(`/logement-consommables?logement_id=${logementId}`),
+    enabled: !!logementId,
+  });
+}
+
+export function useCreateConsommable(logementId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { label: string; unit?: string | null; seuil_alerte?: number }) =>
+      apiFetch('/logement-consommables', { method: 'POST', body: { logement_id: logementId, ...body } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['logement-consommables', logementId] }),
+  });
+}
+
+export function useUpdateConsommable(logementId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: { label?: string; unit?: string | null; seuil_alerte?: number };
+    }) => apiFetch(`/logement-consommables/${id}`, { method: 'PATCH', body }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['logement-consommables', logementId] }),
+  });
+}
+
+export function useDeleteConsommable(logementId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<void>(`/logement-consommables/${id}`, { method: 'DELETE' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['logement-consommables', logementId] }),
+  });
+}
+
+/** Fixe/initialise le stock courant d'un consommable (admin). */
+export function useSetConsommableStock(logementId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, qty }: { id: string; qty: number }) =>
+      apiFetch(`/logement-consommables/${id}/stock`, { method: 'PUT', body: { qty } }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['logement-consommables', logementId] }),
+  });
+}
+
 /** Relevé au pointage de fin : envoie la quantité restante de chaque consommable. */
 export function useSetMenageConsommables(menageId: string) {
   const qc = useQueryClient();

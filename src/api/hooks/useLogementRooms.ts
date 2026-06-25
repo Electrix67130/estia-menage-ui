@@ -40,7 +40,7 @@ export function useLogementRooms(logementId: string | undefined) {
 export function useCreateRoom(logementId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; photo_url?: string | null; position?: number }) =>
+    mutationFn: (body: { kind: RoomKind; name?: string; photo_url?: string | null; position?: number }) =>
       apiFetch<LogementRoom>('/logement-rooms', {
         method: 'POST',
         body: { logement_id: logementId, ...body },
@@ -52,8 +52,13 @@ export function useCreateRoom(logementId: string) {
 export function useUpdateRoom(logementId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, body }: { id: string; body: { name?: string; photo_url?: string | null } }) =>
-      apiFetch<LogementRoom>(`/logement-rooms/${id}`, { method: 'PATCH', body }),
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: { kind?: RoomKind; name?: string; photo_url?: string | null };
+    }) => apiFetch<LogementRoom>(`/logement-rooms/${id}`, { method: 'PATCH', body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['logement-rooms', logementId] }),
   });
 }

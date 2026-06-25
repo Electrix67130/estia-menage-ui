@@ -113,6 +113,8 @@ export interface Logement {
   n_lit_appoint: number;
   has_basement: boolean;
   has_laundry: boolean;
+  has_pool: boolean;
+  has_jacuzzi: boolean;
   surface_m2: number | null;
   notes: string | null;
   key_safe_code: string | null;
@@ -163,6 +165,8 @@ export interface CreateLogementInput {
   n_lit_appoint?: number;
   has_basement?: boolean;
   has_laundry?: boolean;
+  has_pool?: boolean;
+  has_jacuzzi?: boolean;
   surface_m2?: number;
   notes?: string;
   proprietaire_user_id?: string;

@@ -41,7 +41,33 @@ import {
   useUpdateRoom,
   useDeleteRoom,
   type LogementRoom,
+  type RoomKind,
 } from '@/api/hooks/useLogementRooms';
+import {
+  useLogementConsommables,
+  useCreateConsommable,
+  useUpdateConsommable,
+  useDeleteConsommable,
+  useSetConsommableStock,
+  type ConsommableLine,
+} from '@/api/hooks/useConsommables';
+
+/** Types de pièce sélectionnables (piscine/jacuzzi gérés via les équipements du logement). */
+const ROOM_KINDS: { value: RoomKind; label: string }[] = [
+  { value: 'chambre', label: 'Chambre' },
+  { value: 'salle_de_bain', label: 'Salle de bain' },
+  { value: 'wc', label: 'WC' },
+  { value: 'cuisine', label: 'Cuisine' },
+  { value: 'salon', label: 'Salon' },
+  { value: 'salle_a_manger', label: 'Salle à manger' },
+  { value: 'bureau', label: 'Bureau' },
+  { value: 'entree', label: 'Entrée' },
+  { value: 'couloir', label: 'Couloir' },
+  { value: 'exterieur', label: 'Extérieur' },
+  { value: 'cave', label: 'Cave' },
+  { value: 'buanderie', label: 'Buanderie' },
+  { value: 'autre', label: 'Autre' },
+];
 
 export default function LogementDetailScreen() {
   const colorScheme = useColorScheme();
@@ -236,6 +262,13 @@ export default function LogementDetailScreen() {
           onEdit={(room) => setRoomModal({ mode: 'edit', room })}
         />
 
+        {isAdmin ? (
+          <>
+            <Text style={[styles.section, { color: colors.text2 }]}>CONSOMMABLES</Text>
+            <ConsommablesSection logementId={logement.id} />
+          </>
+        ) : null}
+
         {logement.key_safe_code && (isAdmin || !!myMember) ? (
           <>
             <Text style={[styles.section, { color: colors.text2 }]}>CODE BOÎTE À CLEF</Text>
@@ -387,6 +420,7 @@ function RoomEditModal({
   const updateRoom = useUpdateRoom(logementId);
   const deleteRoom = useDeleteRoom(logementId);
 
+  const [kind, setKind] = useState<RoomKind | ''>(room?.kind ?? '');
   const [name, setName] = useState(room?.name ?? '');
   const [photoUrl, setPhotoUrl] = useState<string | null>(room?.photo_url ?? null);
   const [uploading, setUploading] = useState(false);
@@ -420,15 +454,21 @@ function RoomEditModal({
   };
 
   const handleSave = async () => {
-    if (!name.trim()) {
+    if (!kind) {
+      void dialog.alert({ title: 'Type requis', message: 'Choisis un type de pièce.' });
+      return;
+    }
+    if (kind === 'autre' && !name.trim()) {
       void dialog.alert({ title: 'Nom requis', message: 'Donne un nom à la pièce.' });
       return;
     }
+    // Le nom n'est envoyé que pour « autre » ; sinon l'API le génère depuis le type.
+    const body = { kind, name: kind === 'autre' ? name.trim() : undefined, photo_url: photoUrl };
     try {
       if (room) {
-        await updateRoom.mutateAsync({ id: room.id, body: { name: name.trim(), photo_url: photoUrl } });
+        await updateRoom.mutateAsync({ id: room.id, body });
       } else {
-        await createRoom.mutateAsync({ name: name.trim(), photo_url: photoUrl });
+        await createRoom.mutateAsync(body);
       }
       onClose();
     } catch (err) {
@@ -472,14 +512,41 @@ function RoomEditModal({
             {room ? 'Modifier la pièce' : 'Nouvelle pièce'}
           </Text>
 
-          <Text style={[styles.modalLabel, { color: colors.text2 }]}>Nom de la pièce</Text>
-          <TextInput
-            style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
-            value={name}
-            onChangeText={setName}
-            placeholder="Ex. Chambre parentale"
-            placeholderTextColor={colors.placeholder}
-          />
+          <Text style={[styles.modalLabel, { color: colors.text2 }]}>Type de pièce</Text>
+          <View style={styles.kindWrap}>
+            {ROOM_KINDS.map((k) => {
+              const active = kind === k.value;
+              return (
+                <TouchableOpacity
+                  key={k.value}
+                  style={[
+                    styles.kindChip,
+                    { borderColor: colors.border, backgroundColor: active ? colors.primary : colors.itemBackground },
+                  ]}
+                  onPress={() => setKind(k.value)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Type : ${k.label}`}
+                >
+                  <Text style={{ color: active ? '#FFFFFF' : colors.text, fontSize: FontSize.sm, fontWeight: FontWeight.medium }}>
+                    {k.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {kind === 'autre' ? (
+            <>
+              <Text style={[styles.modalLabel, { color: colors.text2 }]}>Nom de la pièce</Text>
+              <TextInput
+                style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+                value={name}
+                onChangeText={setName}
+                placeholder="Ex. Salle de jeux"
+                placeholderTextColor={colors.placeholder}
+              />
+            </>
+          ) : null}
 
           <Text style={[styles.modalLabel, { color: colors.text2 }]}>Photo de couverture</Text>
           <TouchableOpacity
@@ -538,6 +605,227 @@ function RoomEditModal({
   );
 }
 
+function ConsommablesSection({ logementId }: { logementId: string }) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const { data, isLoading } = useLogementConsommables(logementId);
+  const [modal, setModal] = useState<{ mode: 'create' } | { mode: 'edit'; item: ConsommableLine } | null>(null);
+  const list = data ?? [];
+
+  if (isLoading) {
+    return (
+      <View style={[styles.roomsEmpty, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ gap: Spacing.sm }}>
+      {list.map((c) => {
+        const badge =
+          c.qty === null
+            ? { text: 'jamais relevé', color: colors.text2 }
+            : c.needs_restock
+              ? { text: `${c.qty}${c.unit ? ` ${c.unit}` : ''} · à racheter`, color: colors.red }
+              : { text: `${c.qty}${c.unit ? ` ${c.unit}` : ''}`, color: colors.primary };
+        return (
+          <TouchableOpacity
+            key={c.logement_consommable_id}
+            style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => setModal({ mode: 'edit', item: c })}
+            activeOpacity={0.7}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.medium }}>{c.label}</Text>
+              <Text style={{ color: colors.text2, fontSize: FontSize.sm }}>
+                Seuil : {c.seuil_alerte}{c.unit ? ` ${c.unit}` : ''}
+              </Text>
+            </View>
+            <Text style={{ color: badge.color, fontSize: FontSize.sm, fontWeight: FontWeight.semibold }}>{badge.text}</Text>
+          </TouchableOpacity>
+        );
+      })}
+      <TouchableOpacity
+        style={[styles.addRoomBtn, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}
+        onPress={() => setModal({ mode: 'create' })}
+      >
+        <Plus size={IconSize.sm} color={colors.primary} />
+        <Text style={[styles.addRoomText, { color: colors.primary }]}>Ajouter un consommable</Text>
+      </TouchableOpacity>
+
+      {modal ? (
+        <ConsommableEditModal
+          logementId={logementId}
+          item={modal.mode === 'edit' ? modal.item : null}
+          onClose={() => setModal(null)}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function ConsommableEditModal({
+  logementId,
+  item,
+  onClose,
+}: {
+  logementId: string;
+  item: ConsommableLine | null;
+  onClose: () => void;
+}) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const insets = useSafeAreaInsets();
+  const dialog = useDialog();
+  const create = useCreateConsommable(logementId);
+  const update = useUpdateConsommable(logementId);
+  const remove = useDeleteConsommable(logementId);
+  const setStock = useSetConsommableStock(logementId);
+
+  const [label, setLabel] = useState(item?.label ?? '');
+  const [unit, setUnit] = useState(item?.unit ?? '');
+  const [seuil, setSeuil] = useState(String(item?.seuil_alerte ?? 1));
+  const [qty, setQty] = useState(item && item.qty !== null ? String(item.qty) : '');
+
+  const modalStyle = useKeyboardAwareModalStyle({ visible: true });
+  const swipe = useSwipeToClose(onClose, true);
+
+  const saving = create.isPending || update.isPending || setStock.isPending;
+
+  const handleSave = async () => {
+    if (!label.trim()) {
+      void dialog.alert({ title: 'Nom requis', message: 'Donne un nom au consommable.' });
+      return;
+    }
+    const seuilNum = parseInt(seuil, 10);
+    if (Number.isNaN(seuilNum) || seuilNum < 0) {
+      void dialog.alert({ title: 'Seuil invalide', message: 'Le seuil doit être un entier positif.' });
+      return;
+    }
+    const body = { label: label.trim(), unit: unit.trim() || null, seuil_alerte: seuilNum };
+    try {
+      if (item) {
+        await update.mutateAsync({ id: item.logement_consommable_id, body });
+        // Stock : maj seulement si la valeur a changé et est valide.
+        const original = item.qty === null ? '' : String(item.qty);
+        if (qty.trim() !== original) {
+          const qtyNum = parseInt(qty, 10);
+          if (!Number.isNaN(qtyNum) && qtyNum >= 0) {
+            await setStock.mutateAsync({ id: item.logement_consommable_id, qty: qtyNum });
+          }
+        }
+      } else {
+        await create.mutateAsync(body);
+      }
+      onClose();
+    } catch (err) {
+      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Enregistrement impossible' });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!item) return;
+    const ok = await dialog.confirm({
+      title: 'Supprimer le consommable ?',
+      message: `« ${item.label} » sera supprimé.`,
+      confirmLabel: 'Supprimer',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await remove.mutateAsync(item.logement_consommable_id);
+      onClose();
+    } catch (err) {
+      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Suppression impossible' });
+    }
+  };
+
+  return (
+    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <Animated.View
+          style={[
+            styles.modal,
+            { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, Spacing.lg) },
+            modalStyle,
+            swipe.animatedStyle,
+          ]}
+        >
+          <SheetHandle gesture={swipe.gesture} />
+          <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.sm }]}>
+            {item ? 'Modifier le consommable' : 'Nouveau consommable'}
+          </Text>
+
+          <Text style={[styles.modalLabel, { color: colors.text2 }]}>Nom</Text>
+          <TextInput
+            style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+            value={label}
+            onChangeText={setLabel}
+            placeholder="Ex. Papier toilette"
+            placeholderTextColor={colors.placeholder}
+          />
+
+          <Text style={[styles.modalLabel, { color: colors.text2 }]}>Unité (optionnel)</Text>
+          <TextInput
+            style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+            value={unit}
+            onChangeText={setUnit}
+            placeholder="Ex. rouleaux"
+            placeholderTextColor={colors.placeholder}
+          />
+
+          <Text style={[styles.modalLabel, { color: colors.text2 }]}>Seuil d&apos;alerte</Text>
+          <TextInput
+            style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+            value={seuil}
+            onChangeText={setSeuil}
+            placeholder="1"
+            placeholderTextColor={colors.placeholder}
+            keyboardType="number-pad"
+          />
+
+          {item ? (
+            <>
+              <Text style={[styles.modalLabel, { color: colors.text2 }]}>Stock actuel</Text>
+              <TextInput
+                style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+                value={qty}
+                onChangeText={setQty}
+                placeholder={item.qty === null ? 'Initialiser le stock' : '0'}
+                placeholderTextColor={colors.placeholder}
+                keyboardType="number-pad"
+              />
+            </>
+          ) : null}
+
+          <TouchableOpacity
+            style={[styles.modalSubmit, { backgroundColor: colors.primary }]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modalSubmitText}>Enregistrer</Text>}
+          </TouchableOpacity>
+
+          {item ? (
+            <TouchableOpacity
+              style={[styles.modalDelete, { borderColor: colors.red }]}
+              onPress={handleDelete}
+              disabled={remove.isPending}
+            >
+              <Trash size={IconSize.sm} color={colors.red} />
+              <Text style={{ color: colors.red, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
+                Supprimer le consommable
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.md, gap: Spacing.md },
@@ -570,6 +858,8 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     paddingBottom: Spacing.sm,
   },
+  kindWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.sm },
+  kindChip: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: Radius.pill, borderWidth: 1 },
   roomThumb: { width: '100%', aspectRatio: 16 / 9 },
   roomThumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   roomName: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, paddingHorizontal: Spacing.sm },

@@ -11,7 +11,7 @@ interface Props {
   readonly?: boolean;
 }
 
-const SECTION_ICONS: Record<string, string> = {
+export const SECTION_ICONS: Record<string, string> = {
   kitchen: '🍳',
   living_room: '🛋️',
   bedroom: '🛏️',

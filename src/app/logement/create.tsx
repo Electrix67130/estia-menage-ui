@@ -115,6 +115,8 @@ export default function CreateLogementScreen() {
   const [defLaundryIncluded, setDefLaundryIncluded] = useState(false);
   const [defLaundryClient, setDefLaundryClient] = useState('');
   const [defLaundryProvider, setDefLaundryProvider] = useState('');
+  const [hasPool, setHasPool] = useState(false);
+  const [hasJacuzzi, setHasJacuzzi] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async () => {
@@ -165,6 +167,8 @@ export default function CreateLogementScreen() {
         default_laundry_provider_price: defLaundryIncluded
           ? parseMoneyOrUndef(defLaundryProvider)
           : undefined,
+        has_pool: hasPool,
+        has_jacuzzi: hasJacuzzi,
       });
       if (checklistTemplateId) {
         try {
@@ -441,6 +445,24 @@ export default function CreateLogementScreen() {
             </LabeledField>
           </>
         ) : null}
+
+        <Text style={[styles.section, { color: colors.text2 }]}>ÉQUIPEMENTS</Text>
+        <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Piscine</Text>
+          <Switch
+            value={hasPool}
+            onValueChange={setHasPool}
+            trackColor={{ false: colors.border, true: colors.primary }}
+          />
+        </View>
+        <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Jacuzzi</Text>
+          <Switch
+            value={hasJacuzzi}
+            onValueChange={setHasJacuzzi}
+            trackColor={{ false: colors.border, true: colors.primary }}
+          />
+        </View>
 
         <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
         <AutoScrollInput

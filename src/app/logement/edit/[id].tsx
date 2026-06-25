@@ -114,6 +114,8 @@ export default function EditLogementScreen() {
   const [defaultHoraireDebut, setDefaultHoraireDebut] = useState('');
   const [defaultHoraireFin, setDefaultHoraireFin] = useState('');
   const [color, setColor] = useState<string | null>(null);
+  const [hasPool, setHasPool] = useState(false);
+  const [hasJacuzzi, setHasJacuzzi] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -143,6 +145,8 @@ export default function EditLogementScreen() {
     setDefaultHoraireDebut(logement.default_horaire_debut ?? '');
     setDefaultHoraireFin(logement.default_horaire_fin ?? '');
     setColor(logement.color ?? null);
+    setHasPool(logement.has_pool ?? false);
+    setHasJacuzzi(logement.has_jacuzzi ?? false);
   }, [logement]);
 
   const handleSubmit = async () => {
@@ -196,6 +200,8 @@ export default function EditLogementScreen() {
           default_horaire_debut: defaultHoraireDebut.trim() || undefined,
           default_horaire_fin: defaultHoraireFin.trim() || undefined,
           color: color || undefined,
+          has_pool: hasPool,
+          has_jacuzzi: hasJacuzzi,
         },
       });
       router.back();
@@ -437,6 +443,24 @@ export default function EditLogementScreen() {
             </LabeledField>
           </>
         ) : null}
+
+        <Text style={[styles.section, { color: colors.text2 }]}>ÉQUIPEMENTS</Text>
+        <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Piscine</Text>
+          <Switch
+            value={hasPool}
+            onValueChange={setHasPool}
+            trackColor={{ false: colors.border, true: colors.primary }}
+          />
+        </View>
+        <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Jacuzzi</Text>
+          <Switch
+            value={hasJacuzzi}
+            onValueChange={setHasJacuzzi}
+            trackColor={{ false: colors.border, true: colors.primary }}
+          />
+        </View>
 
         <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
         <AutoScrollInput

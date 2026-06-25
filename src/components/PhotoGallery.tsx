@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useMemo } from 'react';
-import { View, Text, Image, TouchableOpacity, FlatList, StyleSheet, Dimensions, RefreshControl, Modal } from 'react-native';
+import { View, Text, Image, TouchableOpacity, FlatList, StyleSheet, Dimensions, RefreshControl, Modal, ScrollView } from 'react-native';
 import { Camera, ImagePlus, Trash2, Share2, X } from 'lucide-react-native';
 import ImageView from 'react-native-image-viewing';
 import * as ImagePicker from 'expo-image-picker';
@@ -7,6 +7,8 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { usePhotos, useLogementPhotos, useCreatePhoto, useDeletePhoto } from '@/api/hooks/usePhotos';
+import { useMenageCheck } from '@/api/hooks/useMenageCheck';
+import { SECTION_ICONS } from '@/components/MenageCheckList';
 import { uploadFile } from '@/api/upload';
 import { optimizeImage } from '@/utils/optimizeImage';
 import { shareFile } from '@/utils/shareFile';
@@ -58,6 +60,13 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
       data: rawData.data.filter((p) => p.logement_room_id && allowed.has(p.logement_room_id)),
     };
   }, [isMultiRooms, rooms, rawData]);
+
+  // Mode ménage : pièces = sections de la checklist. Le sélecteur sert à la
+  // fois de filtre d'affichage et de cible d'upload (section_id).
+  const { data: checkTree } = useMenageCheck(menageId);
+  const sections = useMemo(() => checkTree ?? [], [checkTree]);
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+
   const [roomPickerOpen, setRoomPickerOpen] = useState<null | 'camera' | 'gallery'>(null);
   const createMutation = useCreatePhoto();
   const deleteMutation = useDeletePhoto();
@@ -97,6 +106,9 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
         const uploaded = await uploadFile(optimized.uri, fileName, optimized.mimeType);
         await createMutation.mutateAsync({
           menage_id: menageId,
+          // Rattache la photo à la pièce sélectionnée (section de checklist).
+          // « Toutes » (null) => photo non classée.
+          section_id: menageId ? (selectedSectionId ?? undefined) : undefined,
           logement_id: menageId ? undefined : logementId,
           logement_room_id: menageId
             ? undefined
@@ -110,7 +122,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
     } catch (err) {
       void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
     }
-  }, [menageId, logementId, logementRoomId, createMutation, dialog]);
+  }, [menageId, logementId, logementRoomId, selectedSectionId, createMutation, dialog]);
 
   /**
    * Entrée d'upload : en mode multi-rooms, on ouvre d'abord la modal "quelle
@@ -163,30 +175,103 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
     [colors, handleDelete],
   );
 
-  const renderHeader = () => readonly ? null : (
-    <View style={styles.actions}>
-      <TouchableOpacity
-        style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-        onPress={() => handleAdd(true)}
-        accessibilityRole="button"
-        accessibilityLabel="Prendre une photo"
-      >
-        <Camera size={IconSize.md} color="#FFFFFF" />
-        <Text style={styles.actionText}>Caméra</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-        onPress={() => handleAdd(false)}
-        accessibilityRole="button"
-        accessibilityLabel="Choisir une photo"
-      >
-        <ImagePlus size={IconSize.md} color="#FFFFFF" />
-        <Text style={styles.actionText}>Galerie</Text>
-      </TouchableOpacity>
+  // Sélecteur de pièce (mode ménage uniquement) : « Toutes » + une chip par section.
+  const sectionChips = menageId && sections.length > 0 ? (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.chipsRow}
+    >
+      {[{ id: null as string | null, label: 'Toutes', icon: '' }, ...sections.map((s) => ({
+        id: s.id as string | null,
+        label: s.section_label,
+        icon: SECTION_ICONS[s.section_type] || '•',
+      }))].map((chip) => {
+        const active = selectedSectionId === chip.id;
+        return (
+          <TouchableOpacity
+            key={chip.id ?? '__all__'}
+            style={[
+              styles.chip,
+              { borderColor: colors.border, backgroundColor: active ? colors.primary : colors.itemBackground },
+            ]}
+            onPress={() => setSelectedSectionId(chip.id)}
+            accessibilityRole="button"
+            accessibilityLabel={`Filtrer : ${chip.label}`}
+          >
+            <Text style={[styles.chipText, { color: active ? '#FFFFFF' : colors.text }]}>
+              {chip.icon ? `${chip.icon} ` : ''}{chip.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  ) : null;
+
+  const renderHeader = () => (
+    <View>
+      {sectionChips}
+      {!readonly && (
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+            onPress={() => handleAdd(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Prendre une photo"
+          >
+            <Camera size={IconSize.md} color="#FFFFFF" />
+            <Text style={styles.actionText}>Caméra</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+            onPress={() => handleAdd(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Choisir une photo"
+          >
+            <ImagePlus size={IconSize.md} color="#FFFFFF" />
+            <Text style={styles.actionText}>Galerie</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 
-  const photos = data?.data ?? [];
+  const allPhotos = data?.data ?? [];
+
+  // Mode ménage : regroupement par pièce (sections de checklist).
+  // - une section précise sélectionnée => grille plate filtrée
+  // - « Toutes » => groupes (1 par section ayant des photos) + « Non classées »
+  const groups = useMemo(() => {
+    if (!menageId) return [];
+    const bySection = new Map<string, typeof allPhotos>();
+    for (const p of allPhotos) {
+      const key = p.section_id ?? '__none__';
+      if (!bySection.has(key)) bySection.set(key, []);
+      bySection.get(key)!.push(p);
+    }
+    const result = sections
+      .filter((s) => bySection.has(s.id))
+      .map((s) => ({
+        id: s.id,
+        label: s.section_label,
+        icon: SECTION_ICONS[s.section_type] || '•',
+        photos: bySection.get(s.id)!,
+      }));
+    if (bySection.has('__none__')) {
+      result.push({ id: '__none__', label: 'Non classées', icon: '📷', photos: bySection.get('__none__')! });
+    }
+    return result;
+  }, [menageId, sections, allPhotos]);
+
+  const grouped = !!menageId && selectedSectionId === null && groups.length > 0;
+
+  // Photos affichées (et ordre) selon le mode : groupé (aplati), filtré, ou plat.
+  const photos = useMemo(() => {
+    if (grouped) return groups.flatMap((g) => g.photos);
+    if (menageId && selectedSectionId) return allPhotos.filter((p) => p.section_id === selectedSectionId);
+    return allPhotos;
+  }, [grouped, groups, menageId, selectedSectionId, allPhotos]);
+
   const imageSources = useMemo(() => photos.map((p) => ({ uri: p.url })), [photos]);
 
   // Detail overlay — tap the image to open fullscreen with zoom
@@ -267,7 +352,26 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
     );
   }
 
-  const items = data?.data ?? [];
+  const items = photos;
+
+  // Rendu d'un groupe de pièce : titre (icône + label + compteur) puis grille statique.
+  const renderGroup = useCallback(
+    (group: { id: string; label: string; icon: string; photos: typeof allPhotos }) => (
+      <View key={group.id} style={styles.group}>
+        <Text style={[styles.groupTitle, { color: colors.text2 }]}>
+          {group.icon} {group.label} · {group.photos.length}
+        </Text>
+        <View style={styles.gridWrap}>
+          {group.photos.map((item) => (
+            <View key={item.id} style={styles.gridCell}>
+              {renderItem({ item })}
+            </View>
+          ))}
+        </View>
+      </View>
+    ),
+    [colors, renderItem],
+  );
 
   const roomPickerModal = isMultiRooms && rooms ? (
     <Modal
@@ -338,6 +442,8 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
               Aucune photo. Utilisez la caméra ou la galerie.
             </Text>
           ) : null
+        ) : grouped ? (
+          groups.map((g) => renderGroup(g))
         ) : (
           <View style={styles.gridWrap}>
             {items.map((item) => (
@@ -354,21 +460,37 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        numColumns={COLUMN_COUNT}
-        columnWrapperStyle={styles.row}
-        ListHeaderComponent={renderHeader}
-        contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} colors={[colors.primary]} />}
-        ListEmptyComponent={
-          !isLoading ? (
-            <Text style={[styles.empty, { color: colors.mutedText }]}>Aucune photo. Utilisez la caméra ou la galerie.</Text>
-          ) : null
-        }
-      />
+      {grouped ? (
+        <FlatList
+          data={groups}
+          keyExtractor={(g) => g.id}
+          renderItem={({ item: g }) => renderGroup(g)}
+          ListHeaderComponent={renderHeader}
+          contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} colors={[colors.primary]} />}
+          ListEmptyComponent={
+            !isLoading ? (
+              <Text style={[styles.empty, { color: colors.mutedText }]}>Aucune photo. Utilisez la caméra ou la galerie.</Text>
+            ) : null
+          }
+        />
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          numColumns={COLUMN_COUNT}
+          columnWrapperStyle={styles.row}
+          ListHeaderComponent={renderHeader}
+          contentContainerStyle={styles.list}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} colors={[colors.primary]} />}
+          ListEmptyComponent={
+            !isLoading ? (
+              <Text style={[styles.empty, { color: colors.mutedText }]}>Aucune photo. Utilisez la caméra ou la galerie.</Text>
+            ) : null
+          }
+        />
+      )}
       {roomPickerModal}
     </View>
   );
@@ -416,6 +538,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: ITEM_GAP / 2,
     marginBottom: ITEM_GAP,
   },
+  chipsRow: { flexDirection: 'row', gap: Spacing.sm, paddingBottom: Spacing.md },
+  chip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+  },
+  chipText: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
+  group: { marginBottom: Spacing.lg },
+  groupTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, marginBottom: Spacing.sm },
   actions: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.lg },
   actionBtn: {
     flex: 1,

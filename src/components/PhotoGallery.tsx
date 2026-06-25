@@ -157,6 +157,12 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
           accessibilityLabel={item.caption || 'Photo de menage'}
         >
           <Image source={{ uri: item.thumbnail_url || item.url }} style={styles.photoImage} />
+          {/* Horodatage de prise, incrusté en bas de la vignette */}
+          <View style={styles.timeBadge}>
+            <Text style={styles.timeBadgeText} numberOfLines={1}>
+              {formatDateFr(item.taken_at, 'dayShortTime')}
+            </Text>
+          </View>
         </TouchableOpacity>
         {!readonly && (
           <TouchableOpacity
@@ -308,7 +314,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
               <Text style={[styles.photoCaption, { color: colors.text2 }]}>{selectedPhoto.caption}</Text>
             )}
             <Text style={[styles.photoDate, { color: colors.mutedText }]}>
-              {formatDateFr(selectedPhoto.created_at, 'long')}
+              {formatDateFr(selectedPhoto.taken_at, 'datetime')}
             </Text>
           </View>
           <View style={styles.detailActions}>
@@ -562,6 +568,16 @@ const styles = StyleSheet.create({
   row: { gap: ITEM_GAP, marginBottom: ITEM_GAP },
   photoItem: { width: ITEM_SIZE, height: ITEM_SIZE, borderRadius: Radius.sm, overflow: 'hidden', position: 'relative' },
   photoImage: { width: '100%', height: '100%' },
+  timeBadge: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  timeBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: FontWeight.medium },
   deleteIcon: { position: 'absolute', top: 4, right: 4 },
   deleteIconBg: {
     backgroundColor: 'rgba(220, 38, 38, 0.85)',

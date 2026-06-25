@@ -16,7 +16,7 @@ import { useDialog } from '@/contexts/DialogContext';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Pencil, Trash2, MapPin, Camera, Plus, DoorOpen, Image as ImageIcon, Trash } from 'lucide-react-native';
+import { ArrowLeft, Trash2, MapPin, Camera, Plus, DoorOpen, Image as ImageIcon, Trash } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -32,6 +32,7 @@ import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import CheckTemplateEditor from '@/components/CheckTemplateEditor';
 import KeyboardAwareScroll from '@/components/KeyboardAwareScroll';
 import LogementMembersSection from '@/components/LogementMembersSection';
+import LogementInfoForm from '@/components/LogementInfoForm';
 import LogementClientSection from '@/components/LogementClientSection';
 import LogementExternalCalendarsSection from '@/components/LogementExternalCalendarsSection';
 import { openMaps } from '@/lib/contact-links';
@@ -191,9 +192,6 @@ export default function LogementDetailScreen() {
                 <Plus size={IconSize.sm} color="#FFFFFF" />
                 <Text style={styles.headerCtaText}>Ménage</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => router.push(`/logement/edit/${id}`)} accessibilityLabel="Éditer">
-                <Pencil size={IconSize.md} color={colors.text} />
-              </TouchableOpacity>
               <TouchableOpacity onPress={handleDelete} accessibilityLabel="Supprimer">
                 <Trash2 size={IconSize.md} color={colors.red} />
               </TouchableOpacity>
@@ -254,6 +252,8 @@ export default function LogementDetailScreen() {
           </TouchableOpacity>
         ) : null}
 
+        {isAdmin ? <LogementInfoForm logementId={logement.id} /> : null}
+
         <Text style={[styles.section, { color: colors.text2 }]}>PIÈCES</Text>
         <RoomsSection
           logementId={logement.id}
@@ -269,14 +269,15 @@ export default function LogementDetailScreen() {
           </>
         ) : null}
 
-        {logement.key_safe_code && (isAdmin || !!myMember) ? (
+        {/* Code & notes : en lecture seule pour les non-admins (l'admin les édite dans le formulaire ci-dessus). */}
+        {!isAdmin && logement.key_safe_code && !!myMember ? (
           <>
             <Text style={[styles.section, { color: colors.text2 }]}>CODE BOÎTE À CLEF</Text>
             <SecretCodeField value={logement.key_safe_code} onChangeText={() => {}} readonly />
           </>
         ) : null}
 
-        {logement.notes ? (
+        {!isAdmin && logement.notes ? (
           <>
             <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
             <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -285,7 +286,7 @@ export default function LogementDetailScreen() {
           </>
         ) : null}
 
-        {canViewClients ? (
+        {canViewClients && !isAdmin ? (
           <LogementClientSection
             logementId={logement.id}
             currentClientId={logement.client_id}

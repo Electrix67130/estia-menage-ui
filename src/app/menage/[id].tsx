@@ -1114,6 +1114,12 @@ function AccessInfoSection({
   );
 }
 
+/** Compo de lits suggérée pour N voyageurs : un double par paire, +1 simple si impair. */
+function suggestBeds(travelers: number) {
+  const n = Math.max(0, travelers);
+  return { n_lit_double: Math.floor(n / 2), n_lit_simple: n % 2, n_canape_lit: 0, n_lit_appoint: 0 };
+}
+
 function BedsSection({
   menage,
   colors,
@@ -1142,6 +1148,12 @@ function BedsSection({
     updateMutation.mutate({ id: menage.id, body: { [field]: Math.max(0, value) } });
   };
 
+  const applySuggestion = () => {
+    const n = menage.n_travelers ?? 0;
+    if (n <= 0) return;
+    updateMutation.mutate({ id: menage.id, body: suggestBeds(n) });
+  };
+
   const stepBtn = {
     width: 30,
     height: 30,
@@ -1168,9 +1180,21 @@ function BedsSection({
 
   return (
     <View style={{ paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm }}>
-      <Text style={{ color: colors.text2, fontSize: FontSize.xs, fontWeight: FontWeight.semibold, marginBottom: Spacing.sm, letterSpacing: 0.5 }}>
-        LITS À FAIRE
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm }}>
+        <Text style={{ color: colors.text2, fontSize: FontSize.xs, fontWeight: FontWeight.semibold, letterSpacing: 0.5 }}>
+          LITS À FAIRE
+        </Text>
+        {isAdmin && (menage.n_travelers ?? 0) > 0 ? (
+          <TouchableOpacity
+            onPress={applySuggestion}
+            style={{ borderWidth: 1, borderColor: colors.primary, borderRadius: Radius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 4 }}
+          >
+            <Text style={{ color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semibold }}>
+              Suggérer ({menage.n_travelers})
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
 
       {/* Voyageurs + durée */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm, gap: Spacing.md, flexWrap: 'wrap' }}>

@@ -573,7 +573,7 @@ export default function MenageDetailScreen() {
 
       <AccessInfoSection menage={menage} logement={logement} colors={colors} />
 
-      <BedsSection menage={menage} colors={colors} />
+      <BedsSection menage={menage} colors={colors} isAdmin={isAdmin} />
 
       {/* Tabs */}
       <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
@@ -1117,32 +1117,85 @@ function AccessInfoSection({
 function BedsSection({
   menage,
   colors,
+  isAdmin,
 }: {
   menage: Menage;
   colors: typeof Colors.light;
+  isAdmin: boolean;
 }) {
   const { t } = useTranslation();
-  const total =
-    (menage.n_lit_simple ?? 0) +
-    (menage.n_lit_double ?? 0) +
-    (menage.n_canape_lit ?? 0) +
-    (menage.n_lit_appoint ?? 0);
-  if (total === 0) return null;
-  const items: { value: number; label: string }[] = [
-    { value: menage.n_lit_simple ?? 0, label: t('beds.simple') },
-    { value: menage.n_lit_double ?? 0, label: t('beds.double') },
-    { value: menage.n_canape_lit ?? 0, label: t('beds.sofa') },
-    { value: menage.n_lit_appoint ?? 0, label: t('beds.extra') },
+  const updateMutation = useUpdateMenage();
+  const nights = menage.stay_nights ?? null;
+  const beds: { field: 'n_lit_simple' | 'n_lit_double' | 'n_canape_lit' | 'n_lit_appoint'; value: number; label: string }[] = [
+    { field: 'n_lit_simple', value: menage.n_lit_simple ?? 0, label: t('beds.simple') },
+    { field: 'n_lit_double', value: menage.n_lit_double ?? 0, label: t('beds.double') },
+    { field: 'n_canape_lit', value: menage.n_canape_lit ?? 0, label: t('beds.sofa') },
+    { field: 'n_lit_appoint', value: menage.n_lit_appoint ?? 0, label: t('beds.extra') },
   ];
+  const total = beds.reduce((s, b) => s + b.value, 0);
+  if (!isAdmin && total === 0 && menage.n_travelers == null && nights == null) return null;
+
+  const setField = (
+    field: 'n_lit_simple' | 'n_lit_double' | 'n_canape_lit' | 'n_lit_appoint' | 'n_travelers',
+    value: number,
+  ) => {
+    updateMutation.mutate({ id: menage.id, body: { [field]: Math.max(0, value) } });
+  };
+
+  const stepBtn = {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  };
+
+  const Stepper = ({ value, onChange }: { value: number; onChange: (n: number) => void }) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+      <TouchableOpacity style={stepBtn} onPress={() => onChange(value - 1)} disabled={value <= 0}>
+        <Text style={{ color: colors.text, fontSize: FontSize.lg }}>−</Text>
+      </TouchableOpacity>
+      <Text style={{ color: colors.text, fontSize: FontSize.xl, fontWeight: FontWeight.bold, minWidth: 22, textAlign: 'center' }}>
+        {value}
+      </Text>
+      <TouchableOpacity style={stepBtn} onPress={() => onChange(value + 1)}>
+        <Text style={{ color: colors.text, fontSize: FontSize.lg }}>+</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <View style={{ paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm }}>
-      <Text style={{ color: colors.text2, fontSize: FontSize.xs, fontWeight: FontWeight.semibold, marginBottom: Spacing.xs, letterSpacing: 0.5 }}>
-        {t('beds.section').toUpperCase()}
+      <Text style={{ color: colors.text2, fontSize: FontSize.xs, fontWeight: FontWeight.semibold, marginBottom: Spacing.sm, letterSpacing: 0.5 }}>
+        LITS À FAIRE
       </Text>
+
+      {/* Voyageurs + durée */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm, gap: Spacing.md, flexWrap: 'wrap' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+          <Text style={{ color: colors.text2, fontSize: FontSize.sm }}>Voyageurs :</Text>
+          {isAdmin ? (
+            <Stepper value={menage.n_travelers ?? 0} onChange={(n) => setField('n_travelers', n)} />
+          ) : (
+            <Text style={{ color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
+              {menage.n_travelers ?? '—'}
+            </Text>
+          )}
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
+          <Moon size={IconSize.sm} color={colors.text2} />
+          <Text style={{ color: colors.text, fontSize: FontSize.sm }}>
+            {nights != null ? `${nights} nuit${nights > 1 ? 's' : ''}` : '—'}
+          </Text>
+        </View>
+      </View>
+
       <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-        {items.map((it) => (
+        {beds.map((b) => (
           <View
-            key={it.label}
+            key={b.field}
             style={{
               flex: 1,
               backgroundColor: colors.surface,
@@ -1151,14 +1204,15 @@ function BedsSection({
               borderRadius: 8,
               paddingVertical: Spacing.sm,
               alignItems: 'center',
+              gap: 4,
             }}
           >
-            <Text style={{ color: colors.text, fontSize: FontSize.xl, fontWeight: FontWeight.bold }}>
-              {it.value}
-            </Text>
-            <Text style={{ color: colors.text2, fontSize: 11, marginTop: 2, textAlign: 'center' }}>
-              {it.label}
-            </Text>
+            {isAdmin ? (
+              <Stepper value={b.value} onChange={(n) => setField(b.field, n)} />
+            ) : (
+              <Text style={{ color: colors.text, fontSize: FontSize.xl, fontWeight: FontWeight.bold }}>{b.value}</Text>
+            )}
+            <Text style={{ color: colors.text2, fontSize: 11, marginTop: 2, textAlign: 'center' }}>{b.label}</Text>
           </View>
         ))}
       </View>

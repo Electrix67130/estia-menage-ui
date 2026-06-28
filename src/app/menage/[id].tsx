@@ -432,8 +432,40 @@ export default function MenageDetailScreen() {
         )}
       </View>
       {isAdmin ? (
-        <View style={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, alignItems: 'flex-end' }}>
+        <View style={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, alignItems: 'flex-end', gap: Spacing.xs }}>
           <StatusBadge status={menage.status} />
+          {menage.status !== 'valide' ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, justifyContent: 'flex-end' }}>
+              {([
+                { v: 'a_venir', l: 'À venir' },
+                { v: 'en_cours', l: 'En cours' },
+                { v: 'termine', l: 'Terminé' },
+                { v: 'annule', l: 'Annulé' },
+              ] as const).map((s) => {
+                const active = menage.status === s.v;
+                return (
+                  <TouchableOpacity
+                    key={s.v}
+                    onPress={() => {
+                      if (!active) updateMutation.mutate({ id: menage.id, body: { status: s.v } });
+                    }}
+                    style={{
+                      paddingHorizontal: Spacing.sm,
+                      paddingVertical: 4,
+                      borderRadius: Radius.pill,
+                      borderWidth: 1,
+                      borderColor: active ? colors.primary : colors.border,
+                      backgroundColor: active ? colors.primary : colors.surface,
+                    }}
+                  >
+                    <Text style={{ color: active ? '#FFFFFF' : colors.text2, fontSize: FontSize.xs, fontWeight: FontWeight.medium }}>
+                      {s.l}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : null}
         </View>
       ) : null}
 

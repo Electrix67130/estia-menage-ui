@@ -10,6 +10,7 @@ import {
   ScrollView,
   Image,
   Linking,
+  Switch,
   Pressable} from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,13 +20,11 @@ import {
   MessageSquare,
   Camera,
   ListChecks,
-  Home,
   Play,
   Square,
   CheckCircle2,
   Clock,
   X,
-  Euro,
   Pencil,
   Trash2,
   RefreshCw,
@@ -36,6 +35,7 @@ import {
   KeyRound,
   Moon,
   CalendarClock,
+  Save,
 } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
@@ -70,18 +70,21 @@ import MenageCheckList from '@/components/MenageCheckList';
 import { formatDateFr } from '@/lib/date-fr';
 import { useDialog } from '@/contexts/DialogContext';
 import TimePickerField from '@/components/TimePickerField';
+import DurationPickerField from '@/components/DurationPickerField';
+import LabeledField from '@/components/LabeledField';
+import AutoScrollInput from '@/components/AutoScrollInput';
+import KeyboardAwareScroll from '@/components/KeyboardAwareScroll';
 import { captureGeoPhoto, GeoPhotoError } from '@/lib/captureGeoPhoto';
 import ArrivalDeclarationModal, { type ArrivalDeclaration } from '@/components/ArrivalDeclarationModal';
 import { uploadFile } from '@/api/upload';
 import { optimizeImage } from '@/utils/optimizeImage';
 import { haversineMeters, formatDistance, POINTAGE_DISTANCE_WARN_M } from '@/lib/geo-distance';
-import type { Menage, Logement } from '@/api/types';
+import type { Menage, Logement, MenageStatus, UpdateMenageInput } from '@/api/types';
 
 const TABS = [
   { key: 'check', label: 'Check', icon: ListChecks },
   { key: 'photos', label: 'Photos', icon: Camera },
   { key: 'comments', label: 'Discussion', icon: MessageSquare },
-  { key: 'logement', label: 'Logement', icon: Home },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
@@ -104,10 +107,12 @@ export default function MenageDetailScreen() {
   const validateMutation = useValidateReport();
   const rescheduleMutation = useCreateRescheduleRequest();
   const archiveMutation = useArchiveMenage();
-  const updateMutation = useUpdateMenage();
 
   const [activeTab, setActiveTab] = useState<TabKey>('check');
   const [showValidateModal, setShowValidateModal] = useState(false);
+  // Toute la fiche est en consultation par défaut ; l'admin passe en édition
+  // via le crayon (un seul mode édition pour tous les champs).
+  const [isEditing, setIsEditing] = useState(false);
 
   // Marque l'onglet ouvert comme lu → vide la pastille de non-lus correspondante
   // (la discussion `comments` est marquée par CommentThread lui-même).
@@ -134,7 +139,6 @@ export default function MenageDetailScreen() {
   const [proposedDate, setProposedDate] = useState('');
   const [proposedTime, setProposedTime] = useState('');
   const [rescheduleReason, setRescheduleReason] = useState('');
-  const [showPointageModal, setShowPointageModal] = useState(false);
   const [arrivalProof, setArrivalProof] = useState<{ photoUrl: string; lat: number; lng: number } | null>(null);
   const [arrivalSubmitting, setArrivalSubmitting] = useState(false);
   const [showConsommables, setShowConsommables] = useState(false);
@@ -144,32 +148,6 @@ export default function MenageDetailScreen() {
   const rescheduleModalStyle = useKeyboardAwareModalStyle({ visible: showRescheduleModal });
   const validateSwipe = useSwipeToClose(() => setShowValidateModal(false), showValidateModal);
   const rescheduleSwipe = useSwipeToClose(() => setShowRescheduleModal(false), showRescheduleModal);
-
-  const handleForceComplete = async () => {
-    const ok = await dialog.confirm({
-      title: 'Marquer terminé ?',
-      message:
-        "Le ménage passera en \"terminé\". Les heures d'arrivée/départ manquantes seront remplies avec l'heure actuelle.",
-      confirmLabel: 'Marquer terminé',
-    });
-    if (!ok || !menage) return;
-    const now = new Date().toISOString();
-    try {
-      await updateMutation.mutateAsync({
-        id: id!,
-        body: {
-          status: 'termine',
-          arrived_at: menage.arrived_at ?? now,
-          departed_at: menage.departed_at ?? now,
-        },
-      });
-    } catch (err) {
-      void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Échec',
-      });
-    }
-  };
 
   const runPointage = async (
     kind: 'arrival' | 'departure',
@@ -310,10 +288,6 @@ export default function MenageDetailScreen() {
   // filtre déjà les ménages assignés à quelqu'un d'autre, donc s'il est ici
   // c'est qu'il y a accès — référent, multi-affecté, ou membre du logement).
   const canRequestReschedule = user?.role === 'prestataire' && menage.status === 'a_venir';
-  // L'admin peut forcer la complétion (cas presta qui oublie de pointer) et
-  // éditer manuellement les heures d'arrivée/départ.
-  const canForceComplete = isAdmin && (menage.status === 'a_venir' || menage.status === 'en_cours');
-  const canEditPointage = isAdmin && menage.status !== 'valide';
   // Un ménage terminé ou validé : on ne change plus le prestataire affecté.
   const isFinished = menage.status === 'termine' || menage.status === 'valide';
 
@@ -363,40 +337,17 @@ export default function MenageDetailScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
             <Text style={[styles.dateText, { color: colors.text2 }]}>{date}</Text>
             {menage.date_locked ? (
-              isAdmin ? (
-                <TouchableOpacity
-                  style={[styles.lockPill, { backgroundColor: colors.statusEnCours + '25' }]}
-                  onPress={async () => {
-                    const ok = await dialog.confirm({
-                      title: 'Déverrouiller la date ?',
-                      message: 'La prochaine synchronisation iCal pourra écraser cette date.',
-                      confirmLabel: 'Déverrouiller',
-                    });
-                    if (!ok) return;
-                    await updateMutation.mutateAsync({
-                      id: menage.id,
-                      body: { date_locked: false },
-                    });
-                  }}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  accessibilityLabel="Date verrouillée — toucher pour déverrouiller"
-                >
-                  <Lock size={14} color={colors.statusEnCours} />
-                  <Text style={[styles.lockText, { color: colors.statusEnCours }]}>Verrouillée</Text>
-                </TouchableOpacity>
-              ) : (
-                <View style={[styles.lockPill, { backgroundColor: colors.statusEnCours + '25' }]}>
-                  <Lock size={14} color={colors.statusEnCours} />
-                  <Text style={[styles.lockText, { color: colors.statusEnCours }]}>Verrouillée</Text>
-                </View>
-              )
+              <View style={[styles.lockPill, { backgroundColor: colors.statusEnCours + '25' }]}>
+                <Lock size={14} color={colors.statusEnCours} />
+                <Text style={[styles.lockText, { color: colors.statusEnCours }]}>Verrouillée</Text>
+              </View>
             ) : null}
           </View>
         </View>
-        {isAdmin ? (
+        {isAdmin && !isEditing ? (
           <View style={{ flexDirection: 'row', gap: Spacing.md, alignItems: 'center' }}>
             <TouchableOpacity
-              onPress={() => router.push(`/menage/edit/${menage.id}`)}
+              onPress={() => setIsEditing(true)}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               accessibilityLabel="Modifier"
             >
@@ -431,41 +382,14 @@ export default function MenageDetailScreen() {
           <StatusBadge status={menage.status} />
         )}
       </View>
+
+      {isEditing ? (
+        <MenageEditForm menage={menage} onClose={() => setIsEditing(false)} />
+      ) : (
+      <>
       {isAdmin ? (
-        <View style={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, alignItems: 'flex-end', gap: Spacing.xs }}>
+        <View style={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, alignItems: 'flex-end' }}>
           <StatusBadge status={menage.status} />
-          {menage.status !== 'valide' ? (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, justifyContent: 'flex-end' }}>
-              {([
-                { v: 'a_venir', l: 'À venir' },
-                { v: 'en_cours', l: 'En cours' },
-                { v: 'termine', l: 'Terminé' },
-                { v: 'annule', l: 'Annulé' },
-              ] as const).map((s) => {
-                const active = menage.status === s.v;
-                return (
-                  <TouchableOpacity
-                    key={s.v}
-                    onPress={() => {
-                      if (!active) updateMutation.mutate({ id: menage.id, body: { status: s.v } });
-                    }}
-                    style={{
-                      paddingHorizontal: Spacing.sm,
-                      paddingVertical: 4,
-                      borderRadius: Radius.pill,
-                      borderWidth: 1,
-                      borderColor: active ? colors.primary : colors.border,
-                      backgroundColor: active ? colors.primary : colors.surface,
-                    }}
-                  >
-                    <Text style={{ color: active ? '#FFFFFF' : colors.text2, fontSize: FontSize.xs, fontWeight: FontWeight.medium }}>
-                      {s.l}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          ) : null}
         </View>
       ) : null}
 
@@ -562,25 +486,6 @@ export default function MenageDetailScreen() {
             <Text style={styles.actionText}>Valider le rapport</Text>
           </TouchableOpacity>
         ) : null}
-        {canForceComplete ? (
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: colors.statusTermine }]}
-            onPress={handleForceComplete}
-            disabled={updateMutation.isPending}
-          >
-            <CheckCircle2 size={IconSize.md} color="#FFFFFF" />
-            <Text style={styles.actionText}>Marquer terminé</Text>
-          </TouchableOpacity>
-        ) : null}
-        {canEditPointage ? (
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: colors.itemBackground }]}
-            onPress={() => setShowPointageModal(true)}
-          >
-            <Clock size={IconSize.md} color={colors.text} />
-            <Text style={[styles.actionText, { color: colors.text }]}>Modifier les pointages</Text>
-          </TouchableOpacity>
-        ) : null}
         {menage.arrived_at ? (
           <View style={[styles.timestamp, { backgroundColor: colors.itemBackground }]}>
             <Clock size={14} color={colors.text2} />
@@ -647,63 +552,9 @@ export default function MenageDetailScreen() {
             readonly={menage.status === 'valide'}
           />
         )}
-        {activeTab === 'logement' && (
-          <ScrollView contentContainerStyle={{ padding: Spacing.lg, gap: Spacing.md }}>
-            {logement ? (
-              <>
-                <Text style={[styles.section, { color: colors.text2 }]}>LOGEMENT</Text>
-                <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Text style={[styles.logementName, { color: colors.text }]}>{logement.name}</Text>
-                  {logement.address || logement.city ? (
-                    <Text style={[styles.logementAddr, { color: colors.text2 }]}>
-                      {[logement.address, logement.city].filter(Boolean).join(' · ')}
-                    </Text>
-                  ) : null}
-                  <View style={{ flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.sm, flexWrap: 'wrap' }}>
-                    {logement.n_bedrooms > 0 ? <Text style={{ color: colors.text2 }}>🛏️ {logement.n_bedrooms}</Text> : null}
-                    {logement.n_bathrooms > 0 ? <Text style={{ color: colors.text2 }}>🚿 {logement.n_bathrooms}</Text> : null}
-                    {logement.n_wc > 0 ? <Text style={{ color: colors.text2 }}>🚽 {logement.n_wc}</Text> : null}
-                    {logement.n_kitchens > 0 ? <Text style={{ color: colors.text2 }}>🍳 {logement.n_kitchens}</Text> : null}
-                    {logement.n_living_rooms > 0 ? <Text style={{ color: colors.text2 }}>🛋️ {logement.n_living_rooms}</Text> : null}
-                  </View>
-                  {logement.notes ? (
-                    <Text style={[styles.logementNotes, { color: colors.text2 }]}>{logement.notes}</Text>
-                  ) : null}
-                  <TouchableOpacity
-                    style={[styles.viewLogementBtn, { borderColor: colors.primary }]}
-                    onPress={() => router.push(`/logement/${logement.id}`)}
-                  >
-                    <Text style={{ color: colors.primary, fontWeight: FontWeight.semibold }}>
-                      Voir le logement
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {menage.prix_prevu != null ? (
-                  <>
-                    <Text style={[styles.section, { color: colors.text2 }]}>PRIX</Text>
-                    <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-                        <Euro size={IconSize.md} color={colors.text2} />
-                        <Text style={{ color: colors.text, fontSize: FontSize.lg, fontWeight: FontWeight.semibold }}>
-                          {menage.prix_prevu} €
-                        </Text>
-                        {menage.validated_price != null ? (
-                          <Text style={{ color: colors.statusValide, fontSize: FontSize.md }}>
-                            → {menage.validated_price} € (validé)
-                          </Text>
-                        ) : null}
-                      </View>
-                    </View>
-                  </>
-                ) : null}
-              </>
-            ) : (
-              <ActivityIndicator color={colors.primary} />
-            )}
-          </ScrollView>
-        )}
       </View>
+      </>
+      )}
 
       {/* Validation modal */}
       <Modal
@@ -832,12 +683,6 @@ export default function MenageDetailScreen() {
         onClose={() => setShowAssignModal(false)}
       />
 
-      <PointageModal
-        visible={showPointageModal}
-        menage={menage}
-        onClose={() => setShowPointageModal(false)}
-      />
-
       <ConsommablesReleveModal
         visible={showConsommables}
         menageId={menage.id}
@@ -851,6 +696,275 @@ export default function MenageDetailScreen() {
         onSubmit={submitArrival}
       />
     </SafeAreaView>
+  );
+}
+
+const EDIT_STATUSES: { v: MenageStatus; l: string }[] = [
+  { v: 'a_venir', l: 'À venir' },
+  { v: 'en_cours', l: 'En cours' },
+  { v: 'termine', l: 'Terminé' },
+  { v: 'annule', l: 'Annulé' },
+];
+
+function parseMoneyInput(s: string): number | null | 'invalid' {
+  if (!s.trim()) return null;
+  const n = parseFloat(s.replace(',', '.'));
+  if (Number.isNaN(n) || n < 0) return 'invalid';
+  return n;
+}
+
+function parseCountInput(s: string): number {
+  const n = parseInt(s, 10);
+  return Number.isNaN(n) || n < 0 ? 0 : n;
+}
+
+/**
+ * Formulaire d'édition unifié de la fiche ménage. Affiché en lieu et place des
+ * sections en lecture seule quand l'admin passe en mode édition. Tous les champs
+ * sont envoyés en un seul PATCH (Enregistrer) ; Annuler abandonne sans appel réseau.
+ */
+function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => void }) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  const { t: tr } = useTranslation();
+  const dialog = useDialog();
+  const update = useUpdateMenage();
+
+  const [datePrevue, setDatePrevue] = useState(menage.date_prevue.slice(0, 10));
+  const [horairePrevu, setHorairePrevu] = useState(menage.horaire_prevu ? menage.horaire_prevu.slice(0, 5) : '');
+  const [dureeEstimee, setDureeEstimee] = useState(menage.duree_estimee_min != null ? String(menage.duree_estimee_min) : '');
+  const [status, setStatus] = useState<MenageStatus>(menage.status);
+  const [clientPriceHt, setClientPriceHt] = useState(menage.client_price_ht != null ? String(menage.client_price_ht) : '');
+  const [clientVatRate, setClientVatRate] = useState(menage.client_vat_rate != null ? String(menage.client_vat_rate) : '20');
+  const [providerPrice, setProviderPrice] = useState(menage.provider_price != null ? String(menage.provider_price) : '');
+  const [laundryIncluded, setLaundryIncluded] = useState(!!menage.laundry_included);
+  const [laundryClientPriceHt, setLaundryClientPriceHt] = useState(menage.laundry_client_price_ht != null ? String(menage.laundry_client_price_ht) : '');
+  const [laundryProviderPrice, setLaundryProviderPrice] = useState(menage.laundry_provider_price != null ? String(menage.laundry_provider_price) : '');
+  const [nLitSimple, setNLitSimple] = useState(String(menage.n_lit_simple ?? 0));
+  const [nLitDouble, setNLitDouble] = useState(String(menage.n_lit_double ?? 0));
+  const [nCanapeLit, setNCanapeLit] = useState(String(menage.n_canape_lit ?? 0));
+  const [nLitAppoint, setNLitAppoint] = useState(String(menage.n_lit_appoint ?? 0));
+  const [nTravelers, setNTravelers] = useState(menage.n_travelers != null ? String(menage.n_travelers) : '');
+  const toTime = (iso: string | null) => (iso ? formatDateFr(iso, 'time') : '');
+  const [arrivalTime, setArrivalTime] = useState(toTime(menage.arrived_at));
+  const [departureTime, setDepartureTime] = useState(toTime(menage.departed_at));
+  const [dateLocked, setDateLocked] = useState(!!menage.date_locked);
+  const [notes, setNotes] = useState(menage.notes_intervention ?? '');
+
+  // Combine la date du ménage + une heure HH:MM en ISO. Vide → null.
+  const toIso = (time: string): string | null => {
+    if (!time.match(/^\d{2}:\d{2}$/)) return null;
+    return new Date(`${datePrevue}T${time}:00`).toISOString();
+  };
+
+  const applySuggestion = () => {
+    const n = parseCountInput(nTravelers);
+    if (n <= 0) return;
+    const s = suggestBeds(n);
+    setNLitDouble(String(s.n_lit_double));
+    setNLitSimple(String(s.n_lit_simple));
+    setNCanapeLit(String(s.n_canape_lit));
+    setNLitAppoint(String(s.n_lit_appoint));
+  };
+
+  const invalid = (field: string) =>
+    void dialog.alert({ title: 'Champ invalide', message: `Valeur invalide pour « ${field} »` });
+
+  const handleSubmit = async () => {
+    if (!datePrevue) {
+      void dialog.alert({ title: 'Date requise', message: 'La date prévue est obligatoire.' });
+      return;
+    }
+    const duree = dureeEstimee.trim() ? parseInt(dureeEstimee, 10) : null;
+    if (dureeEstimee.trim() && (duree === null || Number.isNaN(duree) || duree < 0)) {
+      void dialog.alert({ title: 'Durée invalide', message: 'La durée doit être un nombre de minutes positif.' });
+      return;
+    }
+    const cPrice = parseMoneyInput(clientPriceHt);
+    if (cPrice === 'invalid') return invalid('Prix client HT');
+    const cVat = parseMoneyInput(clientVatRate);
+    if (cVat === 'invalid') return invalid('TVA');
+    const pPrice = parseMoneyInput(providerPrice);
+    if (pPrice === 'invalid') return invalid('Prix prestataire');
+    const lCPrice = parseMoneyInput(laundryClientPriceHt);
+    if (lCPrice === 'invalid') return invalid('Linge — prix client');
+    const lPPrice = parseMoneyInput(laundryProviderPrice);
+    if (lPPrice === 'invalid') return invalid('Linge — prix prestataire');
+
+    const body: UpdateMenageInput = {
+      date_prevue: datePrevue,
+      horaire_prevu: horairePrevu || null,
+      duree_estimee_min: duree,
+      status,
+      client_price_ht: cPrice,
+      client_vat_rate: cVat,
+      provider_price: pPrice,
+      laundry_included: laundryIncluded,
+      laundry_client_price_ht: laundryIncluded ? lCPrice : null,
+      laundry_provider_price: laundryIncluded ? lPPrice : null,
+      n_lit_simple: parseCountInput(nLitSimple),
+      n_lit_double: parseCountInput(nLitDouble),
+      n_canape_lit: parseCountInput(nCanapeLit),
+      n_lit_appoint: parseCountInput(nLitAppoint),
+      n_travelers: nTravelers.trim() ? parseCountInput(nTravelers) : null,
+      arrived_at: arrivalTime ? toIso(arrivalTime) : null,
+      departed_at: departureTime ? toIso(departureTime) : null,
+      date_locked: dateLocked,
+      notes_intervention: notes.trim() || null,
+    };
+
+    try {
+      await update.mutateAsync({ id: menage.id, body });
+      onClose();
+    } catch (err) {
+      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+    }
+  };
+
+  const inputStyle = [styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }];
+  const statuses = menage.status === 'valide' ? [...EDIT_STATUSES, { v: 'valide' as MenageStatus, l: 'Validé' }] : EDIT_STATUSES;
+
+  return (
+    <KeyboardAwareScroll contentContainerStyle={{ padding: Spacing.lg, gap: Spacing.sm }}>
+      <Text style={[styles.section, { color: colors.text2 }]}>PLANIFICATION</Text>
+      <DatePickerField label={tr('menage.fields.datePrevue')} value={datePrevue} onChange={setDatePrevue} />
+      <TimePickerField label={tr('menage.fields.horaire')} value={horairePrevu} onChange={setHorairePrevu} />
+      <DurationPickerField label={tr('menage.fields.dureeEstimee')} value={dureeEstimee} onChange={setDureeEstimee} />
+
+      <Text style={[styles.section, { color: colors.text2 }]}>STATUT</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
+        {statuses.map((s) => {
+          const active = status === s.v;
+          return (
+            <TouchableOpacity
+              key={s.v}
+              onPress={() => setStatus(s.v)}
+              style={{
+                paddingHorizontal: Spacing.md,
+                paddingVertical: Spacing.sm,
+                borderRadius: Radius.md,
+                borderWidth: 1,
+                borderColor: active ? colors.primary : colors.border,
+                backgroundColor: active ? colors.primary : colors.surface,
+              }}
+            >
+              <Text style={{ color: active ? '#FFFFFF' : colors.text, fontSize: FontSize.sm }}>{s.l}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={{ color: colors.text, fontSize: FontSize.md, flex: 1 }}>Date verrouillée (sync iCal bloquée)</Text>
+        <Switch value={dateLocked} onValueChange={setDateLocked} trackColor={{ false: colors.border, true: colors.primary }} />
+      </View>
+
+      <Text style={[styles.section, { color: colors.text2 }]}>POINTAGES</Text>
+      <TimePickerField label="Heure d'arrivée" value={arrivalTime} onChange={setArrivalTime} placeholder="--:--" />
+      <TimePickerField label="Heure de départ" value={departureTime} onChange={setDepartureTime} placeholder="--:--" />
+
+      <Text style={[styles.section, { color: colors.text2 }]}>TARIFS</Text>
+      <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+        <View style={{ flex: 2 }}>
+          <LabeledField label={tr('menage.fields.clientPriceHt')}>
+            <AutoScrollInput style={inputStyle} value={clientPriceHt} onChangeText={setClientPriceHt} placeholder="ex. 80" placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+          </LabeledField>
+        </View>
+        <View style={{ flex: 1 }}>
+          <LabeledField label={tr('menage.fields.clientVatRate')}>
+            <AutoScrollInput style={inputStyle} value={clientVatRate} onChangeText={setClientVatRate} placeholder="20" placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+          </LabeledField>
+        </View>
+      </View>
+      <LabeledField label={tr('menage.fields.providerPrice')}>
+        <AutoScrollInput style={inputStyle} value={providerPrice} onChangeText={setProviderPrice} placeholder="ex. 50" placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+      </LabeledField>
+
+      <Text style={[styles.section, { color: colors.text2 }]}>LINGE</Text>
+      <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={{ color: colors.text, fontSize: FontSize.md, flex: 1 }}>{tr('menage.fields.laundryIncluded')}</Text>
+        <Switch value={laundryIncluded} onValueChange={setLaundryIncluded} trackColor={{ false: colors.border, true: colors.primary }} />
+      </View>
+      {laundryIncluded ? (
+        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+          <View style={{ flex: 1 }}>
+            <LabeledField label={tr('menage.fields.laundryClientHt')}>
+              <AutoScrollInput style={inputStyle} value={laundryClientPriceHt} onChangeText={setLaundryClientPriceHt} placeholder="ex. 15" placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+            </LabeledField>
+          </View>
+          <View style={{ flex: 1 }}>
+            <LabeledField label={tr('menage.fields.laundryProvider')}>
+              <AutoScrollInput style={inputStyle} value={laundryProviderPrice} onChangeText={setLaundryProviderPrice} placeholder="ex. 10" placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+            </LabeledField>
+          </View>
+        </View>
+      ) : null}
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: Spacing.md }}>
+        <Text style={[styles.section, { color: colors.text2, marginTop: 0 }]}>{tr('beds.section').toUpperCase()}</Text>
+        {parseCountInput(nTravelers) > 0 ? (
+          <TouchableOpacity
+            onPress={applySuggestion}
+            style={{ borderWidth: 1, borderColor: colors.primary, borderRadius: Radius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 4 }}
+          >
+            <Text style={{ color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semibold }}>Suggérer</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
+      <LabeledField label="Voyageurs">
+        <AutoScrollInput style={inputStyle} value={nTravelers} onChangeText={setNTravelers} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.placeholder} />
+      </LabeledField>
+      <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+        <View style={{ flex: 1 }}>
+          <LabeledField label={tr('beds.simple')}>
+            <AutoScrollInput style={inputStyle} value={nLitSimple} onChangeText={setNLitSimple} keyboardType="number-pad" />
+          </LabeledField>
+        </View>
+        <View style={{ flex: 1 }}>
+          <LabeledField label={tr('beds.double')}>
+            <AutoScrollInput style={inputStyle} value={nLitDouble} onChangeText={setNLitDouble} keyboardType="number-pad" />
+          </LabeledField>
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+        <View style={{ flex: 1 }}>
+          <LabeledField label={tr('beds.sofa')}>
+            <AutoScrollInput style={inputStyle} value={nCanapeLit} onChangeText={setNCanapeLit} keyboardType="number-pad" />
+          </LabeledField>
+        </View>
+        <View style={{ flex: 1 }}>
+          <LabeledField label={tr('beds.extra')}>
+            <AutoScrollInput style={inputStyle} value={nLitAppoint} onChangeText={setNLitAppoint} keyboardType="number-pad" />
+          </LabeledField>
+        </View>
+      </View>
+
+      <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
+      <AutoScrollInput
+        style={[...inputStyle, { minHeight: 80, textAlignVertical: 'top' }]}
+        value={notes}
+        onChangeText={setNotes}
+        placeholder={tr('menage.fields.notesPlaceholder')}
+        placeholderTextColor={colors.placeholder}
+        multiline
+      />
+
+      <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.lg }}>
+        <TouchableOpacity
+          style={[styles.submit, { flex: 1, marginTop: 0, backgroundColor: colors.itemBackground }]}
+          onPress={onClose}
+        >
+          <Text style={[styles.submitText, { color: colors.text }]}>Annuler</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.submit, { flex: 1, marginTop: 0, backgroundColor: colors.primary }]}
+          onPress={handleSubmit}
+          disabled={update.isPending}
+        >
+          <Save size={IconSize.md} color="#FFFFFF" />
+          <Text style={styles.submitText}>{update.isPending ? 'Enregistrement…' : 'Enregistrer'}</Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAwareScroll>
   );
 }
 
@@ -990,104 +1104,6 @@ function ConsommablesReleveModal({
 }
 
 /**
- * Modal admin pour saisir/corriger manuellement les heures d'arrivée et de
- * départ d'un ménage (cas prestataire qui a oublié de pointer). Sauve via
- * PATCH { arrived_at, departed_at }. Vider un champ remet le timestamp à null.
- */
-function PointageModal({
-  visible,
-  menage,
-  onClose,
-}: {
-  visible: boolean;
-  menage: { id: string; date_prevue: string; arrived_at: string | null; departed_at: string | null };
-  onClose: () => void;
-}) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme];
-  const dialog = useDialog();
-  const updateMutation = useUpdateMenage();
-
-  // Heures HH:MM dérivées des timestamps existants (sur la date du ménage).
-  const toTime = (iso: string | null) => (iso ? formatDateFr(iso, 'time') : '');
-  const [arrivalTime, setArrivalTime] = useState(toTime(menage.arrived_at));
-  const [departureTime, setDepartureTime] = useState(toTime(menage.departed_at));
-
-  useEffect(() => {
-    if (!visible) return;
-    setArrivalTime(toTime(menage.arrived_at));
-    setDepartureTime(toTime(menage.departed_at));
-  }, [visible, menage.arrived_at, menage.departed_at]);
-
-  // Combine la date du ménage + une heure HH:MM en ISO. Vide → null.
-  const toIso = (time: string): string | null => {
-    if (!time.match(/^\d{2}:\d{2}$/)) return null;
-    const day = menage.date_prevue.slice(0, 10);
-    return new Date(`${day}T${time}:00`).toISOString();
-  };
-
-  const handleSave = async () => {
-    try {
-      await updateMutation.mutateAsync({
-        id: menage.id,
-        body: {
-          arrived_at: arrivalTime ? toIso(arrivalTime) : null,
-          departed_at: departureTime ? toIso(departureTime) : null,
-        },
-      });
-      onClose();
-    } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
-    }
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={assignStyles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[assignStyles.modal, { backgroundColor: colors.surface }, Shadow.lg]}>
-          <Text style={[assignStyles.title, { color: colors.text }]}>Pointages (admin)</Text>
-          <Text style={{ color: colors.text2, fontSize: FontSize.sm, marginBottom: Spacing.md }}>
-            Corrige les heures si le prestataire a oublié de pointer.
-          </Text>
-          <View style={{ gap: Spacing.md }}>
-            <TimePickerField
-              label="Heure d'arrivée"
-              value={arrivalTime}
-              onChange={setArrivalTime}
-              placeholder="--:--"
-            />
-            <TimePickerField
-              label="Heure de départ"
-              value={departureTime}
-              onChange={setDepartureTime}
-              placeholder="--:--"
-            />
-          </View>
-          <View style={assignStyles.actions}>
-            <TouchableOpacity
-              style={[assignStyles.btn, { backgroundColor: colors.itemBackground }]}
-              onPress={onClose}
-            >
-              <Text style={{ color: colors.text, fontWeight: FontWeight.medium }}>Annuler</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[assignStyles.btn, { backgroundColor: colors.primary }]}
-              onPress={handleSave}
-              disabled={updateMutation.isPending}
-            >
-              <Text style={{ color: '#FFFFFF', fontWeight: FontWeight.semibold }}>
-                {updateMutation.isPending ? '…' : 'Enregistrer'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-/**
  * Preuve de présence : photos géolocalisées prises au pointage arrivée/départ,
  * avec la distance au logement. Un badge rouge alerte si la photo a été prise
  * trop loin du logement (presta peut-être pas vraiment sur place).
@@ -1162,9 +1178,8 @@ function BedsSection({
   isAdmin: boolean;
 }) {
   const { t } = useTranslation();
-  const updateMutation = useUpdateMenage();
   const nights = menage.stay_nights ?? null;
-  const beds: { field: 'n_lit_simple' | 'n_lit_double' | 'n_canape_lit' | 'n_lit_appoint'; value: number; label: string }[] = [
+  const beds: { field: string; value: number; label: string }[] = [
     { field: 'n_lit_simple', value: menage.n_lit_simple ?? 0, label: t('beds.simple') },
     { field: 'n_lit_double', value: menage.n_lit_double ?? 0, label: t('beds.double') },
     { field: 'n_canape_lit', value: menage.n_canape_lit ?? 0, label: t('beds.sofa') },
@@ -1173,72 +1188,21 @@ function BedsSection({
   const total = beds.reduce((s, b) => s + b.value, 0);
   if (!isAdmin && total === 0 && menage.n_travelers == null && nights == null) return null;
 
-  const setField = (
-    field: 'n_lit_simple' | 'n_lit_double' | 'n_canape_lit' | 'n_lit_appoint' | 'n_travelers',
-    value: number,
-  ) => {
-    updateMutation.mutate({ id: menage.id, body: { [field]: Math.max(0, value) } });
-  };
-
-  const applySuggestion = () => {
-    const n = menage.n_travelers ?? 0;
-    if (n <= 0) return;
-    updateMutation.mutate({ id: menage.id, body: suggestBeds(n) });
-  };
-
-  const stepBtn = {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-  };
-
-  const Stepper = ({ value, onChange }: { value: number; onChange: (n: number) => void }) => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-      <TouchableOpacity style={stepBtn} onPress={() => onChange(value - 1)} disabled={value <= 0}>
-        <Text style={{ color: colors.text, fontSize: FontSize.lg }}>−</Text>
-      </TouchableOpacity>
-      <Text style={{ color: colors.text, fontSize: FontSize.xl, fontWeight: FontWeight.bold, minWidth: 22, textAlign: 'center' }}>
-        {value}
-      </Text>
-      <TouchableOpacity style={stepBtn} onPress={() => onChange(value + 1)}>
-        <Text style={{ color: colors.text, fontSize: FontSize.lg }}>+</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
     <View style={{ paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm }}>
+      <View style={{ marginBottom: Spacing.sm }}>
         <Text style={{ color: colors.text2, fontSize: FontSize.xs, fontWeight: FontWeight.semibold, letterSpacing: 0.5 }}>
           LITS À FAIRE
         </Text>
-        {isAdmin && (menage.n_travelers ?? 0) > 0 ? (
-          <TouchableOpacity
-            onPress={applySuggestion}
-            style={{ borderWidth: 1, borderColor: colors.primary, borderRadius: Radius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 4 }}
-          >
-            <Text style={{ color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semibold }}>
-              Suggérer ({menage.n_travelers})
-            </Text>
-          </TouchableOpacity>
-        ) : null}
       </View>
 
       {/* Voyageurs + durée */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm, gap: Spacing.md, flexWrap: 'wrap' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
           <Text style={{ color: colors.text2, fontSize: FontSize.sm }}>Voyageurs :</Text>
-          {isAdmin ? (
-            <Stepper value={menage.n_travelers ?? 0} onChange={(n) => setField('n_travelers', n)} />
-          ) : (
-            <Text style={{ color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
-              {menage.n_travelers ?? '—'}
-            </Text>
-          )}
+          <Text style={{ color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
+            {menage.n_travelers ?? '—'}
+          </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
           <Moon size={IconSize.sm} color={colors.text2} />
@@ -1263,11 +1227,7 @@ function BedsSection({
               gap: 4,
             }}
           >
-            {isAdmin ? (
-              <Stepper value={b.value} onChange={(n) => setField(b.field, n)} />
-            ) : (
-              <Text style={{ color: colors.text, fontSize: FontSize.xl, fontWeight: FontWeight.bold }}>{b.value}</Text>
-            )}
+            <Text style={{ color: colors.text, fontSize: FontSize.xl, fontWeight: FontWeight.bold }}>{b.value}</Text>
             <Text style={{ color: colors.text2, fontSize: 11, marginTop: 2, textAlign: 'center' }}>{b.label}</Text>
           </View>
         ))}
@@ -1943,17 +1903,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   section: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, letterSpacing: 0.5 },
-  card: { padding: Spacing.md, borderRadius: Radius.lg, borderWidth: 1, gap: Spacing.xs },
-  logementName: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold },
-  logementAddr: { fontSize: FontSize.sm },
-  logementNotes: { fontSize: FontSize.sm, marginTop: Spacing.sm, fontStyle: 'italic' as const },
-  viewLogementBtn: {
-    marginTop: Spacing.sm,
-    padding: Spacing.sm,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
   overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
   modal: {
     borderTopLeftRadius: Radius.xl,
@@ -1972,6 +1921,14 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold },
   label: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
   input: { padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, fontSize: FontSize.md },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
   submit: {
     flexDirection: 'row',
     alignItems: 'center',

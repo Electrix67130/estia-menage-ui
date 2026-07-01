@@ -1178,7 +1178,6 @@ function BedsSection({
   isAdmin: boolean;
 }) {
   const { t } = useTranslation();
-  const nights = menage.stay_nights ?? null;
   const beds: { field: string; value: number; label: string }[] = [
     { field: 'n_lit_simple', value: menage.n_lit_simple ?? 0, label: t('beds.simple') },
     { field: 'n_lit_double', value: menage.n_lit_double ?? 0, label: t('beds.double') },
@@ -1186,7 +1185,7 @@ function BedsSection({
     { field: 'n_lit_appoint', value: menage.n_lit_appoint ?? 0, label: t('beds.extra') },
   ];
   const total = beds.reduce((s, b) => s + b.value, 0);
-  if (!isAdmin && total === 0 && menage.n_travelers == null && nights == null) return null;
+  if (!isAdmin && total === 0 && menage.n_travelers == null) return null;
 
   return (
     <View style={{ paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm }}>
@@ -1196,20 +1195,12 @@ function BedsSection({
         </Text>
       </View>
 
-      {/* Voyageurs + durée */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm, gap: Spacing.md, flexWrap: 'wrap' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-          <Text style={{ color: colors.text2, fontSize: FontSize.sm }}>Voyageurs :</Text>
-          <Text style={{ color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
-            {menage.n_travelers ?? '—'}
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
-          <Moon size={IconSize.sm} color={colors.text2} />
-          <Text style={{ color: colors.text, fontSize: FontSize.sm }}>
-            {nights != null ? `${nights} nuit${nights > 1 ? 's' : ''}` : '—'}
-          </Text>
-        </View>
+      {/* Voyageurs */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm, gap: Spacing.sm }}>
+        <Text style={{ color: colors.text2, fontSize: FontSize.sm }}>Voyageurs :</Text>
+        <Text style={{ color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
+          {menage.n_travelers ?? '—'}
+        </Text>
       </View>
 
       <View style={{ flexDirection: 'row', gap: Spacing.sm }}>

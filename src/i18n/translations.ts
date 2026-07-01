@@ -455,7 +455,7 @@ const fr: Dictionary = {
   "logement.rooms.exteriorSpaces": "Extérieurs",
   "logement.rooms.basement": "Cave",
   "logement.rooms.laundry": "Buanderie",
-  "beds.section": "Composition des lits",
+  "beds.section": "Préparation du logement",
   "beds.simple": "Lit simple",
   "beds.double": "Lit double",
   "beds.sofa": "Canapé-lit",

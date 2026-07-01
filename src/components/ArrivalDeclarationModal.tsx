@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Star, Camera, ImagePlus, X, AlertTriangle } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
@@ -45,10 +46,15 @@ export default function ArrivalDeclarationModal({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const insets = useSafeAreaInsets();
   const [rating, setRating] = useState(0);
   const [hasDegradation, setHasDegradation] = useState(false);
   const [note, setNote] = useState('');
   const [assets, setAssets] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  // Erreur affichée INLINE dans la feuille : une alerte (dialog/native) déclenchée
+  // par-dessus ce Modal reste invisible sur iOS (Modals imbriqués) → l'utilisateur
+  // avait l'impression que « Démarrer le ménage » ne faisait rien.
+  const [error, setError] = useState('');
   const animatedModalStyle = useKeyboardAwareModalStyle({ visible });
 
   const reset = () => {
@@ -56,6 +62,7 @@ export default function ArrivalDeclarationModal({
     setHasDegradation(false);
     setNote('');
     setAssets([]);
+    setError('');
   };
 
   const pickPhoto = async (useCamera: boolean) => {
@@ -71,24 +78,26 @@ export default function ArrivalDeclarationModal({
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, allowsMultipleSelection: true });
     if (!result.canceled) {
       setAssets((prev) => [...prev, ...result.assets]);
+      setError('');
     }
   };
 
   const handleSubmit = () => {
     if (rating < 1) {
-      void dialog.alert({ title: 'Note requise', message: 'Note les voyageurs (1 à 5 étoiles).' });
+      setError('Note les voyageurs (1 à 5 étoiles) avant de démarrer.');
       return;
     }
     if (hasDegradation) {
       if (!note.trim()) {
-        void dialog.alert({ title: 'Description requise', message: 'Décris la dégradation constatée.' });
+        setError('Décris la dégradation constatée.');
         return;
       }
       if (assets.length === 0) {
-        void dialog.alert({ title: 'Photo requise', message: 'Ajoute au moins une photo de la dégradation.' });
+        setError('Ajoute au moins une photo de la dégradation.');
         return;
       }
     }
+    setError('');
     onSubmit({ rating, hasDegradation, note: note.trim(), assets });
   };
 
@@ -102,7 +111,7 @@ export default function ArrivalDeclarationModal({
     >
       <View style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={submitting ? undefined : onClose} />
-        <Animated.View style={[styles.sheet, { backgroundColor: colors.surface }, Shadow.lg, animatedModalStyle]}>
+        <Animated.View style={[styles.sheet, { backgroundColor: colors.surface, paddingBottom: insets.bottom + Spacing.xl }, Shadow.lg, animatedModalStyle]}>
           <View style={styles.handle}>
             <View style={[styles.handleBar, { backgroundColor: colors.border }]} />
           </View>
@@ -114,7 +123,7 @@ export default function ArrivalDeclarationModal({
               {[1, 2, 3, 4, 5].map((n) => (
                 <TouchableOpacity
                   key={n}
-                  onPress={() => setRating(n)}
+                  onPress={() => { setRating(n); setError(''); }}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   accessibilityLabel={`${n} étoile${n > 1 ? 's' : ''}`}
                 >
@@ -132,7 +141,7 @@ export default function ArrivalDeclarationModal({
                 styles.degradationRow,
                 { backgroundColor: colors.itemBackground, borderColor: hasDegradation ? colors.red : colors.border },
               ]}
-              onPress={() => setHasDegradation((v) => !v)}
+              onPress={() => { setHasDegradation((v) => !v); setError(''); }}
               activeOpacity={0.7}
             >
               <AlertTriangle size={IconSize.md} color={hasDegradation ? colors.red : colors.text2} />
@@ -165,7 +174,7 @@ export default function ArrivalDeclarationModal({
                     { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground, minHeight: 70, textAlignVertical: 'top' },
                   ]}
                   value={note}
-                  onChangeText={setNote}
+                  onChangeText={(t) => { setNote(t); setError(''); }}
                   placeholder="Ex : tache sur le canapé, vaisselle cassée…"
                   placeholderTextColor={colors.placeholder}
                   multiline
@@ -202,6 +211,12 @@ export default function ArrivalDeclarationModal({
                   </TouchableOpacity>
                 </View>
               </>
+            ) : null}
+
+            {error ? (
+              <Text style={{ color: colors.red, fontSize: FontSize.sm, textAlign: 'center', marginTop: Spacing.md }}>
+                {error}
+              </Text>
             ) : null}
 
             <TouchableOpacity

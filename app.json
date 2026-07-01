@@ -8,6 +8,12 @@
     "scheme": "estia-clean-connect",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e6fd6612-b500-4dd1-b754-5f10e4479369"
+    },
     "splash": {
       "image": "./src/assets/images/splash-logo.png",
       "backgroundColor": "#FFFFFF",

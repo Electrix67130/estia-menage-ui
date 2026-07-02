@@ -5,7 +5,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import StatusBadge from './StatusBadge';
-import { menageLogementLabel, menageSourceLabel, type Menage } from '@/api/types';
+import { menageLogementLabel, menageSourceLabel, prestationTypeLabel, type Menage } from '@/api/types';
 import { formatDateFr, formatDurationMin } from '@/lib/date-fr';
 
 interface Props {
@@ -73,6 +73,16 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, u
             </Text>
           </View>
           <View style={styles.badgesRow}>
+            {menage.prestation_type && menage.prestation_type !== 'menage' ? (
+              <View
+                style={[styles.typeBadge, { backgroundColor: colors.statusEnCours + '20' }]}
+                accessibilityLabel={prestationTypeLabel(menage.prestation_type)}
+              >
+                <Text style={[styles.typeBadgeText, { color: colors.statusEnCours }]}>
+                  {prestationTypeLabel(menage.prestation_type)}
+                </Text>
+              </View>
+            ) : null}
             {unread > 0 ? (
               <View
                 style={[styles.unreadBadge, { backgroundColor: colors.red }]}
@@ -159,6 +169,17 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   unreadBadgeText: { fontSize: 9, fontWeight: FontWeight.bold, color: '#FFFFFF' },
+  typeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+  },
+  typeBadgeText: {
+    fontSize: 9,
+    fontWeight: FontWeight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   lateBadge: {
     flexDirection: 'row',
     alignItems: 'center',

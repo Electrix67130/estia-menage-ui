@@ -25,8 +25,8 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Menage, MenageStatus } from '@/api/types';
-import { menagePrestataireLabel, menageLogementLabel } from '@/api/types';
+import type { Menage, MenageStatus, PrestationType } from '@/api/types';
+import { menagePrestataireLabel, menageLogementLabel, prestationTypeLabel } from '@/api/types';
 import { formatDateFr } from '@/lib/date-fr';
 
 const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
@@ -42,6 +42,7 @@ const STATUS_COLOR: Record<MenageStatus, string> = {
 const PRESTATAIRE_ALL = '';
 const PRESTATAIRE_UNASSIGNED = '__unassigned__';
 const LOGEMENT_ALL = '';
+const TYPE_ALL = '';
 
 interface CalendarScreenProps {
   /**
@@ -84,8 +85,19 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
     'calendar.filter.logement',
     LOGEMENT_ALL,
   );
+  const [typeFilter, setTypeFilter] = usePersistedState<string>('calendar.filter.type', TYPE_ALL);
   const [prestataireSheetOpen, setPrestataireSheetOpen] = useState(false);
   const [logementSheetOpen, setLogementSheetOpen] = useState(false);
+  const [typeSheetOpen, setTypeSheetOpen] = useState(false);
+
+  const typeOptions = useMemo(
+    () =>
+      (['menage', 'check_in', 'check_out'] as PrestationType[]).map((t) => ({
+        id: t,
+        label: prestationTypeLabel(t),
+      })),
+    [],
+  );
 
   const prestataireOptions = useMemo(
     () => buildPrestataireOptions(allMenages, allUsers.data?.data ?? []),
@@ -109,10 +121,11 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         } else if (prestataireFilter) {
           if (m.prestataire_user_id !== prestataireFilter) return false;
         }
+        if (typeFilter && m.prestation_type !== typeFilter) return false;
         if (logementFilter && m.logement_id !== logementFilter) return false;
         return true;
       }),
-    [allMenages, prestataireFilter, logementFilter],
+    [allMenages, prestataireFilter, typeFilter, logementFilter],
   );
 
   const byDate = useMemo(() => groupByDate(filteredMenages), [filteredMenages]);
@@ -121,7 +134,10 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
   const todayIso = isoLocal(new Date());
 
   const selectedItems = selectedDate ? byDate.get(selectedDate) ?? [] : [];
-  const filtersActive = prestataireFilter !== PRESTATAIRE_ALL || logementFilter !== LOGEMENT_ALL;
+  const filtersActive =
+    prestataireFilter !== PRESTATAIRE_ALL ||
+    logementFilter !== LOGEMENT_ALL ||
+    typeFilter !== TYPE_ALL;
 
   const prestataireFilterLabel =
     prestataireFilter === PRESTATAIRE_ALL
@@ -134,6 +150,11 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
     logementFilter === LOGEMENT_ALL
       ? 'Tous'
       : logementOptions.find((l) => l.id === logementFilter)?.label ?? 'Tous';
+
+  const typeFilterLabel =
+    typeFilter === TYPE_ALL
+      ? 'Type'
+      : typeOptions.find((o) => o.id === typeFilter)?.label ?? 'Type';
 
   const prestatairePickerOptions = useMemo(
     () => [
@@ -205,6 +226,30 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterRow}
       >
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            {
+              backgroundColor: typeFilter !== TYPE_ALL ? colors.primary + '20' : colors.itemBackground,
+              borderColor: typeFilter !== TYPE_ALL ? colors.primary : colors.border,
+            },
+          ]}
+          onPress={() => setTypeSheetOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Filtrer par type"
+        >
+          <Text
+            style={[
+              styles.filterLabel,
+              { color: typeFilter !== TYPE_ALL ? colors.primary : colors.text2 },
+            ]}
+            numberOfLines={1}
+          >
+            {typeFilterLabel}
+          </Text>
+          <ChevronDown size={12} color={typeFilter !== TYPE_ALL ? colors.primary : colors.text2} />
+        </TouchableOpacity>
+
         {showPrestataireFilter ? (
           <TouchableOpacity
             style={[
@@ -278,6 +323,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
             onPress={() => {
               setPrestataireFilter(PRESTATAIRE_ALL);
               setLogementFilter(LOGEMENT_ALL);
+              setTypeFilter(TYPE_ALL);
             }}
             accessibilityRole="button"
             accessibilityLabel="Réinitialiser les filtres"
@@ -452,6 +498,17 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         }}
         onClose={() => setLogementSheetOpen(false)}
       />
+      <FilterPickerSheet
+        visible={typeSheetOpen}
+        title="Filtrer par type"
+        options={[{ id: TYPE_ALL, label: 'Tous les types' }, ...typeOptions]}
+        selectedId={typeFilter}
+        onSelect={(id) => {
+          setTypeFilter(id);
+          setTypeSheetOpen(false);
+        }}
+        onClose={() => setTypeSheetOpen(false)}
+      />
     </Wrapper>
   );
 }
@@ -464,7 +521,8 @@ interface FilterOption {
 interface FilterPickerSheetProps {
   visible: boolean;
   title: string;
-  searchPlaceholder: string;
+  /** Absent = pas de barre de recherche (listes courtes, ex. type de prestation). */
+  searchPlaceholder?: string;
   options: FilterOption[];
   selectedId: string;
   onSelect: (id: string) => void;
@@ -510,23 +568,25 @@ function FilterPickerSheet({
             <Text style={[sheetStyles.title, { color: colors.text }]}>{title}</Text>
           </View>
 
-          <View
-            style={[
-              sheetStyles.searchBox,
-              { backgroundColor: colors.itemBackground, borderColor: colors.border },
-            ]}
-          >
-            <Search size={16} color={colors.placeholder} />
-            <TextInput
-              style={[sheetStyles.searchInput, { color: colors.text }]}
-              placeholder={searchPlaceholder}
-              placeholderTextColor={colors.placeholder}
-              value={search}
-              onChangeText={setSearch}
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
-          </View>
+          {searchPlaceholder ? (
+            <View
+              style={[
+                sheetStyles.searchBox,
+                { backgroundColor: colors.itemBackground, borderColor: colors.border },
+              ]}
+            >
+              <Search size={16} color={colors.placeholder} />
+              <TextInput
+                style={[sheetStyles.searchInput, { color: colors.text }]}
+                placeholder={searchPlaceholder}
+                placeholderTextColor={colors.placeholder}
+                value={search}
+                onChangeText={setSearch}
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+            </View>
+          ) : null}
 
           <FlatList
             data={filtered}

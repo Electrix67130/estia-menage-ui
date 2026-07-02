@@ -6,10 +6,12 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { IconSize } from '@/constants/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnreadSummary } from '@/api/hooks/useMenageViews';
+import { useTranslation } from '@/contexts/I18nContext';
 
 export default function TabsLayout() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const { user } = useAuth();
   const isPrestataire = user?.role === 'prestataire';
   // Total des non-lus (tous ménages) → pastille sur l'onglet "Ménages".
@@ -31,7 +33,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Ménages',
+          title: t('prestation.title'),
           tabBarIcon: ({ color }) => <Sparkles size={IconSize.lg} color={color} />,
           tabBarBadge: totalUnread > 0 ? (totalUnread > 99 ? '99+' : totalUnread) : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.red, fontSize: 10 },

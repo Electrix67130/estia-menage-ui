@@ -84,6 +84,8 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
   const [color, setColor] = useState<string | null>(null);
   const [hasPool, setHasPool] = useState(false);
   const [hasJacuzzi, setHasJacuzzi] = useState(false);
+  const [enableCheckIn, setEnableCheckIn] = useState(false);
+  const [enableCheckOut, setEnableCheckOut] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const seeded = useRef(false);
 
@@ -118,6 +120,8 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
     setColor(logement.color ?? null);
     setHasPool(logement.has_pool ?? false);
     setHasJacuzzi(logement.has_jacuzzi ?? false);
+    setEnableCheckIn(logement.enable_check_in ?? false);
+    setEnableCheckOut(logement.enable_check_out ?? false);
   }, [logement]);
 
   // Auto-save (debounce 700ms) à chaque modification, une fois les champs initialisés.
@@ -127,6 +131,7 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
     defaultDurationMin, defaultClientPriceHt, defaultClientVatRate, defaultProviderPrice,
     defaultLaundryIncluded, defaultLaundryClientPriceHt, defaultLaundryProviderPrice,
     defaultHoraireDebut, defaultHoraireFin, color, hasPool, hasJacuzzi,
+    enableCheckIn, enableCheckOut,
   ].join('¦');
 
   useEffect(() => {
@@ -172,6 +177,8 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
             color: color || undefined,
             has_pool: hasPool,
             has_jacuzzi: hasJacuzzi,
+            enable_check_in: enableCheckIn,
+            enable_check_out: enableCheckOut,
           },
         },
         {
@@ -394,6 +401,16 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
       <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={{ color: colors.text, fontSize: FontSize.md }}>Jacuzzi</Text>
         <Switch value={hasJacuzzi} onValueChange={setHasJacuzzi} trackColor={{ false: colors.border, true: colors.primary }} />
+      </View>
+
+      <Text style={[styles.section, { color: colors.text2 }]}>{tr('logement.prestationsSection').toUpperCase()}</Text>
+      <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={{ color: colors.text, fontSize: FontSize.md }}>{tr('logement.enableCheckIn')}</Text>
+        <Switch value={enableCheckIn} onValueChange={setEnableCheckIn} trackColor={{ false: colors.border, true: colors.primary }} />
+      </View>
+      <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={{ color: colors.text, fontSize: FontSize.md }}>{tr('logement.enableCheckOut')}</Text>
+        <Switch value={enableCheckOut} onValueChange={setEnableCheckOut} trackColor={{ false: colors.border, true: colors.primary }} />
       </View>
 
       <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>

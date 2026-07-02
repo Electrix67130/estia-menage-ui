@@ -79,6 +79,7 @@ import ArrivalDeclarationModal, { type ArrivalDeclaration } from '@/components/A
 import { uploadFile } from '@/api/upload';
 import { optimizeImage } from '@/utils/optimizeImage';
 import { haversineMeters, formatDistance, POINTAGE_DISTANCE_WARN_M } from '@/lib/geo-distance';
+import { prestationTypeLabel } from '@/api/types';
 import type { Menage, Logement, MenageStatus, UpdateMenageInput } from '@/api/types';
 
 const TABS = [
@@ -184,9 +185,28 @@ export default function MenageDetailScreen() {
     }
   };
 
+  // check-in / check-out : pointage OPTIONNEL, sans photo ni GPS. On confirme
+  // simplement puis on POST un body vide (photo/lat/lng omis).
+  const isCheckInOut = !!menage && menage.prestation_type !== 'menage';
+
   // Arrivée : on capture la photo géolocalisée, puis on demande la déclaration
   // (note voyageurs + dégradation) avant de pointer réellement l'arrivée.
+  // Pour un check-in/check-out : pas de photo/GPS, juste une confirmation.
   const handleArrival = async () => {
+    if (isCheckInOut) {
+      const ok = await dialog.confirm({
+        title: menage?.prestation_type === 'check_in' ? "Pointer l'arrivée du voyageur ?" : "Pointer l'arrivée ?",
+        message: 'Le statut passera à « en cours ».',
+        confirmLabel: 'Confirmer',
+      });
+      if (!ok) return;
+      try {
+        await arrivalMutation.mutateAsync({ id: id! });
+      } catch (err) {
+        void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec du pointage' });
+      }
+      return;
+    }
     const ok = await dialog.confirm({
       title: "Pointer l'arrivée ?",
       message: 'Une photo géolocalisée va être prise pour confirmer ta présence sur place.',
@@ -237,6 +257,20 @@ export default function MenageDetailScreen() {
     }
   };
   const handleDeparture = async () => {
+    if (isCheckInOut) {
+      const ok = await dialog.confirm({
+        title: 'Pointer le départ ?',
+        message: 'Le statut passera à « terminé ».',
+        confirmLabel: 'Confirmer',
+      });
+      if (!ok) return;
+      try {
+        await departureMutation.mutateAsync({ id: id! });
+      } catch (err) {
+        void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec du pointage' });
+      }
+      return;
+    }
     const ok = await runPointage('departure', departureMutation.mutateAsync);
     // Après le pointage de fin, on invite le presta à relever les consommables.
     if (ok && hasConsommables) {
@@ -336,6 +370,13 @@ export default function MenageDetailScreen() {
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
             <Text style={[styles.dateText, { color: colors.text2 }]}>{date}</Text>
+            {isCheckInOut ? (
+              <View style={[styles.typeBadge, { backgroundColor: colors.statusEnCours + '20' }]}>
+                <Text style={[styles.typeBadgeText, { color: colors.statusEnCours }]}>
+                  {prestationTypeLabel(menage.prestation_type)}
+                </Text>
+              </View>
+            ) : null}
             {menage.date_locked ? (
               <View style={[styles.lockPill, { backgroundColor: colors.statusEnCours + '25' }]}>
                 <Lock size={14} color={colors.statusEnCours} />
@@ -514,7 +555,7 @@ export default function MenageDetailScreen() {
 
       {/* Tabs */}
       <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
-        {TABS.map((tab) => {
+        {(isCheckInOut ? TABS.filter((tb) => tb.key !== 'photos') : TABS).map((tab) => {
           const isActive = activeTab === tab.key;
           const TabIcon = tab.icon;
           const unread = unreadForTab(tab.key);
@@ -544,7 +585,7 @@ export default function MenageDetailScreen() {
       {/* Content */}
       <View style={{ flex: 1 }}>
         {activeTab === 'check' && <MenageCheckList menageId={id!} readonly={menage.status === 'valide'} />}
-        {activeTab === 'photos' && <PhotoGallery menageId={id!} readonly={menage.status === 'valide'} />}
+        {activeTab === 'photos' && !isCheckInOut && <PhotoGallery menageId={id!} readonly={menage.status === 'valide'} />}
         {activeTab === 'comments' && (
           <MenageDiscussions
             menageId={id!}
@@ -1771,6 +1812,12 @@ const styles = StyleSheet.create({
     borderRadius: Radius.pill,
   },
   lockText: { fontSize: 11, fontWeight: FontWeight.semibold, textTransform: 'uppercase', letterSpacing: 0.4 },
+  typeBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.pill,
+  },
+  typeBadgeText: { fontSize: 11, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.4 },
   prestataireBlock: {
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.sm,

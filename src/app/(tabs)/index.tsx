@@ -23,7 +23,7 @@ import MenageMap from '@/components/MenageMap';
 import { useAuth } from '@/contexts/AuthContext';
 import AppHeader from '@/components/AppHeader';
 import PrestaUpcomingList from '@/components/PrestaUpcomingList';
-import { menageLogementLabel, menageSourceLabel, type MenageStatus, type Menage } from '@/api/types';
+import { menageLogementLabel, menageSourceLabel, prestationTypeLabel, type MenageStatus, type Menage, type PrestationType } from '@/api/types';
 import type { MenageFilter } from '@/components/FilterChips';
 
 type ViewMode = 'list' | 'map';
@@ -46,9 +46,9 @@ function PrestataireMenagesScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.title, { color: colors.text }]}>{t('menage.title')}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t('prestation.title')}</Text>
           <Text style={{ color: colors.mutedText, fontSize: FontSize.xs, marginTop: 2 }}>
-            Indique si tu peux faire chaque ménage.
+            Indique si tu peux faire chaque prestation.
           </Text>
         </View>
       </AppHeader>
@@ -78,7 +78,8 @@ function AdminMenagesScreen() {
   const [logementFilter, setLogementFilter] = usePersistedState('menages.filter.logement', '');
   const [prestaFilter, setPrestaFilter] = usePersistedState('menages.filter.presta', '');
   const [creatorFilter, setCreatorFilter] = usePersistedState('menages.filter.creator', '');
-  const [openPicker, setOpenPicker] = useState<null | 'logement' | 'presta' | 'creator'>(null);
+  const [typeFilter, setTypeFilter] = usePersistedState('menages.filter.type', '');
+  const [openPicker, setOpenPicker] = useState<null | 'logement' | 'presta' | 'creator' | 'type'>(null);
   const [periodFilter, setPeriodFilter] = usePersistedState<'week' | 'month' | 'year' | 'all'>(
     'menages.filter.period',
     'all',
@@ -145,6 +146,7 @@ function AdminMenagesScreen() {
     return all
       .filter((m) => {
         if (q && !menageLogementLabel(m).toLowerCase().includes(q)) return false;
+        if (typeFilter && m.prestation_type !== typeFilter) return false;
         if (logementFilter && m.logement_id !== logementFilter) return false;
         if (prestaFilter && m.prestataire_user_id !== prestaFilter) return false;
         if (creatorFilter) {
@@ -172,10 +174,18 @@ function AdminMenagesScreen() {
         if (!aUp && !bUp) return bd.localeCompare(ad);
         return aUp ? -1 : 1;
       });
-  }, [menagesQuery.data, searchQuery, logementFilter, prestaFilter, creatorFilter, period.min, period.max]);
+  }, [menagesQuery.data, searchQuery, typeFilter, logementFilter, prestaFilter, creatorFilter, period.min, period.max]);
   const isLoading = menagesQuery.isLoading;
 
   // Options pour les pickers.
+  const typeOptions: FilterOption[] = React.useMemo(
+    () =>
+      (['menage', 'check_in', 'check_out'] as PrestationType[]).map((t) => ({
+        id: t,
+        label: prestationTypeLabel(t),
+      })),
+    [],
+  );
   const logementOptions: FilterOption[] = React.useMemo(
     () =>
       (logementsQuery.data?.data ?? [])
@@ -331,9 +341,9 @@ function AdminMenagesScreen() {
           {t('menage.empty')}
         </Text>
         <Text style={[styles.emptyHint, { color: colors.mutedText }]}>
-          {searchQuery || logementFilter || prestaFilter || creatorFilter
-            ? 'Aucun ménage pour ces filtres.'
-            : 'Appuyez sur + pour créer votre premier menage.'}
+          {searchQuery || typeFilter || logementFilter || prestaFilter || creatorFilter
+            ? 'Aucune prestation pour ces filtres.'
+            : 'Appuyez sur + pour créer votre première prestation.'}
         </Text>
       </View>
     );
@@ -342,7 +352,7 @@ function AdminMenagesScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader>
-        <Text style={[styles.title, { color: colors.text }]}>{t('menage.title')}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('prestation.title')}</Text>
         {/* Demandes de changement — actif si pending > 0, muted sinon. */}
         <TouchableOpacity
           style={[
@@ -501,6 +511,14 @@ function AdminMenagesScreen() {
             onSelect={setStatusFilter}
             extra={[
               {
+                key: 'type',
+                label: typeFilter
+                  ? typeOptions.find((o) => o.id === typeFilter)?.label ?? 'Type'
+                  : 'Type',
+                active: !!typeFilter,
+                onPress: () => setOpenPicker('type'),
+              },
+              {
                 key: 'logement',
                 label: logementFilter
                   ? logementOptions.find((o) => o.id === logementFilter)?.label ?? 'Logement'
@@ -533,6 +551,17 @@ function AdminMenagesScreen() {
         </Animated.View>
       )}
 
+      <FilterPickerSheet
+        visible={openPicker === 'type'}
+        title="Filtrer par type"
+        options={typeOptions}
+        selectedId={typeFilter}
+        onSelect={(id) => {
+          setTypeFilter(id);
+          setOpenPicker(null);
+        }}
+        onClose={() => setOpenPicker(null)}
+      />
       <FilterPickerSheet
         visible={openPicker === 'logement'}
         title="Filtrer par logement"

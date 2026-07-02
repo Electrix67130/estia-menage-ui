@@ -253,7 +253,11 @@ export type TranslationKeys =
   | "menage.errors.dureeInvalid"
   | "menage.errors.fieldInvalid"
   | "menage.errors.updateError"
-  | "menage.success.updated";
+  | "menage.success.updated"
+  | "prestation.title"
+  | "logement.prestationsSection"
+  | "logement.enableCheckIn"
+  | "logement.enableCheckOut";
 
 type Dictionary = Record<TranslationKeys, string>;
 
@@ -491,6 +495,10 @@ const fr: Dictionary = {
   "menage.errors.fieldInvalid": "{field} invalide",
   "menage.errors.updateError": "Erreur lors de la modification",
   "menage.success.updated": "Ménage mis à jour",
+  "prestation.title": "Prestations",
+  "logement.prestationsSection": "Prestations proposées",
+  "logement.enableCheckIn": "Check-in (arrivée voyageur)",
+  "logement.enableCheckOut": "Check-out (départ voyageur)",
 };
 
 const en: Dictionary = {
@@ -727,6 +735,10 @@ const en: Dictionary = {
   "menage.errors.fieldInvalid": "Invalid {field}",
   "menage.errors.updateError": "Error while updating",
   "menage.success.updated": "Cleaning updated",
+  "prestation.title": "Services",
+  "logement.prestationsSection": "Offered services",
+  "logement.enableCheckIn": "Check-in (guest arrival)",
+  "logement.enableCheckOut": "Check-out (guest departure)",
 };
 
 const de: Dictionary = {
@@ -963,6 +975,10 @@ const de: Dictionary = {
   "menage.errors.fieldInvalid": "Ungültig: {field}",
   "menage.errors.updateError": "Fehler beim Aktualisieren",
   "menage.success.updated": "Reinigung aktualisiert",
+  "prestation.title": "Leistungen",
+  "logement.prestationsSection": "Angebotene Leistungen",
+  "logement.enableCheckIn": "Check-in (Anreise Gast)",
+  "logement.enableCheckOut": "Check-out (Abreise Gast)",
 };
 
 const es: Dictionary = {
@@ -1199,6 +1215,10 @@ const es: Dictionary = {
   "menage.errors.fieldInvalid": "{field} inválido",
   "menage.errors.updateError": "Error al actualizar",
   "menage.success.updated": "Limpieza actualizada",
+  "prestation.title": "Servicios",
+  "logement.prestationsSection": "Servicios ofrecidos",
+  "logement.enableCheckIn": "Check-in (llegada del huésped)",
+  "logement.enableCheckOut": "Check-out (salida del huésped)",
 };
 
 const it: Dictionary = {
@@ -1435,6 +1455,10 @@ const it: Dictionary = {
   "menage.errors.fieldInvalid": "{field} non valido",
   "menage.errors.updateError": "Errore durante l'aggiornamento",
   "menage.success.updated": "Pulizia aggiornata",
+  "prestation.title": "Prestazioni",
+  "logement.prestationsSection": "Prestazioni offerte",
+  "logement.enableCheckIn": "Check-in (arrivo ospite)",
+  "logement.enableCheckOut": "Check-out (partenza ospite)",
 };
 
 const pt: Dictionary = {
@@ -1671,6 +1695,10 @@ const pt: Dictionary = {
   "menage.errors.fieldInvalid": "{field} inválido",
   "menage.errors.updateError": "Erro ao atualizar",
   "menage.success.updated": "Limpeza atualizada",
+  "prestation.title": "Serviços",
+  "logement.prestationsSection": "Serviços oferecidos",
+  "logement.enableCheckIn": "Check-in (chegada do hóspede)",
+  "logement.enableCheckOut": "Check-out (saída do hóspede)",
 };
 
 const tr: Dictionary = {
@@ -1907,6 +1935,10 @@ const tr: Dictionary = {
   "menage.errors.fieldInvalid": "Geçersiz {field}",
   "menage.errors.updateError": "Güncelleme sırasında hata",
   "menage.success.updated": "Temizlik güncellendi",
+  "prestation.title": "Hizmetler",
+  "logement.prestationsSection": "Sunulan hizmetler",
+  "logement.enableCheckIn": "Check-in (misafir girişi)",
+  "logement.enableCheckOut": "Check-out (misafir çıkışı)",
 };
 
 const pl: Dictionary = {
@@ -2143,6 +2175,10 @@ const pl: Dictionary = {
   "menage.errors.fieldInvalid": "Nieprawidłowe {field}",
   "menage.errors.updateError": "Błąd podczas aktualizacji",
   "menage.success.updated": "Sprzątanie zaktualizowane",
+  "prestation.title": "Usługi",
+  "logement.prestationsSection": "Oferowane usługi",
+  "logement.enableCheckIn": "Zameldowanie (przyjazd gościa)",
+  "logement.enableCheckOut": "Wymeldowanie (wyjazd gościa)",
 };
 
 export const TRANSLATIONS: Record<Locale, Dictionary> = {

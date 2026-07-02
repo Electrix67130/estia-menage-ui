@@ -125,7 +125,6 @@ export default function LogementDetailScreen() {
     [members.data, user],
   );
   const canViewPrestataires = isAdmin || !!myMember?.can_view_prestataires;
-  const canViewResponsables = isAdmin || !!myMember?.can_view_responsables;
   const canViewClients = isAdmin || !!myMember?.can_view_clients;
 
   const handleDelete = async () => {
@@ -292,10 +291,6 @@ export default function LogementDetailScreen() {
             currentClientId={logement.client_id}
             isAdmin={isAdmin}
           />
-        ) : null}
-
-        {canViewResponsables ? (
-          <LogementMembersSection logementId={logement.id} isAdmin={isAdmin} role="manager" />
         ) : null}
 
         {canViewPrestataires ? (

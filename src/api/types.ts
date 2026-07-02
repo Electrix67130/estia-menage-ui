@@ -115,6 +115,9 @@ export interface Logement {
   has_laundry: boolean;
   has_pool: boolean;
   has_jacuzzi: boolean;
+  /** Prestations proposées sur ce logement (pilote la création de check-in/check-out). */
+  enable_check_in: boolean;
+  enable_check_out: boolean;
   surface_m2: number | null;
   notes: string | null;
   key_safe_code: string | null;
@@ -167,6 +170,8 @@ export interface CreateLogementInput {
   has_laundry?: boolean;
   has_pool?: boolean;
   has_jacuzzi?: boolean;
+  enable_check_in?: boolean;
+  enable_check_out?: boolean;
   surface_m2?: number;
   notes?: string;
   proprietaire_user_id?: string;
@@ -178,6 +183,21 @@ export type UpdateLogementInput = Partial<CreateLogementInput>;
 // --------------- Menage ---------------
 
 export type MenageStatus = 'a_venir' | 'en_cours' | 'termine' | 'valide' | 'annule';
+
+/** Type de prestation d'un ménage. `menage` = nettoyage classique (défaut). */
+export type PrestationType = 'menage' | 'check_in' | 'check_out';
+
+/** Libellé du type de prestation pour affichage (badge). */
+export function prestationTypeLabel(type?: PrestationType | null): string {
+  switch (type) {
+    case 'check_in':
+      return 'Check-in';
+    case 'check_out':
+      return 'Check-out';
+    default:
+      return 'Ménage';
+  }
+}
 
 export function menagePrestataireLabel(m: {
   prestataire_user_id: string | null;
@@ -207,6 +227,8 @@ export interface Menage {
   created_by: string;
   prestataire_user_id: string | null;
   status: MenageStatus;
+  /** Type de prestation : ménage (défaut), check-in (arrivée) ou check-out (départ). */
+  prestation_type: PrestationType;
   date_prevue: string;
   /** Prochain check-in du logement (arrivée du prochain voyageur, via iCal). */
   next_checkin_at?: string | null;
@@ -279,6 +301,7 @@ export function menageSourceLabel(externalSource?: string | null): string {
 export interface CreateMenageInput {
   logement_id: string;
   prestataire_user_id?: string;
+  prestation_type?: PrestationType;
   date_prevue: string;
   horaire_prevu?: string;
   horaire_fin_prevu?: string;

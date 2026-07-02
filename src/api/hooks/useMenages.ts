@@ -5,6 +5,7 @@ import { menagesApi } from '../services';
 import type {
   Menage,
   MenageStatus,
+  PrestationType,
   PaginatedResponse,
   PaginationParams,
   CreateMenageInput,
@@ -19,6 +20,8 @@ export const menageHooks = createCrudHooks<Menage, CreateMenageInput, UpdateMena
 
 interface ListParams extends PaginationParams {
   status?: MenageStatus;
+  /** Filtre par type de prestation (ménage / check-in / check-out). */
+  type?: PrestationType;
   prestataire_user_id?: string;
   logement_id?: string;
   validated?: boolean;
@@ -34,6 +37,7 @@ export function useMenages(params?: ListParams) {
   if (params?.page) query.set('page', String(params.page));
   if (params?.limit) query.set('limit', String(params.limit));
   if (params?.status) query.set('status', params.status);
+  if (params?.type) query.set('type', params.type);
   if (params?.prestataire_user_id) query.set('prestataire_user_id', params.prestataire_user_id);
   if (params?.logement_id) query.set('logement_id', params.logement_id);
   if (params?.validated !== undefined) query.set('validated', String(params.validated));
@@ -91,9 +95,10 @@ export function useUpdateMenage() {
 
 export interface PointagePayload {
   id: string;
-  photo_url: string;
-  lat: number;
-  lng: number;
+  /** Photo/GPS obligatoires pour un ménage, omis pour un check-in/check-out. */
+  photo_url?: string;
+  lat?: number;
+  lng?: number;
 }
 
 export interface DegradationPhotoInput {

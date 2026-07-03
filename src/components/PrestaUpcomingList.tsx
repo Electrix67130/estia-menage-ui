@@ -21,7 +21,7 @@ import {
   type MenageResponseStatus,
 } from '@/api/hooks/useMenageResponses';
 import { useUnreadSummary } from '@/api/hooks/useMenageViews';
-import { prestationTypeLabel } from '@/api/types';
+import { prestationTypeLabel, prestationTypeColorKey } from '@/api/types';
 import { formatDateFr, formatDurationMin } from '@/lib/date-fr';
 
 /** Date locale au format YYYY-MM-DD (sans décalage UTC). */
@@ -267,16 +267,19 @@ export default function PrestaUpcomingList() {
                   </Text>
                 </View>
                 <View style={styles.metaRow}>
-                  {item.prestation_type && item.prestation_type !== 'menage' ? (
-                    <View
-                      style={[styles.typeBadge, { backgroundColor: colors.statusEnCours + '20' }]}
-                      accessibilityLabel={prestationTypeLabel(item.prestation_type)}
-                    >
-                      <Text style={[styles.typeBadgeText, { color: colors.statusEnCours }]}>
-                        {prestationTypeLabel(item.prestation_type)}
-                      </Text>
-                    </View>
-                  ) : null}
+                  {(() => {
+                    const typeColor = colors[prestationTypeColorKey(item.prestation_type)];
+                    return (
+                      <View
+                        style={[styles.typeBadge, { backgroundColor: typeColor + '20' }]}
+                        accessibilityLabel={prestationTypeLabel(item.prestation_type)}
+                      >
+                        <Text style={[styles.typeBadgeText, { color: typeColor }]}>
+                          {prestationTypeLabel(item.prestation_type)}
+                        </Text>
+                      </View>
+                    );
+                  })()}
                   {unread > 0 ? (
                     <View
                       style={[styles.unreadBadge, { backgroundColor: colors.red }]}

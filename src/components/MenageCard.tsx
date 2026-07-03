@@ -5,7 +5,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import StatusBadge from './StatusBadge';
-import { menageLogementLabel, menageSourceLabel, prestationTypeLabel, type Menage } from '@/api/types';
+import { menageLogementLabel, menageSourceLabel, prestationTypeLabel, prestationTypeColorKey, type Menage } from '@/api/types';
 import { formatDateFr, formatDurationMin } from '@/lib/date-fr';
 
 interface Props {
@@ -72,44 +72,49 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, u
               {menageLogementLabel(menage)}
             </Text>
           </View>
-          <View style={styles.badgesRow}>
-            {menage.prestation_type && menage.prestation_type !== 'menage' ? (
-              <View
-                style={[styles.typeBadge, { backgroundColor: colors.statusEnCours + '20' }]}
-                accessibilityLabel={prestationTypeLabel(menage.prestation_type)}
-              >
-                <Text style={[styles.typeBadgeText, { color: colors.statusEnCours }]}>
-                  {prestationTypeLabel(menage.prestation_type)}
-                </Text>
-              </View>
-            ) : null}
-            {unread > 0 ? (
-              <View
-                style={[styles.unreadBadge, { backgroundColor: colors.red }]}
-                accessibilityLabel={`${unread} élément(s) non lu(s)`}
-              >
-                <Bell size={10} color="#FFFFFF" />
-                <Text style={styles.unreadBadgeText}>{unread > 99 ? '99+' : unread}</Text>
-              </View>
-            ) : null}
-            {needsAttention ? (
-              <View
-                style={[styles.lateBadge, { backgroundColor: colors.red + '20' }]}
-                accessibilityLabel="Jour passé sans pointage"
-              >
-                <AlertTriangle size={11} color={colors.red} />
-                <Text style={[styles.lateBadgeText, { color: colors.red }]}>Non pointé</Text>
-              </View>
-            ) : null}
-            {menage.has_pending_reschedule ? (
-              <View
-                style={[styles.reschedulePill, { backgroundColor: colors.statusEnCours + '25' }]}
-                accessibilityLabel="Demande de changement en attente"
-              >
-                <Clock size={12} color={colors.statusEnCours} />
-              </View>
-            ) : null}
-            <StatusBadge status={menage.status} />
+          <View style={styles.badgesCol}>
+            <View style={styles.badgesRow}>
+              {unread > 0 ? (
+                <View
+                  style={[styles.unreadBadge, { backgroundColor: colors.red }]}
+                  accessibilityLabel={`${unread} élément(s) non lu(s)`}
+                >
+                  <Bell size={10} color="#FFFFFF" />
+                  <Text style={styles.unreadBadgeText}>{unread > 99 ? '99+' : unread}</Text>
+                </View>
+              ) : null}
+              {needsAttention ? (
+                <View
+                  style={[styles.lateBadge, { backgroundColor: colors.red + '20' }]}
+                  accessibilityLabel="Jour passé sans pointage"
+                >
+                  <AlertTriangle size={11} color={colors.red} />
+                  <Text style={[styles.lateBadgeText, { color: colors.red }]}>Non pointé</Text>
+                </View>
+              ) : null}
+              {menage.has_pending_reschedule ? (
+                <View
+                  style={[styles.reschedulePill, { backgroundColor: colors.statusEnCours + '25' }]}
+                  accessibilityLabel="Demande de changement en attente"
+                >
+                  <Clock size={12} color={colors.statusEnCours} />
+                </View>
+              ) : null}
+              <StatusBadge status={menage.status} />
+            </View>
+            {(() => {
+              const typeColor = colors[prestationTypeColorKey(menage.prestation_type)];
+              return (
+                <View
+                  style={[styles.typeBadge, { backgroundColor: typeColor + '20' }]}
+                  accessibilityLabel={prestationTypeLabel(menage.prestation_type)}
+                >
+                  <Text style={[styles.typeBadgeText, { color: typeColor }]}>
+                    {prestationTypeLabel(menage.prestation_type)}
+                  </Text>
+                </View>
+              );
+            })()}
           </View>
         </View>
 
@@ -159,6 +164,7 @@ const styles = StyleSheet.create({
   logementRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, flex: 1 },
   logementDot: { width: 10, height: 10, borderRadius: 5 },
   logement: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, flex: 1, letterSpacing: -0.2 },
+  badgesCol: { alignItems: 'flex-end', gap: 7, flexShrink: 0 },
   badgesRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 },
   unreadBadge: {
     flexDirection: 'row',

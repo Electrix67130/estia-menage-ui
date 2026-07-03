@@ -199,6 +199,24 @@ export function prestationTypeLabel(type?: PrestationType | null): string {
   }
 }
 
+/**
+ * Clé de couleur (dans `Colors[scheme]`) associée au type de prestation.
+ * Sémantique : ménage = bleu (prestation principale), check-in = vert (arrivée),
+ * check-out = rouge (départ).
+ */
+export function prestationTypeColorKey(
+  type?: PrestationType | null,
+): 'primary' | 'statusValide' | 'red' {
+  switch (type) {
+    case 'check_in':
+      return 'statusValide';
+    case 'check_out':
+      return 'red';
+    default:
+      return 'primary';
+  }
+}
+
 export function menagePrestataireLabel(m: {
   prestataire_user_id: string | null;
   prestataire_first_name?: string | null;

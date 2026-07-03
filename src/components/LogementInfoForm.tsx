@@ -16,12 +16,13 @@ import ColorPicker from '@/components/ColorPicker';
 import LabeledField from '@/components/LabeledField';
 import ClientPickerSheet from '@/components/ClientPickerSheet';
 import CreateClientModal from '@/components/CreateClientModal';
+import SectionCard from '@/components/SectionCard';
 
 function RoomCounter({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   return (
-    <View style={[counterStyles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <View style={[counterStyles.row, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
       <Text style={[counterStyles.label, { color: colors.text }]}>{label}</Text>
       <View style={counterStyles.controls}>
         <TouchableOpacity
@@ -47,6 +48,7 @@ function RoomCounter({ label, value, onChange }: { label: string; value: number;
 /**
  * Édition « sur place » des infos d'un logement, avec auto-save par champ
  * (debounce). Destiné à être rendu inline dans l'écran détail (admin only).
+ * Les champs sont regroupés en cartes de section (SectionCard) pour la lisibilité.
  */
 export default function LogementInfoForm({ logementId }: { logementId: string }) {
   const colorScheme = useColorScheme();
@@ -193,95 +195,225 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
 
   if (!logement) return null;
 
+  const selectedClient = clientId
+    ? (clientsQuery.data?.data ?? []).find((x) => x.id === clientId)
+    : undefined;
+
+  const saveLabel =
+    saveState === 'saving'
+      ? 'Enregistrement…'
+      : saveState === 'saved'
+        ? '✓ Enregistré'
+        : saveState === 'error'
+          ? '⚠ Erreur'
+          : 'Auto-enregistré';
+
   return (
-    <View style={{ gap: Spacing.sm }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={[styles.section, { color: colors.text2, marginTop: 0 }]}>INFOS</Text>
-        <Text style={{ color: colors.mutedText, fontSize: FontSize.xs }}>
-          {saveState === 'saving'
-            ? 'Enregistrement…'
-            : saveState === 'saved'
-              ? '✓ Enregistré'
-              : saveState === 'error'
-                ? '⚠ Erreur'
-                : 'Auto-enregistré'}
-        </Text>
+    <View style={{ gap: Spacing.md }}>
+      <View style={styles.saveBar}>
+        <Text style={{ color: colors.mutedText, fontSize: FontSize.xs }}>{saveLabel}</Text>
       </View>
 
-      <LabeledField label="Nom du logement *">
-        <AutoScrollInput
-          style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-          value={name}
-          onChangeText={setName}
-          placeholder="Ex. Studio Paris 11e"
-          placeholderTextColor={colors.placeholder}
-        />
-      </LabeledField>
+      <SectionCard title="Infos générales">
+        <LabeledField label="Nom du logement *">
+          <AutoScrollInput
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+            value={name}
+            onChangeText={setName}
+            placeholder="Ex. Studio Paris 11e"
+            placeholderTextColor={colors.placeholder}
+          />
+        </LabeledField>
 
-      <CityAutocomplete
-        city={city}
-        postalCode={postalCode}
-        address={address}
-        onCityChange={setCity}
-        onSelect={(c, cp, lat, lng) => {
-          setCity(c);
-          setPostalCode(cp);
-          setLatitude(lat);
-          setLongitude(lng);
-        }}
-        onAddressChange={setAddress}
-        onAddressSelect={(addr, lat, lng) => {
-          setAddress(addr);
-          setLatitude(lat);
-          setLongitude(lng);
-        }}
-      />
-
-      <LabeledField label="Surface (m²)">
-        <AutoScrollInput
-          style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-          value={surfaceM2}
-          onChangeText={setSurfaceM2}
-          placeholder="ex. 65"
-          placeholderTextColor={colors.placeholder}
-          keyboardType="number-pad"
-        />
-      </LabeledField>
-
-      <Text style={[styles.section, { color: colors.text2 }]}>CLIENT (FACTURATION)</Text>
-      <TouchableOpacity
-        style={[
-          styles.optionRow,
-          {
-            backgroundColor: colors.surface,
-            borderColor: clientId ? colors.primary : colors.border,
-            borderWidth: clientId ? 2 : 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: Spacing.sm,
-          },
-        ]}
-        onPress={() => setClientPickerOpen(true)}
-        activeOpacity={0.7}
-      >
-        <UserIcon size={IconSize.sm} color={colors.text2} />
-        <Text
-          style={{
-            flex: 1,
-            color: clientId ? colors.text : colors.mutedText,
-            fontWeight: clientId ? FontWeight.semibold : FontWeight.regular,
+        <CityAutocomplete
+          city={city}
+          postalCode={postalCode}
+          address={address}
+          onCityChange={setCity}
+          onSelect={(c, cp, lat, lng) => {
+            setCity(c);
+            setPostalCode(cp);
+            setLatitude(lat);
+            setLongitude(lng);
           }}
-        >
-          {clientId
-            ? (() => {
-                const c = (clientsQuery.data?.data ?? []).find((x) => x.id === clientId);
-                return c ? clientDisplayName(c) : 'Client sélectionné';
-              })()
-            : 'Aucun client — appuyer pour en choisir un'}
-        </Text>
-        <ChevronRight size={IconSize.sm} color={colors.text2} />
-      </TouchableOpacity>
+          onAddressChange={setAddress}
+          onAddressSelect={(addr, lat, lng) => {
+            setAddress(addr);
+            setLatitude(lat);
+            setLongitude(lng);
+          }}
+        />
 
+        <LabeledField label="Surface (m²)">
+          <AutoScrollInput
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+            value={surfaceM2}
+            onChangeText={setSurfaceM2}
+            placeholder="ex. 65"
+            placeholderTextColor={colors.placeholder}
+            keyboardType="number-pad"
+          />
+        </LabeledField>
+
+        <LabeledField label="Couleur (calendrier)">
+          <ColorPicker label="" value={color} onChange={setColor} />
+        </LabeledField>
+      </SectionCard>
+
+      <SectionCard title="Accès" subtitle="Code de la boîte à clef, visible des prestataires.">
+        <SecretCodeField value={keySafeCode} onChangeText={setKeySafeCode} placeholder="Ex : 1234" />
+      </SectionCard>
+
+      <SectionCard title="Client (facturation)">
+        <TouchableOpacity
+          style={[
+            styles.optionRow,
+            {
+              backgroundColor: colors.itemBackground,
+              borderColor: clientId ? colors.primary : colors.border,
+              borderWidth: clientId ? 2 : 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: Spacing.sm,
+            },
+          ]}
+          onPress={() => setClientPickerOpen(true)}
+          activeOpacity={0.7}
+        >
+          <UserIcon size={IconSize.sm} color={colors.text2} />
+          <Text
+            style={{
+              flex: 1,
+              color: clientId ? colors.text : colors.mutedText,
+              fontWeight: clientId ? FontWeight.semibold : FontWeight.regular,
+            }}
+          >
+            {selectedClient
+              ? clientDisplayName(selectedClient)
+              : 'Aucun client — appuyer pour en choisir un'}
+          </Text>
+          <ChevronRight size={IconSize.sm} color={colors.text2} />
+        </TouchableOpacity>
+      </SectionCard>
+
+      <SectionCard title={tr('beds.section')} subtitle={tr('beds.hintLogement')}>
+        <RoomCounter label={tr('beds.simple')} value={nLitSimple} onChange={setNLitSimple} />
+        <RoomCounter label={tr('beds.double')} value={nLitDouble} onChange={setNLitDouble} />
+        <RoomCounter label={tr('beds.sofa')} value={nCanapeLit} onChange={setNCanapeLit} />
+        <RoomCounter label={tr('beds.extra')} value={nLitAppoint} onChange={setNLitAppoint} />
+      </SectionCard>
+
+      <SectionCard title="Valeurs par défaut (ménages)" subtitle="Pré-remplies à la création d'un ménage.">
+        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+          <View style={{ flex: 1 }}>
+            <TimePickerField label="Tranche début" value={defaultHoraireDebut} onChange={setDefaultHoraireDebut} placeholder="--:--" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <TimePickerField label="Tranche fin" value={defaultHoraireFin} onChange={setDefaultHoraireFin} placeholder="--:--" />
+          </View>
+        </View>
+        <DurationPickerField label="Durée moyenne" value={defaultDurationMin} onChange={setDefaultDurationMin} />
+        <LabeledField label="Prix client HT (€)">
+          <AutoScrollInput
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+            value={defaultClientPriceHt}
+            onChangeText={setDefaultClientPriceHt}
+            placeholder="ex. 80"
+            placeholderTextColor={colors.placeholder}
+            keyboardType="decimal-pad"
+          />
+        </LabeledField>
+        <LabeledField label="Taux TVA (%)">
+          <AutoScrollInput
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+            value={defaultClientVatRate}
+            onChangeText={setDefaultClientVatRate}
+            placeholder="20"
+            placeholderTextColor={colors.placeholder}
+            keyboardType="decimal-pad"
+          />
+        </LabeledField>
+        <LabeledField label="Prix prestataire (€)">
+          <AutoScrollInput
+            style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+            value={defaultProviderPrice}
+            onChangeText={setDefaultProviderPrice}
+            placeholder="ex. 50"
+            placeholderTextColor={colors.placeholder}
+            keyboardType="decimal-pad"
+          />
+        </LabeledField>
+        <View style={[styles.switchRow, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Linge inclus par défaut</Text>
+          <Switch
+            value={defaultLaundryIncluded}
+            onValueChange={setDefaultLaundryIncluded}
+            trackColor={{ false: colors.border, true: colors.primary }}
+          />
+        </View>
+        {defaultLaundryIncluded ? (
+          <>
+            <LabeledField label="Prix linge — client HT (€)">
+              <AutoScrollInput
+                style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+                value={defaultLaundryClientPriceHt}
+                onChangeText={setDefaultLaundryClientPriceHt}
+                placeholder="ex. 15"
+                placeholderTextColor={colors.placeholder}
+                keyboardType="decimal-pad"
+              />
+            </LabeledField>
+            <LabeledField label="Prix linge — prestataire (€)">
+              <AutoScrollInput
+                style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+                value={defaultLaundryProviderPrice}
+                onChangeText={setDefaultLaundryProviderPrice}
+                placeholder="ex. 10"
+                placeholderTextColor={colors.placeholder}
+                keyboardType="decimal-pad"
+              />
+            </LabeledField>
+          </>
+        ) : null}
+      </SectionCard>
+
+      <SectionCard title="Équipements & prestations">
+        <View style={[styles.switchRow, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Piscine</Text>
+          <Switch value={hasPool} onValueChange={setHasPool} trackColor={{ false: colors.border, true: colors.primary }} />
+        </View>
+        <View style={[styles.switchRow, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Jacuzzi</Text>
+          <Switch value={hasJacuzzi} onValueChange={setHasJacuzzi} trackColor={{ false: colors.border, true: colors.primary }} />
+        </View>
+        <Text style={[styles.subLabel, { color: colors.text2 }]}>
+          {tr('logement.prestationsSection').toUpperCase()}
+        </Text>
+        <View style={[styles.switchRow, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{tr('logement.enableCheckIn')}</Text>
+          <Switch value={enableCheckIn} onValueChange={setEnableCheckIn} trackColor={{ false: colors.border, true: colors.primary }} />
+        </View>
+        <View style={[styles.switchRow, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{tr('logement.enableCheckOut')}</Text>
+          <Switch value={enableCheckOut} onValueChange={setEnableCheckOut} trackColor={{ false: colors.border, true: colors.primary }} />
+        </View>
+      </SectionCard>
+
+      <SectionCard title="Notes">
+        <AutoScrollInput
+          style={[
+            styles.input,
+            { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground, minHeight: 80, textAlignVertical: 'top' },
+          ]}
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Code interphone, instructions particulières…"
+          placeholderTextColor={colors.placeholder}
+          multiline
+        />
+      </SectionCard>
+
+      {/* Overlays (rendus au niveau racine). */}
       <ClientPickerSheet
         visible={clientPickerOpen}
         clients={clientsQuery.data?.data ?? []}
@@ -304,127 +436,6 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
           setCreateClientOpen(false);
         }}
       />
-
-      <Text style={[styles.section, { color: colors.text2 }]}>{tr('beds.section').toUpperCase()}</Text>
-      <Text style={{ color: colors.text2, fontSize: FontSize.sm, marginBottom: Spacing.sm }}>
-        {tr('beds.hintLogement')}
-      </Text>
-      <RoomCounter label={tr('beds.simple')} value={nLitSimple} onChange={setNLitSimple} />
-      <RoomCounter label={tr('beds.double')} value={nLitDouble} onChange={setNLitDouble} />
-      <RoomCounter label={tr('beds.sofa')} value={nCanapeLit} onChange={setNCanapeLit} />
-      <RoomCounter label={tr('beds.extra')} value={nLitAppoint} onChange={setNLitAppoint} />
-
-      <Text style={[styles.section, { color: colors.text2 }]}>CODE BOÎTE À CLEF</Text>
-      <SecretCodeField value={keySafeCode} onChangeText={setKeySafeCode} placeholder="Ex : 1234" />
-
-      <Text style={[styles.section, { color: colors.text2 }]}>COULEUR (CALENDRIER)</Text>
-      <ColorPicker label="" value={color} onChange={setColor} />
-
-      <Text style={[styles.section, { color: colors.text2 }]}>VALEURS PAR DÉFAUT (MÉNAGES)</Text>
-      <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-        <View style={{ flex: 1 }}>
-          <TimePickerField label="Tranche début" value={defaultHoraireDebut} onChange={setDefaultHoraireDebut} placeholder="--:--" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <TimePickerField label="Tranche fin" value={defaultHoraireFin} onChange={setDefaultHoraireFin} placeholder="--:--" />
-        </View>
-      </View>
-      <DurationPickerField label="Durée moyenne" value={defaultDurationMin} onChange={setDefaultDurationMin} />
-      <LabeledField label="Prix client HT (€)">
-        <AutoScrollInput
-          style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-          value={defaultClientPriceHt}
-          onChangeText={setDefaultClientPriceHt}
-          placeholder="ex. 80"
-          placeholderTextColor={colors.placeholder}
-          keyboardType="decimal-pad"
-        />
-      </LabeledField>
-      <LabeledField label="Taux TVA (%)">
-        <AutoScrollInput
-          style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-          value={defaultClientVatRate}
-          onChangeText={setDefaultClientVatRate}
-          placeholder="20"
-          placeholderTextColor={colors.placeholder}
-          keyboardType="decimal-pad"
-        />
-      </LabeledField>
-      <LabeledField label="Prix prestataire (€)">
-        <AutoScrollInput
-          style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-          value={defaultProviderPrice}
-          onChangeText={setDefaultProviderPrice}
-          placeholder="ex. 50"
-          placeholderTextColor={colors.placeholder}
-          keyboardType="decimal-pad"
-        />
-      </LabeledField>
-      <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={{ color: colors.text, fontSize: FontSize.md }}>Linge inclus par défaut</Text>
-        <Switch
-          value={defaultLaundryIncluded}
-          onValueChange={setDefaultLaundryIncluded}
-          trackColor={{ false: colors.border, true: colors.primary }}
-        />
-      </View>
-      {defaultLaundryIncluded ? (
-        <>
-          <LabeledField label="Prix linge — client HT (€)">
-            <AutoScrollInput
-              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-              value={defaultLaundryClientPriceHt}
-              onChangeText={setDefaultLaundryClientPriceHt}
-              placeholder="ex. 15"
-              placeholderTextColor={colors.placeholder}
-              keyboardType="decimal-pad"
-            />
-          </LabeledField>
-          <LabeledField label="Prix linge — prestataire (€)">
-            <AutoScrollInput
-              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-              value={defaultLaundryProviderPrice}
-              onChangeText={setDefaultLaundryProviderPrice}
-              placeholder="ex. 10"
-              placeholderTextColor={colors.placeholder}
-              keyboardType="decimal-pad"
-            />
-          </LabeledField>
-        </>
-      ) : null}
-
-      <Text style={[styles.section, { color: colors.text2 }]}>ÉQUIPEMENTS</Text>
-      <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={{ color: colors.text, fontSize: FontSize.md }}>Piscine</Text>
-        <Switch value={hasPool} onValueChange={setHasPool} trackColor={{ false: colors.border, true: colors.primary }} />
-      </View>
-      <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={{ color: colors.text, fontSize: FontSize.md }}>Jacuzzi</Text>
-        <Switch value={hasJacuzzi} onValueChange={setHasJacuzzi} trackColor={{ false: colors.border, true: colors.primary }} />
-      </View>
-
-      <Text style={[styles.section, { color: colors.text2 }]}>{tr('logement.prestationsSection').toUpperCase()}</Text>
-      <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={{ color: colors.text, fontSize: FontSize.md }}>{tr('logement.enableCheckIn')}</Text>
-        <Switch value={enableCheckIn} onValueChange={setEnableCheckIn} trackColor={{ false: colors.border, true: colors.primary }} />
-      </View>
-      <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={{ color: colors.text, fontSize: FontSize.md }}>{tr('logement.enableCheckOut')}</Text>
-        <Switch value={enableCheckOut} onValueChange={setEnableCheckOut} trackColor={{ false: colors.border, true: colors.primary }} />
-      </View>
-
-      <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
-      <AutoScrollInput
-        style={[
-          styles.input,
-          { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface, minHeight: 80, textAlignVertical: 'top' },
-        ]}
-        value={notes}
-        onChangeText={setNotes}
-        placeholder="Code interphone, instructions particulières…"
-        placeholderTextColor={colors.placeholder}
-        multiline
-      />
     </View>
   );
 }
@@ -445,7 +456,13 @@ const counterStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  section: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, letterSpacing: 0.5, marginTop: Spacing.md },
+  saveBar: { alignItems: 'flex-end' },
+  subLabel: {
+    fontSize: FontSize.sm,
+    fontWeight: FontWeight.bold,
+    letterSpacing: 0.5,
+    marginTop: Spacing.xs,
+  },
   input: { padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, fontSize: FontSize.md },
   optionRow: { padding: Spacing.md, borderRadius: Radius.md },
   switchRow: {

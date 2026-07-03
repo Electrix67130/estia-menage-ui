@@ -11,7 +11,7 @@ import {
   TextInput,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useDialog } from '@/contexts/DialogContext';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -493,7 +493,7 @@ function RoomEditModal({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <GestureHandlerRootView style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <Animated.View
           style={[
@@ -596,7 +596,7 @@ function RoomEditModal({
             </TouchableOpacity>
           ) : null}
         </Animated.View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }
@@ -739,7 +739,7 @@ function ConsommableEditModal({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <GestureHandlerRootView style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <Animated.View
           style={[
@@ -817,7 +817,7 @@ function ConsommableEditModal({
             </TouchableOpacity>
           ) : null}
         </Animated.View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

@@ -43,7 +43,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useTranslation } from '@/contexts/I18nContext';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
-import { GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import SheetHandle from '@/components/SheetHandle';
 import { menageHooks, useArrival, useDeparture, useValidateReport, useArchiveMenage, useEligiblePrestataires, useUpdateMenage } from '@/api/hooks/useMenages';
 import { useMenagePrestataires, useSetMenagePrestataires } from '@/api/hooks/useMenagePrestataires';
@@ -79,7 +79,7 @@ import ArrivalDeclarationModal, { type ArrivalDeclaration } from '@/components/A
 import { uploadFile } from '@/api/upload';
 import { optimizeImage } from '@/utils/optimizeImage';
 import { haversineMeters, formatDistance, POINTAGE_DISTANCE_WARN_M } from '@/lib/geo-distance';
-import { prestationTypeLabel } from '@/api/types';
+import { prestationTypeLabel, prestationTypeColorKey } from '@/api/types';
 import type { Menage, Logement, MenageStatus, UpdateMenageInput } from '@/api/types';
 
 const TABS = [
@@ -371,11 +371,16 @@ export default function MenageDetailScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
             <Text style={[styles.dateText, { color: colors.text2 }]}>{date}</Text>
             {isCheckInOut ? (
-              <View style={[styles.typeBadge, { backgroundColor: colors.statusEnCours + '20' }]}>
-                <Text style={[styles.typeBadgeText, { color: colors.statusEnCours }]}>
-                  {prestationTypeLabel(menage.prestation_type)}
-                </Text>
-              </View>
+              (() => {
+                const typeColor = colors[prestationTypeColorKey(menage.prestation_type)];
+                return (
+                  <View style={[styles.typeBadge, { backgroundColor: typeColor + '20' }]}>
+                    <Text style={[styles.typeBadgeText, { color: typeColor }]}>
+                      {prestationTypeLabel(menage.prestation_type)}
+                    </Text>
+                  </View>
+                );
+              })()
             ) : null}
             {menage.date_locked ? (
               <View style={[styles.lockPill, { backgroundColor: colors.statusEnCours + '25' }]}>
@@ -604,7 +609,7 @@ export default function MenageDetailScreen() {
         animationType="slide"
         onRequestClose={() => setShowValidateModal(false)}
       >
-        <View style={styles.overlay}>
+        <GestureHandlerRootView style={styles.overlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowValidateModal(false)} />
             <Animated.View
               style={[
@@ -641,7 +646,7 @@ export default function MenageDetailScreen() {
               </Text>
             </TouchableOpacity>
             </Animated.View>
-        </View>
+        </GestureHandlerRootView>
       </Modal>
 
       {/* Reschedule modal */}
@@ -651,7 +656,7 @@ export default function MenageDetailScreen() {
         animationType="slide"
         onRequestClose={() => setShowRescheduleModal(false)}
       >
-        <View style={styles.overlay}>
+        <GestureHandlerRootView style={styles.overlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowRescheduleModal(false)} />
             <Animated.View
               style={[
@@ -715,7 +720,7 @@ export default function MenageDetailScreen() {
               </TouchableOpacity>
             </ScrollView>
             </Animated.View>
-        </View>
+        </GestureHandlerRootView>
       </Modal>
 
       <AssignPrestataireModal

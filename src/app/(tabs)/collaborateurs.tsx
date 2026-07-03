@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, RefreshControl, ActivityIndicator, Pressable, Image } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
 import SheetHandle from '@/components/SheetHandle';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -334,7 +334,7 @@ export default function CollaborateursScreen() {
 
       {/* Modal invitation */}
       <Modal visible={showInviteModal} transparent animationType="slide" onRequestClose={() => setShowInviteModal(false)}>
-        <View style={styles.overlay}>
+        <GestureHandlerRootView style={styles.overlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowInviteModal(false)} />
             <Animated.View
               style={[
@@ -387,7 +387,7 @@ export default function CollaborateursScreen() {
               </Text>
             </TouchableOpacity>
             </Animated.View>
-        </View>
+        </GestureHandlerRootView>
       </Modal>
     </SafeAreaView>
   );

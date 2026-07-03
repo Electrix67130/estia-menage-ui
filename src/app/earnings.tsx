@@ -10,7 +10,7 @@ import {
   Pressable,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Wallet, CheckCircle2, Building2, User as UserIcon, ChevronRight, ChevronLeft } from 'lucide-react-native';
@@ -300,7 +300,7 @@ function DetailSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.sheetOverlay}>
+      <GestureHandlerRootView style={styles.sheetOverlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
           <Animated.View
             style={[
@@ -364,7 +364,7 @@ function DetailSheet({
             </ScrollView>
           )}
           </Animated.View>
-      </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

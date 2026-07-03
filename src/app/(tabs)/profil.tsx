@@ -21,7 +21,7 @@ import { Modal, Pressable } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
-import { GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import SheetHandle from '@/components/SheetHandle';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadFile } from '@/api/upload';
@@ -672,7 +672,7 @@ export default function ProfilScreen() {
 
       {/* Change password modal */}
       <Modal visible={showPasswordModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <GestureHandlerRootView style={styles.modalOverlay}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => {
@@ -738,12 +738,12 @@ export default function ProfilScreen() {
               )}
             </TouchableOpacity>
             </Animated.View>
-        </View>
+        </GestureHandlerRootView>
       </Modal>
 
       {/* Create organization modal */}
       <Modal visible={showCreateOrgModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <GestureHandlerRootView style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowCreateOrgModal(false)} />
             <Animated.View
               style={[
@@ -777,7 +777,7 @@ export default function ProfilScreen() {
               <Text style={[styles.saveBtnText, { color: '#FFFFFF' }]}>Ouvrir le dashboard</Text>
             </TouchableOpacity>
             </Animated.View>
-        </View>
+        </GestureHandlerRootView>
       </Modal>
     </SafeAreaView>
   );

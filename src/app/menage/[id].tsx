@@ -68,6 +68,7 @@ import DatePickerField from '@/components/DatePickerField';
 import MenageDiscussions from '@/components/MenageDiscussions';
 import MenageCheckList from '@/components/MenageCheckList';
 import { formatDateFr } from '@/lib/date-fr';
+import { openMaps } from '@/lib/contact-links';
 import { useDialog } from '@/contexts/DialogContext';
 import TimePickerField from '@/components/TimePickerField';
 import DurationPickerField from '@/components/DurationPickerField';
@@ -1174,9 +1175,30 @@ function AccessInfoSection({
   const nights = menage.stay_nights ?? null;
   const checkin = menage.next_checkin_at ? menage.next_checkin_at.slice(0, 10) : null;
   const sameDay = checkin !== null && checkin === menage.date_prevue.slice(0, 10);
-  if (!code && !nights && !checkin) return null;
+  // Adresse du logement (le presta doit savoir où aller). Tap → Maps. On utilise
+  // les champs portés par le ménage (toujours présents, même si le presta n'a pas
+  // accès au détail du logement) ; complétés par le code postal si dispo.
+  const cityLine = [logement?.postal_code, menage.logement_city ?? logement?.city]
+    .filter(Boolean)
+    .join(' ');
+  const addressParts = [menage.logement_address ?? logement?.address, cityLine].filter(Boolean);
+  const addressText = addressParts.join(' · ');
+  const addressQuery = addressParts.join(', ');
+  if (!addressText && !code && !nights && !checkin) return null;
   return (
     <View style={[styles.accessCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {addressText ? (
+        <TouchableOpacity
+          style={styles.accessRow}
+          onPress={() => openMaps(addressQuery)}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`Ouvrir l'itinéraire vers ${addressText}`}
+        >
+          <MapPin size={IconSize.sm} color={colors.primary} />
+          <Text style={[styles.accessValue, { color: colors.primary, flex: 1 }]}>{addressText}</Text>
+        </TouchableOpacity>
+      ) : null}
       {code ? (
         <View style={styles.accessRow}>
           <KeyRound size={IconSize.sm} color={colors.primary} />

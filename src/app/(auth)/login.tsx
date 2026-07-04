@@ -11,6 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Link } from 'expo-router';
+import { Eye, EyeOff } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { ApiError } from '@/api/client';
@@ -27,6 +28,7 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -76,15 +78,30 @@ export default function LoginScreen() {
             />
 
             <Text style={[styles.label, { color: colors.text }]}>Mot de passe</Text>
-            <AutoScrollInput
-              style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
-              placeholder="••••••••"
-              placeholderTextColor={colors.placeholder}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              accessibilityLabel="Mot de passe"
-            />
+            <View style={styles.passwordWrap}>
+              <AutoScrollInput
+                style={[styles.input, styles.passwordInput, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
+                placeholder="••••••••"
+                placeholderTextColor={colors.placeholder}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                accessibilityLabel="Mot de passe"
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowPassword((s) => !s)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+              >
+                {showPassword ? (
+                  <EyeOff size={20} color={colors.text2} />
+                ) : (
+                  <Eye size={20} color={colors.text2} />
+                )}
+              </TouchableOpacity>
+            </View>
 
             {error ? <Text style={[styles.error, { color: colors.red }]}>{error}</Text> : null}
 
@@ -139,6 +156,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     fontSize: FontSize.base,
   },
+  passwordWrap: { position: 'relative', justifyContent: 'center' },
+  passwordInput: { paddingRight: 48 },
+  eyeButton: { position: 'absolute', right: Spacing.md, height: 48, justifyContent: 'center' },
   error: { fontSize: FontSize.sm, marginTop: Spacing.xs },
   forgotContainer: { alignSelf: 'flex-end', marginTop: Spacing.xs },
   forgotText: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },

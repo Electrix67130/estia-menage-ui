@@ -35,6 +35,8 @@ import LogementMembersSection from '@/components/LogementMembersSection';
 import LogementInfoForm from '@/components/LogementInfoForm';
 import LogementClientSection from '@/components/LogementClientSection';
 import LogementExternalCalendarsSection from '@/components/LogementExternalCalendarsSection';
+import PhotoLightbox from '@/components/PhotoLightbox';
+import { useLogementPhotos } from '@/api/hooks/usePhotos';
 import { openMaps } from '@/lib/contact-links';
 import {
   useLogementRooms,
@@ -344,6 +346,22 @@ function RoomsSection({
   const rooms = useLogementRooms(logementId);
   const list = rooms.data ?? [];
 
+  // Photos de galerie du logement (ajoutées côté dashboard), groupées par pièce.
+  const photos = useLogementPhotos(logementId);
+  const photosByRoom = React.useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const p of photos.data?.data ?? []) {
+      if (!p.logement_room_id) continue;
+      const arr = map.get(p.logement_room_id) ?? [];
+      arr.push(p.url);
+      map.set(p.logement_room_id, arr);
+    }
+    return map;
+  }, [photos.data]);
+
+  // Visionneuse plein écran : liste d'URLs + index courant.
+  const [viewer, setViewer] = React.useState<{ urls: string[]; index: number } | null>(null);
+
   if (rooms.isLoading) {
     return (
       <View
@@ -366,26 +384,44 @@ function RoomsSection({
         </View>
       ) : (
         <View style={styles.roomsGrid}>
-          {list.map((room) => (
-            <TouchableOpacity
-              key={room.id}
-              style={[styles.roomCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              onPress={isAdmin ? () => onEdit(room) : undefined}
-              disabled={!isAdmin}
-              activeOpacity={isAdmin ? 0.7 : 1}
-            >
-              {room.photo_url ? (
-                <Image source={{ uri: room.photo_url }} style={styles.roomThumb} resizeMode="cover" />
-              ) : (
-                <View style={[styles.roomThumb, styles.roomThumbPlaceholder, { backgroundColor: colors.itemBackground }]}>
-                  <DoorOpen size={IconSize.lg} color={colors.text2} />
-                </View>
-              )}
-              <Text style={[styles.roomName, { color: colors.text }]} numberOfLines={1}>
-                {room.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {list.map((room) => {
+            // Toutes les photos de la pièce : couverture (photo_url) + galerie.
+            const gallery = photosByRoom.get(room.id) ?? [];
+            const urls = [room.photo_url, ...gallery].filter(Boolean) as string[];
+            const thumb = urls[0] ?? null;
+            // Admin → éditeur ; sinon → visionneuse (si photos).
+            const onPress = isAdmin
+              ? () => onEdit(room)
+              : urls.length
+                ? () => setViewer({ urls, index: 0 })
+                : undefined;
+            return (
+              <TouchableOpacity
+                key={room.id}
+                style={[styles.roomCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                onPress={onPress}
+                disabled={!onPress}
+                activeOpacity={onPress ? 0.7 : 1}
+              >
+                {thumb ? (
+                  <Image source={{ uri: thumb }} style={styles.roomThumb} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.roomThumb, styles.roomThumbPlaceholder, { backgroundColor: colors.itemBackground }]}>
+                    <DoorOpen size={IconSize.lg} color={colors.text2} />
+                  </View>
+                )}
+                {urls.length > 1 ? (
+                  <View style={styles.roomPhotoCount}>
+                    <ImageIcon size={11} color="#FFFFFF" />
+                    <Text style={styles.roomPhotoCountText}>{urls.length}</Text>
+                  </View>
+                ) : null}
+                <Text style={[styles.roomName, { color: colors.text }]} numberOfLines={1}>
+                  {room.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
@@ -400,6 +436,37 @@ function RoomsSection({
           <Text style={[styles.addRoomText, { color: colors.primary }]}>Ajouter une pièce</Text>
         </TouchableOpacity>
       ) : null}
+
+      <PhotoLightbox
+        visible={!!viewer}
+        photoUrl={viewer ? viewer.urls[viewer.index] : null}
+        onClose={() => setViewer(null)}
+        subtitle={viewer && viewer.urls.length > 1 ? `${viewer.index + 1} / ${viewer.urls.length}` : undefined}
+        footer={
+          viewer && viewer.urls.length > 1 ? (
+            <View style={styles.viewerNav}>
+              <TouchableOpacity
+                onPress={() =>
+                  setViewer((v) => (v ? { ...v, index: (v.index - 1 + v.urls.length) % v.urls.length } : v))
+                }
+                style={[styles.viewerNavBtn, { backgroundColor: colors.surface }]}
+                accessibilityLabel="Photo précédente"
+              >
+                <ArrowLeft size={IconSize.md} color={colors.text} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() =>
+                  setViewer((v) => (v ? { ...v, index: (v.index + 1) % v.urls.length } : v))
+                }
+                style={[styles.viewerNavBtn, { backgroundColor: colors.surface }]}
+                accessibilityLabel="Photo suivante"
+              >
+                <ArrowLeft size={IconSize.md} color={colors.text} style={{ transform: [{ rotate: '180deg' }] }} />
+              </TouchableOpacity>
+            </View>
+          ) : undefined
+        }
+      />
     </View>
   );
 }
@@ -871,6 +938,21 @@ const styles = StyleSheet.create({
   kindChip: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: Radius.pill, borderWidth: 1 },
   roomThumb: { width: '100%', aspectRatio: 16 / 9 },
   roomThumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  roomPhotoCount: {
+    position: 'absolute',
+    top: Spacing.xs,
+    right: Spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  roomPhotoCountText: { fontSize: 10, fontWeight: FontWeight.bold, color: '#FFFFFF' },
+  viewerNav: { flexDirection: 'row', gap: Spacing.lg },
+  viewerNavBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   roomName: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, paddingHorizontal: Spacing.sm },
   addRoomBtn: {
     flexDirection: 'row',

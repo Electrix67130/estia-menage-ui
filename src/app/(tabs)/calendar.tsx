@@ -26,7 +26,7 @@ import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Menage, MenageStatus, PrestationType } from '@/api/types';
-import { menagePrestataireLabel, menageLogementLabel, prestationTypeLabel } from '@/api/types';
+import { menagePrestataireLabel, menageLogementLabel, prestationTypeLabel, prestationTypeColorKey } from '@/api/types';
 import { formatDateFr } from '@/lib/date-fr';
 
 const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
@@ -444,6 +444,19 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
                     <Text style={{ color: colors.text2 }}>{menageLogementLabel(m)}</Text>
                   </Text>
                   <View style={styles.itemMetaRow}>
+                    {(() => {
+                      const typeColor = colors[prestationTypeColorKey(m.prestation_type)];
+                      return (
+                        <View
+                          style={[styles.badgeType, { backgroundColor: typeColor + '20' }]}
+                          accessibilityLabel={prestationTypeLabel(m.prestation_type)}
+                        >
+                          <Text style={[styles.badgeTypeText, { color: typeColor }]}>
+                            {prestationTypeLabel(m.prestation_type)}
+                          </Text>
+                        </View>
+                      );
+                    })()}
                     {needsAttention ? (
                       <View
                         style={[styles.badgeLate, { backgroundColor: colors.red + '20' }]}
@@ -731,7 +744,18 @@ const styles = StyleSheet.create({
   statusBar: { width: 4, alignSelf: 'stretch', borderRadius: 2, marginRight: Spacing.sm },
   itemTime: { fontSize: FontSize.md, fontWeight: FontWeight.medium },
   itemSub: { fontSize: FontSize.xs, marginTop: 2 },
-  itemMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 2 },
+  itemMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4, marginTop: 2 },
+  badgeType: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+  },
+  badgeTypeText: {
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.bold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   badgeUnassigned: {
     backgroundColor: '#FED7AA',
     paddingHorizontal: 6,

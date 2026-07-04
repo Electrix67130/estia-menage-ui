@@ -370,18 +370,16 @@ export default function MenageDetailScreen() {
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
             <Text style={[styles.dateText, { color: colors.text2 }]}>{date}</Text>
-            {isCheckInOut ? (
-              (() => {
-                const typeColor = colors[prestationTypeColorKey(menage.prestation_type)];
-                return (
-                  <View style={[styles.typeBadge, { backgroundColor: typeColor + '20' }]}>
-                    <Text style={[styles.typeBadgeText, { color: typeColor }]}>
-                      {prestationTypeLabel(menage.prestation_type)}
-                    </Text>
-                  </View>
-                );
-              })()
-            ) : null}
+            {(() => {
+              const typeColor = colors[prestationTypeColorKey(menage.prestation_type)];
+              return (
+                <View style={[styles.typeBadge, { backgroundColor: typeColor + '20' }]}>
+                  <Text style={[styles.typeBadgeText, { color: typeColor }]}>
+                    {prestationTypeLabel(menage.prestation_type)}
+                  </Text>
+                </View>
+              );
+            })()}
             {menage.date_locked ? (
               <View style={[styles.lockPill, { backgroundColor: colors.statusEnCours + '25' }]}>
                 <Lock size={14} color={colors.statusEnCours} />

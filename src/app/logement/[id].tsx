@@ -129,19 +129,28 @@ export default function LogementDetailScreen() {
 
   const handleDelete = async () => {
     const ok = await dialog.confirm({
-      title: 'Supprimer le logement ?',
-      message: 'Tous les ménages associés seront aussi supprimés.',
-      confirmLabel: 'Supprimer',
+      title: 'Archiver le logement ?',
+      message:
+        'Le logement sera archivé, ainsi que TOUTES les prestations qui le concernent (ménages, check-in, check-out) et ses consommables.',
+      confirmLabel: 'Archiver',
       destructive: true,
     });
     if (!ok) return;
     try {
-      await deleteMutation.mutateAsync(id!);
+      const res = await deleteMutation.mutateAsync(id!);
+      const n = res?.archived_menages ?? 0;
+      void dialog.alert({
+        title: 'Logement archivé',
+        message:
+          n > 0
+            ? `${n} prestation${n > 1 ? 's' : ''} ${n > 1 ? 'ont' : 'a'} aussi été archivée${n > 1 ? 's' : ''}.`
+            : 'Le logement a été archivé.',
+      });
       router.back();
     } catch (err) {
       void dialog.alert({
         title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Suppression impossible',
+        message: err instanceof Error ? err.message : 'Archivage impossible',
       });
     }
   };

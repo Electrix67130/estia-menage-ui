@@ -132,7 +132,9 @@ export default function LogementsScreen() {
           ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
           ListEmptyComponent={
             <Text style={{ color: colors.mutedText, textAlign: 'center', marginTop: Spacing.xl }}>
-              Aucun logement. Appuyez sur + pour en créer un.
+              {isAdmin
+                ? 'Aucun logement. Appuyez sur + pour en créer un.'
+                : 'Vous n’avez aucun logement assigné pour le moment. Un administrateur vous en attribuera prochainement.'}
             </Text>
           }
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={colors.primary} />}

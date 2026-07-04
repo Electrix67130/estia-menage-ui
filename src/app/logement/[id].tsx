@@ -467,8 +467,12 @@ function RoomEditModal({
       void dialog.alert({ title: 'Nom requis', message: 'Donne un nom à la pièce.' });
       return;
     }
+    // On retire un éventuel token de signature (`?t=...`) de l'URL avant de la
+    // persister : `photoUrl` peut venir de `room.photo_url` déjà signé (si on
+    // édite sans changer la photo). Stocker l'URL propre évite le double-signage.
+    const cleanPhotoUrl = photoUrl ? photoUrl.split('?')[0] : photoUrl;
     // Le nom n'est envoyé que pour « autre » ; sinon l'API le génère depuis le type.
-    const body = { kind, name: kind === 'autre' ? name.trim() : undefined, photo_url: photoUrl };
+    const body = { kind, name: kind === 'autre' ? name.trim() : undefined, photo_url: cleanPhotoUrl };
     try {
       if (room) {
         await updateRoom.mutateAsync({ id: room.id, body });

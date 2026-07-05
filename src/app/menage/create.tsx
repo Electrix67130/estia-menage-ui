@@ -35,6 +35,8 @@ export default function CreateMenageScreen() {
   const initialType: PrestationType =
     params.type === 'check_in' || params.type === 'check_out' ? params.type : 'menage';
   const [prestationType, setPrestationType] = useState<PrestationType>(initialType);
+  // Check-in / check-out ≠ ménage : pas de durée de ménage ni de linge.
+  const isCheck = prestationType !== 'menage';
   const [datePrevue, setDatePrevue] = useState('');
   const [horairePrevu, setHorairePrevu] = useState('');
   const [horaireFinPrevu, setHoraireFinPrevu] = useState('');
@@ -106,13 +108,13 @@ export default function CreateMenageScreen() {
         date_prevue: datePrevue.trim(),
         horaire_prevu: horairePrevu || undefined,
         horaire_fin_prevu: horaireFinPrevu || undefined,
-        duree_estimee_min: duree,
+        duree_estimee_min: isCheck ? undefined : duree,
         client_price_ht: cPrice,
         client_vat_rate: cVat,
         provider_price: pPrice,
-        laundry_included: laundryIncluded,
-        laundry_client_price_ht: laundryIncluded ? lCPrice : undefined,
-        laundry_provider_price: laundryIncluded ? lPPrice : undefined,
+        laundry_included: isCheck ? false : laundryIncluded,
+        laundry_client_price_ht: !isCheck && laundryIncluded ? lCPrice : undefined,
+        laundry_provider_price: !isCheck && laundryIncluded ? lPPrice : undefined,
         notes_intervention: notes.trim() || undefined,
       });
       router.replace(`/menage/${menage.id}`);
@@ -218,11 +220,13 @@ export default function CreateMenageScreen() {
             />
           </View>
         </View>
-        <DurationPickerField
-          label="Durée estimée"
-          value={dureeEstimee}
-          onChange={setDureeEstimee}
-        />
+        {!isCheck ? (
+          <DurationPickerField
+            label="Durée estimée"
+            value={dureeEstimee}
+            onChange={setDureeEstimee}
+          />
+        ) : null}
 
         {isAdmin ? (
           <>
@@ -267,42 +271,46 @@ export default function CreateMenageScreen() {
               />
             </LabeledField>
 
-            <Text style={[styles.section, { color: colors.text2 }]}>LINGE</Text>
-            <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={{ color: colors.text, fontSize: FontSize.md }}>Gestion du linge incluse</Text>
-              <Switch
-                value={laundryIncluded}
-                onValueChange={setLaundryIncluded}
-                trackColor={{ false: colors.border, true: colors.primary }}
-              />
-            </View>
-            {laundryIncluded ? (
-              <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-                <View style={{ flex: 1 }}>
-                  <LabeledField label="Linge — client HT (€)">
-                    <AutoScrollInput
-                      style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-                      value={laundryClientPriceHt}
-                      onChangeText={setLaundryClientPriceHt}
-                      placeholder="ex. 15"
-                      placeholderTextColor={colors.placeholder}
-                      keyboardType="decimal-pad"
-                    />
-                  </LabeledField>
+            {!isCheck ? (
+              <>
+                <Text style={[styles.section, { color: colors.text2 }]}>LINGE</Text>
+                <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={{ color: colors.text, fontSize: FontSize.md }}>Gestion du linge incluse</Text>
+                  <Switch
+                    value={laundryIncluded}
+                    onValueChange={setLaundryIncluded}
+                    trackColor={{ false: colors.border, true: colors.primary }}
+                  />
                 </View>
-                <View style={{ flex: 1 }}>
-                  <LabeledField label="Linge — prestataire (€)">
-                    <AutoScrollInput
-                      style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-                      value={laundryProviderPrice}
-                      onChangeText={setLaundryProviderPrice}
-                      placeholder="ex. 10"
-                      placeholderTextColor={colors.placeholder}
-                      keyboardType="decimal-pad"
-                    />
-                  </LabeledField>
-                </View>
-              </View>
+                {laundryIncluded ? (
+                  <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                    <View style={{ flex: 1 }}>
+                      <LabeledField label="Linge — client HT (€)">
+                        <AutoScrollInput
+                          style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+                          value={laundryClientPriceHt}
+                          onChangeText={setLaundryClientPriceHt}
+                          placeholder="ex. 15"
+                          placeholderTextColor={colors.placeholder}
+                          keyboardType="decimal-pad"
+                        />
+                      </LabeledField>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <LabeledField label="Linge — prestataire (€)">
+                        <AutoScrollInput
+                          style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+                          value={laundryProviderPrice}
+                          onChangeText={setLaundryProviderPrice}
+                          placeholder="ex. 10"
+                          placeholderTextColor={colors.placeholder}
+                          keyboardType="decimal-pad"
+                        />
+                      </LabeledField>
+                    </View>
+                  </View>
+                ) : null}
+              </>
             ) : null}
           </>
         ) : null}

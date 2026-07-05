@@ -8,6 +8,8 @@ export interface ConsommableLine {
   seuil_alerte: number;
   position: number;
   qty: number | null; // quantité relevée pour ce ménage (null si pas encore saisie)
+  /** Stock courant = dernier relevé (tous ménages). Sert à pré-remplir l'input. */
+  current_qty?: number | null;
   needs_restock: boolean;
 }
 

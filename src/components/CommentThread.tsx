@@ -24,9 +24,12 @@ interface Props {
   listHeader?: React.ReactNode;
   /** Callback declenche au focus du champ de saisie (ex. pour masquer un header au-dessus). */
   onInputFocus?: () => void;
+  /** Distance entre le haut de l'écran et le haut de cette vue (header + onglets
+   *  au-dessus). Requis par KeyboardAvoidingView pour bien remonter l'input. */
+  keyboardVerticalOffset?: number;
 }
 
-const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, listHeader, onInputFocus }) => {
+const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, listHeader, onInputFocus, keyboardVerticalOffset = 0 }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const { user } = useAuth();
@@ -163,7 +166,7 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
 
   return (
     <>
-      <KeyboardAvoidingView style={styles.container} behavior="padding" keyboardVerticalOffset={0}>
+      <KeyboardAvoidingView style={styles.container} behavior="padding" keyboardVerticalOffset={keyboardVerticalOffset}>
         <Pressable style={styles.flex} onPress={() => Keyboard.dismiss()}>
           <FlatList
             ref={flatListRef}

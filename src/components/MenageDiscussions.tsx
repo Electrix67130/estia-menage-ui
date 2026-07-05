@@ -11,6 +11,7 @@ interface Props {
   canViewComments: boolean;
   readonly?: boolean;
   onInputFocus?: () => void;
+  keyboardVerticalOffset?: number;
   subTab?: DiscussionSubTab;
   onSubTabChange?: (tab: DiscussionSubTab) => void;
 }
@@ -20,7 +21,14 @@ interface Props {
  * La gestion des étapes (steps) est désormais dans un onglet séparé "Check Ménage"
  * (cf. menage-check côté API). Ce composant ne montre donc que le flux de messages.
  */
-export default function MenageDiscussions({ menageId, canViewComments, readonly, onInputFocus }: Props) {
+export default function MenageDiscussions({ menageId, canViewComments, readonly, onInputFocus, keyboardVerticalOffset }: Props) {
   if (!canViewComments) return null;
-  return <CommentThread menageId={menageId} readonly={readonly} onInputFocus={onInputFocus} />;
+  return (
+    <CommentThread
+      menageId={menageId}
+      readonly={readonly}
+      onInputFocus={onInputFocus}
+      keyboardVerticalOffset={keyboardVerticalOffset}
+    />
+  );
 }

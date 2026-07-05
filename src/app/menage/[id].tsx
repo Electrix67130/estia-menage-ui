@@ -151,6 +151,9 @@ export default function MenageDetailScreen() {
   const [arrivalProof, setArrivalProof] = useState<{ lat: number; lng: number } | null>(null);
   const [showEditDecl, setShowEditDecl] = useState(false);
   const [editDeclSubmitting, setEditDeclSubmitting] = useState(false);
+  // Offset écran → haut de la zone d'onglets (pour le KeyboardAvoidingView de la
+  // discussion, qui doit remonter l'input malgré le header au-dessus).
+  const [tabAreaTop, setTabAreaTop] = useState(0);
   // Upload de la photo d'arrivée lancé en tâche de fond dès la capture, pour ne
   // pas retarder l'affichage de la modale de déclaration. Résolu au submit.
   const arrivalUploadRef = useRef<Promise<{ url?: string; error?: unknown }> | null>(null);
@@ -617,7 +620,10 @@ export default function MenageDetailScreen() {
       </View>
 
       {/* Content */}
-      <View style={{ flex: 1 }}>
+      <View
+        style={{ flex: 1 }}
+        onLayout={(e) => setTabAreaTop(insets.top + e.nativeEvent.layout.y)}
+      >
         <ErrorBoundary key={activeTab} label="cet onglet">
         {activeTab === 'infos' && (
           <ScrollView
@@ -649,6 +655,7 @@ export default function MenageDetailScreen() {
             menageId={id!}
             canViewComments={true}
             readonly={menage.status === 'valide'}
+            keyboardVerticalOffset={tabAreaTop}
           />
         )}
         </ErrorBoundary>

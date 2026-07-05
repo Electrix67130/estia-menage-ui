@@ -469,6 +469,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
     <View style={styles.container}>
       {grouped ? (
         <FlatList
+          key="grouped"
           data={groups}
           keyExtractor={(g) => g.id}
           renderItem={({ item: g }) => renderGroup(g)}
@@ -483,6 +484,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
         />
       ) : (
         <FlatList
+          key="grid"
           data={items}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}

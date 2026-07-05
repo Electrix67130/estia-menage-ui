@@ -280,6 +280,26 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
 
   const imageSources = useMemo(() => photos.map((p) => ({ uri: p.url })), [photos]);
 
+  // Rendu d'un groupe de pièce : titre (icône + label + compteur) puis grille statique.
+  // ⚠️ Ce useCallback DOIT rester avant tout `return` conditionnel (règles des hooks).
+  const renderGroup = useCallback(
+    (group: { id: string; label: string; icon: string; photos: typeof allPhotos }) => (
+      <View key={group.id} style={styles.group}>
+        <Text style={[styles.groupTitle, { color: colors.text2 }]}>
+          {group.icon} {group.label} · {group.photos.length}
+        </Text>
+        <View style={styles.gridWrap}>
+          {group.photos.map((item) => (
+            <View key={item.id} style={styles.gridCell}>
+              {renderItem({ item })}
+            </View>
+          ))}
+        </View>
+      </View>
+    ),
+    [colors, renderItem],
+  );
+
   // Detail overlay — tap the image to open fullscreen with zoom
   if (selectedPhoto) {
     return (
@@ -359,25 +379,6 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
   }
 
   const items = photos;
-
-  // Rendu d'un groupe de pièce : titre (icône + label + compteur) puis grille statique.
-  const renderGroup = useCallback(
-    (group: { id: string; label: string; icon: string; photos: typeof allPhotos }) => (
-      <View key={group.id} style={styles.group}>
-        <Text style={[styles.groupTitle, { color: colors.text2 }]}>
-          {group.icon} {group.label} · {group.photos.length}
-        </Text>
-        <View style={styles.gridWrap}>
-          {group.photos.map((item) => (
-            <View key={item.id} style={styles.gridCell}>
-              {renderItem({ item })}
-            </View>
-          ))}
-        </View>
-      </View>
-    ),
-    [colors, renderItem],
-  );
 
   const roomPickerModal = isMultiRooms && rooms ? (
     <Modal

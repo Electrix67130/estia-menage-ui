@@ -37,6 +37,8 @@ import {
   CalendarClock,
   Save,
   Star,
+  LogIn,
+  LogOut,
 } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
@@ -580,23 +582,11 @@ export default function MenageDetailScreen() {
             <Text style={styles.actionText}>Valider le rapport</Text>
           </TouchableOpacity>
         ) : null}
-        {menage.arrived_at ? (
-          <View style={[styles.timestamp, { backgroundColor: colors.itemBackground }]}>
-            <Clock size={14} color={colors.text2} />
-            <Text style={[styles.timestampText, { color: colors.text2 }]}>
-              Arrivée {formatDateFr(menage.arrived_at, 'time')}
-            </Text>
-          </View>
-        ) : null}
-        {menage.departed_at ? (
-          <View style={[styles.timestamp, { backgroundColor: colors.itemBackground }]}>
-            <Clock size={14} color={colors.text2} />
-            <Text style={[styles.timestampText, { color: colors.text2 }]}>
-              Départ {formatDateFr(menage.departed_at, 'time')}
-            </Text>
-          </View>
-        ) : null}
       </View>
+
+      {!isCheckInOut && (menage.arrived_at || menage.departed_at) ? (
+        <PointageSection menage={menage} colors={colors} />
+      ) : null}
 
       {isAdmin && (menage.arrival_photo_url || menage.departure_photo_url) ? (
         <PointageProofSection menage={menage} logement={logement} colors={colors} />
@@ -1298,6 +1288,71 @@ function AccessInfoSection({
           <Text style={[styles.accessLabel, { color: colors.text2 }]}>Prochain check-in</Text>
           <Text style={[styles.accessValue, { color: sameDay ? colors.statusEnCours : colors.text }]}>
             {formatDateFr(checkin, 'dayShort')}{sameDay ? ' · jour même' : ''}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Affichage soigné du pointage arrivée/départ (heures) dans le détail.
+ * Lecture seule ; deux colonnes + durée sur place si les deux sont pointés.
+ */
+function PointageSection({
+  menage,
+  colors,
+}: {
+  menage: Menage;
+  colors: typeof Colors.light;
+}) {
+  const fmt = (iso: string | null) => (iso ? formatDateFr(iso, 'time') : null);
+  const arrived = fmt(menage.arrived_at);
+  const departed = fmt(menage.departed_at);
+  // Durée sur place (si arrivée + départ le même jour renseignés).
+  let duration: string | null = null;
+  if (menage.arrived_at && menage.departed_at) {
+    const mins = Math.round(
+      (new Date(menage.departed_at).getTime() - new Date(menage.arrived_at).getTime()) / 60000,
+    );
+    if (mins > 0) {
+      const h = Math.floor(mins / 60);
+      const m = mins % 60;
+      duration = h > 0 ? `${h} h${m ? ` ${m}` : ''}` : `${m} min`;
+    }
+  }
+  return (
+    <View style={[styles.pointageCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={styles.pointageRow}>
+        <View style={styles.pointageCol}>
+          <View style={[styles.pointageIcon, { backgroundColor: colors.statusValide + '20' }]}>
+            <LogIn size={IconSize.sm} color={colors.statusValide} />
+          </View>
+          <View>
+            <Text style={[styles.pointageLabel, { color: colors.text2 }]}>Arrivée</Text>
+            <Text style={[styles.pointageValue, { color: arrived ? colors.text : colors.mutedText }]}>
+              {arrived ?? 'Non pointée'}
+            </Text>
+          </View>
+        </View>
+        <View style={[styles.pointageDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.pointageCol}>
+          <View style={[styles.pointageIcon, { backgroundColor: colors.red + '20' }]}>
+            <LogOut size={IconSize.sm} color={colors.red} />
+          </View>
+          <View>
+            <Text style={[styles.pointageLabel, { color: colors.text2 }]}>Départ</Text>
+            <Text style={[styles.pointageValue, { color: departed ? colors.text : colors.mutedText }]}>
+              {departed ?? 'Non pointé'}
+            </Text>
+          </View>
+        </View>
+      </View>
+      {duration ? (
+        <View style={[styles.pointageDurationRow, { borderTopColor: colors.border }]}>
+          <Clock size={13} color={colors.text2} />
+          <Text style={[styles.pointageDurationText, { color: colors.text2 }]}>
+            Durée sur place · {duration}
           </Text>
         </View>
       ) : null}
@@ -2093,6 +2148,28 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     gap: Spacing.xs,
   },
+  pointageCard: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+  },
+  pointageRow: { flexDirection: 'row', alignItems: 'center' },
+  pointageCol: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  pointageIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  pointageDivider: { width: StyleSheet.hairlineWidth, alignSelf: 'stretch', marginHorizontal: Spacing.sm },
+  pointageLabel: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, letterSpacing: 0.3 },
+  pointageValue: { fontSize: FontSize.md, fontWeight: FontWeight.bold, marginTop: 1 },
+  pointageDurationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  pointageDurationText: { fontSize: FontSize.xs, fontWeight: FontWeight.medium },
   accessRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   accessLabel: { fontSize: FontSize.sm, flex: 1 },
   accessValue: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, letterSpacing: 0.5 },

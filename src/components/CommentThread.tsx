@@ -65,12 +65,13 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
   const [isEditing, setIsEditing] = useState(false);
   const animatedEditModalStyle = useKeyboardAwareModalStyle({ visible: isEditing });
 
-  // Montée déterministe et fluide : on translate tout le bloc (liste + input) de
-  // la hauteur exacte du clavier (valeur négative animée). L'input, en bas du
-  // bloc, se colle ainsi au clavier — sans offset à deviner.
+  // Montée déterministe et fluide : on réduit la hauteur du bloc par le bas de la
+  // hauteur exacte du clavier (padding animé). L'input (en bas) se colle ainsi au
+  // clavier tandis que la liste reste visible au-dessus (juste plus courte).
+  // `height.value` est négatif quand le clavier est ouvert → on prend l'opposé.
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
   const chatAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: keyboardHeight.value }],
+    paddingBottom: Math.max(0, -keyboardHeight.value),
   }));
 
   const flatListRef = useRef<FlatList>(null);

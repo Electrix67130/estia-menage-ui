@@ -35,7 +35,7 @@ import LogementMembersSection from '@/components/LogementMembersSection';
 import LogementInfoForm from '@/components/LogementInfoForm';
 import LogementClientSection from '@/components/LogementClientSection';
 import LogementExternalCalendarsSection from '@/components/LogementExternalCalendarsSection';
-import PhotoLightbox from '@/components/PhotoLightbox';
+import ImageView from 'react-native-image-viewing';
 import { useLogementPhotos } from '@/api/hooks/usePhotos';
 import { openMaps } from '@/lib/contact-links';
 import {
@@ -437,35 +437,13 @@ function RoomsSection({
         </TouchableOpacity>
       ) : null}
 
-      <PhotoLightbox
+      <ImageView
+        images={viewer ? viewer.urls.map((uri) => ({ uri })) : []}
+        imageIndex={viewer?.index ?? 0}
         visible={!!viewer}
-        photoUrl={viewer ? viewer.urls[viewer.index] : null}
-        onClose={() => setViewer(null)}
-        subtitle={viewer && viewer.urls.length > 1 ? `${viewer.index + 1} / ${viewer.urls.length}` : undefined}
-        footer={
-          viewer && viewer.urls.length > 1 ? (
-            <View style={styles.viewerNav}>
-              <TouchableOpacity
-                onPress={() =>
-                  setViewer((v) => (v ? { ...v, index: (v.index - 1 + v.urls.length) % v.urls.length } : v))
-                }
-                style={[styles.viewerNavBtn, { backgroundColor: colors.surface }]}
-                accessibilityLabel="Photo précédente"
-              >
-                <ArrowLeft size={IconSize.md} color={colors.text} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() =>
-                  setViewer((v) => (v ? { ...v, index: (v.index + 1) % v.urls.length } : v))
-                }
-                style={[styles.viewerNavBtn, { backgroundColor: colors.surface }]}
-                accessibilityLabel="Photo suivante"
-              >
-                <ArrowLeft size={IconSize.md} color={colors.text} style={{ transform: [{ rotate: '180deg' }] }} />
-              </TouchableOpacity>
-            </View>
-          ) : undefined
-        }
+        onRequestClose={() => setViewer(null)}
+        swipeToCloseEnabled
+        doubleTapToZoomEnabled
       />
     </View>
   );
@@ -951,8 +929,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
   roomPhotoCountText: { fontSize: 10, fontWeight: FontWeight.bold, color: '#FFFFFF' },
-  viewerNav: { flexDirection: 'row', gap: Spacing.lg },
-  viewerNavBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   roomName: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, paddingHorizontal: Spacing.sm },
   addRoomBtn: {
     flexDirection: 'row',

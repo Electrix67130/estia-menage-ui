@@ -79,6 +79,7 @@ import DurationPickerField from '@/components/DurationPickerField';
 import LabeledField from '@/components/LabeledField';
 import AutoScrollInput from '@/components/AutoScrollInput';
 import KeyboardAwareScroll from '@/components/KeyboardAwareScroll';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { captureGeoPhoto, uploadGeoPhoto, GeoPhotoError } from '@/lib/captureGeoPhoto';
 import ArrivalDeclarationModal, { type ArrivalDeclaration } from '@/components/ArrivalDeclarationModal';
 import { uploadFile } from '@/api/upload';
@@ -617,6 +618,7 @@ export default function MenageDetailScreen() {
 
       {/* Content */}
       <View style={{ flex: 1 }}>
+        <ErrorBoundary key={activeTab} label="cet onglet">
         {activeTab === 'infos' && (
           <ScrollView
             contentContainerStyle={{ paddingTop: Spacing.md, paddingBottom: Spacing.xl }}
@@ -649,6 +651,7 @@ export default function MenageDetailScreen() {
             readonly={menage.status === 'valide'}
           />
         )}
+        </ErrorBoundary>
       </View>
       </>
       )}

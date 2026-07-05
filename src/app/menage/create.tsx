@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Switch, Modal, TextInput, FlatList, Pressable } from 'react-native';
 import Animated from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Save, Building2, ChevronRight, Search, X } from 'lucide-react-native';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
@@ -107,7 +107,7 @@ export default function CreateMenageScreen() {
         prestation_type: prestationType,
         date_prevue: datePrevue.trim(),
         horaire_prevu: horairePrevu || undefined,
-        horaire_fin_prevu: horaireFinPrevu || undefined,
+        horaire_fin_prevu: isCheck ? undefined : horaireFinPrevu || undefined,
         duree_estimee_min: isCheck ? undefined : duree,
         client_price_ht: cPrice,
         client_vat_rate: cVat,
@@ -202,31 +202,41 @@ export default function CreateMenageScreen() {
           onChange={setDatePrevue}
           placeholder="Choisir une date"
         />
-        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-          <View style={{ flex: 1 }}>
-            <TimePickerField
-              label="Tranche début"
-              value={horairePrevu}
-              onChange={setHorairePrevu}
-              placeholder="--:--"
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <TimePickerField
-              label="Tranche fin"
-              value={horaireFinPrevu}
-              onChange={setHoraireFinPrevu}
-              placeholder="--:--"
-            />
-          </View>
-        </View>
-        {!isCheck ? (
-          <DurationPickerField
-            label="Durée estimée"
-            value={dureeEstimee}
-            onChange={setDureeEstimee}
+        {isCheck ? (
+          // Check-in / check-out : une seule heure (pas de tranche ni de durée).
+          <TimePickerField
+            label="Heure"
+            value={horairePrevu}
+            onChange={setHorairePrevu}
+            placeholder="--:--"
           />
-        ) : null}
+        ) : (
+          <>
+            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <TimePickerField
+                  label="Tranche début"
+                  value={horairePrevu}
+                  onChange={setHorairePrevu}
+                  placeholder="--:--"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <TimePickerField
+                  label="Tranche fin"
+                  value={horaireFinPrevu}
+                  onChange={setHoraireFinPrevu}
+                  placeholder="--:--"
+                />
+              </View>
+            </View>
+            <DurationPickerField
+              label="Durée estimée"
+              value={dureeEstimee}
+              onChange={setDureeEstimee}
+            />
+          </>
+        )}
 
         {isAdmin ? (
           <>
@@ -337,7 +347,7 @@ export default function CreateMenageScreen() {
         >
           <Save size={IconSize.md} color="#FFFFFF" />
           <Text style={styles.submitText}>
-            {createMutation.isPending ? 'Création…' : 'Créer le ménage'}
+            {createMutation.isPending ? 'Création…' : 'Créer la prestation'}
           </Text>
         </TouchableOpacity>
       </KeyboardAwareScroll>
@@ -382,6 +392,7 @@ function LogementPickerModal({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const animatedModalStyle = useKeyboardAwareModalStyle({ visible });
 
@@ -434,7 +445,7 @@ function LogementPickerModal({
             keyExtractor={(item) => item.id}
             keyboardShouldPersistTaps="handled"
             style={pickerStyles.flatList}
-            contentContainerStyle={pickerStyles.list}
+            contentContainerStyle={[pickerStyles.list, { paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}
             ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.border }} />}
             ListEmptyComponent={
               <Text style={[pickerStyles.empty, { color: colors.mutedText }]}>

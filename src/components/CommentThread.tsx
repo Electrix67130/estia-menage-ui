@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Pressable, FlatList, StyleSheet, Modal, Keyboard, Platform, RefreshControl, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
-import Reanimated from 'react-native-reanimated';
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { Send, Trash2, Pencil, X } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
@@ -31,7 +31,7 @@ interface Props {
   keyboardVerticalOffset?: number;
 }
 
-const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, listHeader, onInputFocus, onInputBlur, keyboardVerticalOffset = 0 }) => {
+const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, listHeader, onInputFocus, onInputBlur }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const { user } = useAuth();
@@ -64,6 +64,14 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
   const [editText, setEditText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const animatedEditModalStyle = useKeyboardAwareModalStyle({ visible: isEditing });
+
+  // Montée déterministe et fluide : on translate tout le bloc (liste + input) de
+  // la hauteur exacte du clavier (valeur négative animée). L'input, en bas du
+  // bloc, se colle ainsi au clavier — sans offset à deviner.
+  const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
+  const chatAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: keyboardHeight.value }],
+  }));
 
   const flatListRef = useRef<FlatList>(null);
   // Auto-scroll only quand l'utilisateur est deja proche du bas. Si il a scrolle pour relire
@@ -168,7 +176,7 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
 
   return (
     <>
-      <KeyboardAvoidingView style={styles.container} behavior="padding" keyboardVerticalOffset={keyboardVerticalOffset}>
+      <Reanimated.View style={[styles.container, chatAnimStyle]}>
         <Pressable style={styles.flex} onPress={() => Keyboard.dismiss()}>
           <FlatList
             ref={flatListRef}
@@ -225,7 +233,7 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
             <Send size={IconSize.md} color={text.trim() ? '#FFFFFF' : colors.mutedText} />
           </TouchableOpacity>
         </View>}
-      </KeyboardAvoidingView>
+      </Reanimated.View>
 
       {/* Action sheet */}
       <Modal visible={!!selectedComment && !isEditing} transparent animationType="fade">

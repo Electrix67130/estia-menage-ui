@@ -415,7 +415,12 @@ export default function MenageDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      // En plein écran discussion, on retire le safe-area du bas : sinon l'input
+      // flotte au-dessus du clavier (gap = insets.bottom).
+      edges={chatFullscreen ? ['top', 'left', 'right'] : ['top', 'bottom', 'left', 'right']}
+    >
       {!chatFullscreen && (
       <View style={styles.header}>
         <TouchableOpacity

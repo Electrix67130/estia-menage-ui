@@ -4,7 +4,10 @@ import { optimizeImage } from '@/utils/optimizeImage';
 import { uploadFile } from '@/api/upload';
 
 export interface GeoPhotoResult {
-  photoUrl: string;
+  /** URI locale de la photo (pas encore uploadée) — voir `uploadGeoPhoto`. */
+  localUri: string;
+  width: number;
+  height: number;
   lat: number;
   lng: number;
 }
@@ -58,13 +61,29 @@ export async function captureGeoPhoto(): Promise<GeoPhotoResult> {
   }
 
   const asset = result.assets[0];
-  const optimized = await optimizeImage(asset.uri, asset.width, asset.height);
-  const fileName = `pointage-${Date.now()}.jpg`;
-  const uploaded = await uploadFile(optimized.uri, fileName, optimized.mimeType);
 
+  // On NE fait PAS l'optimisation/upload ici : ça bloquerait l'affichage de la
+  // modale de déclaration. L'appelant lance `uploadGeoPhoto` en arrière-plan.
   return {
-    photoUrl: uploaded.url,
+    localUri: asset.uri,
+    width: asset.width,
+    height: asset.height,
     lat: position.coords.latitude,
     lng: position.coords.longitude,
   };
+}
+
+/**
+ * Optimise puis uploade une photo de pointage capturée par `captureGeoPhoto`.
+ * À lancer en tâche de fond pendant que le presta remplit la déclaration ;
+ * `await` le résultat au moment de soumettre.
+ */
+export async function uploadGeoPhoto(
+  localUri: string,
+  width: number,
+  height: number,
+): Promise<string> {
+  const optimized = await optimizeImage(localUri, width, height);
+  const uploaded = await uploadFile(optimized.uri, `pointage-${Date.now()}.jpg`, optimized.mimeType);
+  return uploaded.url;
 }

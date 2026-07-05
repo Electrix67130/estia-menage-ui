@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -75,7 +75,7 @@ import DurationPickerField from '@/components/DurationPickerField';
 import LabeledField from '@/components/LabeledField';
 import AutoScrollInput from '@/components/AutoScrollInput';
 import KeyboardAwareScroll from '@/components/KeyboardAwareScroll';
-import { captureGeoPhoto, GeoPhotoError } from '@/lib/captureGeoPhoto';
+import { captureGeoPhoto, uploadGeoPhoto, GeoPhotoError } from '@/lib/captureGeoPhoto';
 import ArrivalDeclarationModal, { type ArrivalDeclaration } from '@/components/ArrivalDeclarationModal';
 import { uploadFile } from '@/api/upload';
 import { optimizeImage } from '@/utils/optimizeImage';
@@ -141,7 +141,10 @@ export default function MenageDetailScreen() {
   const [proposedDate, setProposedDate] = useState('');
   const [proposedTime, setProposedTime] = useState('');
   const [rescheduleReason, setRescheduleReason] = useState('');
-  const [arrivalProof, setArrivalProof] = useState<{ photoUrl: string; lat: number; lng: number } | null>(null);
+  const [arrivalProof, setArrivalProof] = useState<{ lat: number; lng: number } | null>(null);
+  // Upload de la photo d'arrivée lancé en tâche de fond dès la capture, pour ne
+  // pas retarder l'affichage de la modale de déclaration. Résolu au submit.
+  const arrivalUploadRef = useRef<Promise<{ url?: string; error?: unknown }> | null>(null);
   const [arrivalSubmitting, setArrivalSubmitting] = useState(false);
   const [showConsommables, setShowConsommables] = useState(false);
   const consommables = useMenageConsommables(id);
@@ -169,7 +172,8 @@ export default function MenageDetailScreen() {
     // au 2e pointage (départ) où l'animation peut être plus lente.
     await new Promise((r) => setTimeout(r, 650));
     try {
-      const { photoUrl, lat, lng } = await captureGeoPhoto();
+      const { localUri, width, height, lat, lng } = await captureGeoPhoto();
+      const photoUrl = await uploadGeoPhoto(localUri, width, height);
       await mutateAsync({ id: id!, photo_url: photoUrl, lat, lng });
       return true;
     } catch (err) {
@@ -217,7 +221,14 @@ export default function MenageDetailScreen() {
     await new Promise((r) => setTimeout(r, 650));
     try {
       const proof = await captureGeoPhoto();
-      setArrivalProof(proof);
+      // Upload en arrière-plan pendant que le presta remplit la déclaration.
+      // On capture succès/erreur dans le then pour éviter tout unhandled reject.
+      arrivalUploadRef.current = uploadGeoPhoto(proof.localUri, proof.width, proof.height).then(
+        (url) => ({ url }),
+        (error) => ({ error }),
+      );
+      // Modale affichée immédiatement (plus d'attente de l'upload).
+      setArrivalProof({ lat: proof.lat, lng: proof.lng });
     } catch (err) {
       if (err instanceof GeoPhotoError) {
         if (err.code !== 'cancelled') void dialog.alert({ title: 'Pointage impossible', message: err.message });
@@ -231,6 +242,12 @@ export default function MenageDetailScreen() {
     if (!arrivalProof) return;
     setArrivalSubmitting(true);
     try {
+      // Récupère l'upload lancé en fond à la capture (souvent déjà terminé).
+      const up = arrivalUploadRef.current ? await arrivalUploadRef.current : null;
+      if (!up || up.error || !up.url) {
+        throw up?.error instanceof Error ? up.error : new Error("Échec de l'envoi de la photo");
+      }
+      const photo_url = up.url;
       let degradation_photos: { url: string; file_size?: number; mime_type?: string }[] | undefined;
       if (decl.hasDegradation && decl.assets.length > 0) {
         degradation_photos = [];
@@ -242,7 +259,7 @@ export default function MenageDetailScreen() {
       }
       await arrivalMutation.mutateAsync({
         id: id!,
-        photo_url: arrivalProof.photoUrl,
+        photo_url,
         lat: arrivalProof.lat,
         lng: arrivalProof.lng,
         traveler_rating: decl.rating,
@@ -251,6 +268,7 @@ export default function MenageDetailScreen() {
         degradation_photos,
       });
       setArrivalProof(null);
+      arrivalUploadRef.current = null;
     } catch (err) {
       void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec du pointage' });
     } finally {
@@ -1028,6 +1046,7 @@ function ConsommablesReleveModal({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const insets = useSafeAreaInsets();
   const dialog = useDialog();
   const consommables = useMenageConsommables(visible ? menageId : undefined);
   const setReleve = useSetMenageConsommables(menageId);
@@ -1037,7 +1056,10 @@ function ConsommablesReleveModal({
     if (!visible || !consommables.data) return;
     const init: Record<string, string> = {};
     for (const c of consommables.data) {
-      init[c.logement_consommable_id] = c.qty === null ? '' : String(c.qty);
+      // Pré-rempli avec le relevé de ce ménage s'il existe, sinon le stock
+      // courant (dernier relevé) → le presta ne retape que si ça a bougé.
+      const preset = c.qty ?? c.current_qty ?? null;
+      init[c.logement_consommable_id] = preset === null ? '' : String(preset);
     }
     setQty(init);
   }, [visible, consommables.data]);
@@ -1072,7 +1094,7 @@ function ConsommablesReleveModal({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={[styles.consoSheet, { backgroundColor: colors.surface }]}>
+        <View style={[styles.consoSheet, { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
           <View style={styles.consoHeader}>
             <Text style={[styles.consoTitle, { color: colors.text }]}>Relevé des consommables</Text>
             <TouchableOpacity onPress={onClose} hitSlop={8}>
@@ -1104,9 +1126,9 @@ function ConsommablesReleveModal({
                         {c.unit ? ` ${c.unit}` : ''}
                       </Text>
                     </View>
-                    {low ? (
-                      <AlertTriangle size={16} color={colors.red} style={{ marginRight: 6 }} />
-                    ) : null}
+                    <View style={styles.consoAlertSlot}>
+                      {low ? <AlertTriangle size={16} color={colors.red} /> : null}
+                    </View>
                     <TextInput
                       style={[
                         styles.consoInput,
@@ -1120,11 +1142,10 @@ function ConsommablesReleveModal({
                       placeholder="0"
                       placeholderTextColor={colors.mutedText}
                     />
-                    {c.unit ? (
-                      <Text style={{ color: colors.text2, fontSize: FontSize.xs, width: 56 }} numberOfLines={1}>
-                        {c.unit}
-                      </Text>
-                    ) : null}
+                    {/* Colonne unité toujours réservée (même vide) pour aligner les inputs. */}
+                    <Text style={[styles.consoUnit, { color: colors.text2 }]} numberOfLines={1}>
+                      {c.unit ?? ''}
+                    </Text>
                   </View>
                 );
               })}
@@ -1926,6 +1947,8 @@ const styles = StyleSheet.create({
     fontSize: FontSize.md,
     fontWeight: FontWeight.semibold,
   },
+  consoAlertSlot: { width: 20, alignItems: 'center' },
+  consoUnit: { width: 40, fontSize: FontSize.xs },
   consoSaveBtn: {
     marginTop: Spacing.md,
     alignItems: 'center',

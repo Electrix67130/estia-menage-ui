@@ -1047,6 +1047,7 @@ function ConsommablesReleveModal({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
+  const modalStyle = useKeyboardAwareModalStyle({ visible });
   const dialog = useDialog();
   const consommables = useMenageConsommables(visible ? menageId : undefined);
   const setReleve = useSetMenageConsommables(menageId);
@@ -1094,7 +1095,7 @@ function ConsommablesReleveModal({
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={[styles.consoSheet, { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, Spacing.lg) }]}>
+        <Animated.View style={[styles.consoSheet, { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, Spacing.lg) }, modalStyle]}>
           <View style={styles.consoHeader}>
             <Text style={[styles.consoTitle, { color: colors.text }]}>Relevé des consommables</Text>
             <TouchableOpacity onPress={onClose} hitSlop={8}>
@@ -1112,7 +1113,7 @@ function ConsommablesReleveModal({
               Aucun consommable pour ce logement.
             </Text>
           ) : (
-            <ScrollView style={{ maxHeight: 380 }}>
+            <ScrollView style={{ maxHeight: 380, flexShrink: 1 }} keyboardShouldPersistTaps="handled">
               {lines.map((c: ConsommableLine) => {
                 const val = qty[c.logement_consommable_id] ?? '';
                 const n = parseInt(val, 10);
@@ -1163,7 +1164,7 @@ function ConsommablesReleveModal({
               </Text>
             </TouchableOpacity>
           ) : null}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

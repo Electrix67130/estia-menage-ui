@@ -154,6 +154,9 @@ export default function MenageDetailScreen() {
   // Offset écran → haut de la zone d'onglets (pour le KeyboardAvoidingView de la
   // discussion, qui doit remonter l'input malgré le header au-dessus).
   const [tabAreaTop, setTabAreaTop] = useState(0);
+  // Discussion en plein écran quand on tape : on replie tout le haut (header +
+  // infos + onglets) pour laisser la place au clavier ; restauré au blur.
+  const [chatFullscreen, setChatFullscreen] = useState(false);
   // Upload de la photo d'arrivée lancé en tâche de fond dès la capture, pour ne
   // pas retarder l'affichage de la modale de déclaration. Résolu au submit.
   const arrivalUploadRef = useRef<Promise<{ url?: string; error?: unknown }> | null>(null);
@@ -413,6 +416,7 @@ export default function MenageDetailScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      {!chatFullscreen && (
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -484,10 +488,13 @@ export default function MenageDetailScreen() {
           <StatusBadge status={menage.status} />
         )}
       </View>
+      )}
 
       {isEditing ? (
         <MenageEditForm menage={menage} onClose={() => setIsEditing(false)} />
       ) : (
+      <>
+      {!chatFullscreen && (
       <>
       {isAdmin ? (
         <View style={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm, alignItems: 'flex-end' }}>
@@ -618,6 +625,8 @@ export default function MenageDetailScreen() {
           );
         })}
       </View>
+      </>
+      )}
 
       {/* Content */}
       <View
@@ -656,6 +665,8 @@ export default function MenageDetailScreen() {
             canViewComments={true}
             readonly={menage.status === 'valide'}
             keyboardVerticalOffset={tabAreaTop}
+            onInputFocus={() => setChatFullscreen(true)}
+            onInputBlur={() => setChatFullscreen(false)}
           />
         )}
         </ErrorBoundary>

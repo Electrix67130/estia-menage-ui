@@ -24,12 +24,14 @@ interface Props {
   listHeader?: React.ReactNode;
   /** Callback declenche au focus du champ de saisie (ex. pour masquer un header au-dessus). */
   onInputFocus?: () => void;
+  /** Callback au blur du champ (pour restaurer le header masqué). */
+  onInputBlur?: () => void;
   /** Distance entre le haut de l'écran et le haut de cette vue (header + onglets
    *  au-dessus). Requis par KeyboardAvoidingView pour bien remonter l'input. */
   keyboardVerticalOffset?: number;
 }
 
-const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, listHeader, onInputFocus, keyboardVerticalOffset = 0 }) => {
+const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, listHeader, onInputFocus, onInputBlur, keyboardVerticalOffset = 0 }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const { user } = useAuth();
@@ -209,6 +211,7 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
             value={text}
             onChangeText={setText}
             onFocus={onInputFocus}
+            onBlur={onInputBlur}
             multiline
             accessibilityLabel="Écrire un commentaire"
           />

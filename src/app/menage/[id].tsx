@@ -36,6 +36,7 @@ import {
   Moon,
   CalendarClock,
   Save,
+  Star,
 } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
@@ -45,7 +46,7 @@ import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import SheetHandle from '@/components/SheetHandle';
-import { menageHooks, useArrival, useDeparture, useValidateReport, useArchiveMenage, useEligiblePrestataires, useUpdateMenage } from '@/api/hooks/useMenages';
+import { menageHooks, useArrival, useDeparture, useUpdateDeclaration, useValidateReport, useArchiveMenage, useEligiblePrestataires, useUpdateMenage } from '@/api/hooks/useMenages';
 import { useMenagePrestataires, useSetMenagePrestataires } from '@/api/hooks/useMenagePrestataires';
 import {
   useMenageResponses,
@@ -105,6 +106,7 @@ export default function MenageDetailScreen() {
   const dialog = useDialog();
 
   const arrivalMutation = useArrival();
+  const updateDeclarationMutation = useUpdateDeclaration();
   const departureMutation = useDeparture();
   const validateMutation = useValidateReport();
   const rescheduleMutation = useCreateRescheduleRequest();
@@ -142,6 +144,8 @@ export default function MenageDetailScreen() {
   const [proposedTime, setProposedTime] = useState('');
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [arrivalProof, setArrivalProof] = useState<{ lat: number; lng: number } | null>(null);
+  const [showEditDecl, setShowEditDecl] = useState(false);
+  const [editDeclSubmitting, setEditDeclSubmitting] = useState(false);
   // Upload de la photo d'arrivée lancé en tâche de fond dès la capture, pour ne
   // pas retarder l'affichage de la modale de déclaration. Résolu au submit.
   const arrivalUploadRef = useRef<Promise<{ url?: string; error?: unknown }> | null>(null);
@@ -275,6 +279,33 @@ export default function MenageDetailScreen() {
       setArrivalSubmitting(false);
     }
   };
+  const submitEditDeclaration = async (decl: ArrivalDeclaration) => {
+    setEditDeclSubmitting(true);
+    try {
+      let degradation_photos: { url: string; file_size?: number; mime_type?: string }[] | undefined;
+      if (decl.hasDegradation && decl.assets.length > 0) {
+        degradation_photos = [];
+        for (const a of decl.assets) {
+          const optimized = await optimizeImage(a.uri, a.width, a.height);
+          const uploaded = await uploadFile(optimized.uri, `degradation-${Date.now()}.jpg`, optimized.mimeType);
+          degradation_photos.push({ url: uploaded.url, file_size: uploaded.file_size, mime_type: uploaded.mime_type });
+        }
+      }
+      await updateDeclarationMutation.mutateAsync({
+        id: id!,
+        traveler_rating: decl.rating,
+        has_degradation: decl.hasDegradation,
+        degradation_note: decl.hasDegradation ? decl.note : '',
+        degradation_photos,
+      });
+      setShowEditDecl(false);
+    } catch (err) {
+      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec de la mise à jour' });
+    } finally {
+      setEditDeclSubmitting(false);
+    }
+  };
+
   const handleDeparture = async () => {
     if (isCheckInOut) {
       const ok = await dialog.confirm({
@@ -573,6 +604,15 @@ export default function MenageDetailScreen() {
 
       <AccessInfoSection menage={menage} logement={logement} colors={colors} />
 
+      {!isCheckInOut && menage.status !== 'a_venir' ? (
+        <DeclarationSection
+          menage={menage}
+          canEdit={(isPrestataire || isAdmin) && menage.status !== 'valide'}
+          onEdit={() => setShowEditDecl(true)}
+          colors={colors}
+        />
+      ) : null}
+
       <BedsSection menage={menage} colors={colors} isAdmin={isAdmin} />
 
       {/* Tabs */}
@@ -757,6 +797,21 @@ export default function MenageDetailScreen() {
         submitting={arrivalSubmitting}
         onClose={() => setArrivalProof(null)}
         onSubmit={submitArrival}
+      />
+
+      <ArrivalDeclarationModal
+        visible={showEditDecl}
+        submitting={editDeclSubmitting}
+        onClose={() => setShowEditDecl(false)}
+        onSubmit={submitEditDeclaration}
+        initial={{
+          rating: menage.traveler_rating ?? 0,
+          hasDegradation: !!menage.has_degradation,
+          note: menage.degradation_note ?? '',
+        }}
+        title="Déclaration voyageurs"
+        submitLabel="Enregistrer"
+        requireDegradationPhoto={false}
       />
     </SafeAreaView>
   );
@@ -1245,6 +1300,70 @@ function AccessInfoSection({
             {formatDateFr(checkin, 'dayShort')}{sameDay ? ' · jour même' : ''}
           </Text>
         </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Déclaration voyageurs (note + dégradation) affichée dans le détail, éditable
+ * a posteriori par le prestataire assigné ou un admin (bouton « Modifier »).
+ */
+function DeclarationSection({
+  menage,
+  canEdit,
+  onEdit,
+  colors,
+}: {
+  menage: Menage;
+  canEdit: boolean;
+  onEdit: () => void;
+  colors: typeof Colors.light;
+}) {
+  const rating = menage.traveler_rating ?? 0;
+  return (
+    <View style={[styles.accessCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={styles.accessRow}>
+        <Star size={IconSize.sm} color="#F5A623" />
+        <Text style={[styles.accessLabel, { color: colors.text2 }]}>Note voyageurs</Text>
+        {rating ? (
+          <View style={{ flexDirection: 'row', gap: 2 }}>
+            {[1, 2, 3, 4, 5].map((n) => (
+              <Star
+                key={n}
+                size={16}
+                color="#F5A623"
+                fill={n <= rating ? '#F5A623' : 'transparent'}
+              />
+            ))}
+          </View>
+        ) : (
+          <Text style={[styles.accessValue, { color: colors.mutedText }]}>Non renseignée</Text>
+        )}
+      </View>
+      {menage.has_degradation ? (
+        <View style={styles.accessRow}>
+          <AlertTriangle size={IconSize.sm} color={colors.red} />
+          <Text style={[styles.accessLabel, { color: colors.text2 }]}>Dégradation</Text>
+          <Text
+            style={[styles.accessValue, { color: colors.red, flex: 1, textAlign: 'right' }]}
+            numberOfLines={2}
+          >
+            {menage.degradation_note || 'Signalée'}
+          </Text>
+        </View>
+      ) : null}
+      {canEdit ? (
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 2 }}
+          onPress={onEdit}
+          accessibilityRole="button"
+        >
+          <Pencil size={14} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.semibold }}>
+            Modifier la déclaration
+          </Text>
+        </TouchableOpacity>
       ) : null}
     </View>
   );

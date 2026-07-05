@@ -127,6 +127,27 @@ export function useArrival() {
   });
 }
 
+export interface DeclarationPayload {
+  id: string;
+  traveler_rating?: number;
+  has_degradation?: boolean;
+  degradation_note?: string;
+  degradation_photos?: DegradationPhotoInput[];
+}
+
+/** Édite la déclaration voyageurs (note + dégradation) après coup. */
+export function useUpdateDeclaration() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: DeclarationPayload) =>
+      apiFetch<Menage>(`/menages/${id}/declaration`, { method: 'PUT', body }),
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ['menages'] });
+      qc.invalidateQueries({ queryKey: ['photos', 'menage', vars.id] });
+    },
+  });
+}
+
 export function useDeparture() {
   const qc = useQueryClient();
   return useMutation({

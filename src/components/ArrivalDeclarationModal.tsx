@@ -37,19 +37,29 @@ export default function ArrivalDeclarationModal({
   submitting,
   onClose,
   onSubmit,
+  initial,
+  title = 'Arrivée sur place',
+  submitLabel = 'Démarrer le ménage',
+  requireDegradationPhoto = true,
 }: {
   visible: boolean;
   submitting: boolean;
   onClose: () => void;
   onSubmit: (decl: ArrivalDeclaration) => void;
+  /** Valeurs initiales (mode édition a posteriori). */
+  initial?: { rating: number; hasDegradation: boolean; note: string };
+  title?: string;
+  submitLabel?: string;
+  /** En édition, la photo de dégradation n'est pas ré-exigée (déjà en galerie). */
+  requireDegradationPhoto?: boolean;
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
   const insets = useSafeAreaInsets();
-  const [rating, setRating] = useState(0);
-  const [hasDegradation, setHasDegradation] = useState(false);
-  const [note, setNote] = useState('');
+  const [rating, setRating] = useState(initial?.rating ?? 0);
+  const [hasDegradation, setHasDegradation] = useState(initial?.hasDegradation ?? false);
+  const [note, setNote] = useState(initial?.note ?? '');
   const [assets, setAssets] = useState<ImagePicker.ImagePickerAsset[]>([]);
   // Erreur affichée INLINE dans la feuille : une alerte (dialog/native) déclenchée
   // par-dessus ce Modal reste invisible sur iOS (Modals imbriqués) → l'utilisateur
@@ -58,9 +68,9 @@ export default function ArrivalDeclarationModal({
   const animatedModalStyle = useKeyboardAwareModalStyle({ visible });
 
   const reset = () => {
-    setRating(0);
-    setHasDegradation(false);
-    setNote('');
+    setRating(initial?.rating ?? 0);
+    setHasDegradation(initial?.hasDegradation ?? false);
+    setNote(initial?.note ?? '');
     setAssets([]);
     setError('');
   };
@@ -92,7 +102,7 @@ export default function ArrivalDeclarationModal({
         setError('Décris la dégradation constatée.');
         return;
       }
-      if (assets.length === 0) {
+      if (requireDegradationPhoto && assets.length === 0) {
         setError('Ajoute au moins une photo de la dégradation.');
         return;
       }
@@ -116,7 +126,7 @@ export default function ArrivalDeclarationModal({
             <View style={[styles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text style={[styles.title, { color: colors.text }]}>Arrivée sur place</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
 
             <Text style={[styles.label, { color: colors.text2 }]}>NOTE DES VOYAGEURS</Text>
             <View style={styles.starsRow}>
@@ -227,7 +237,7 @@ export default function ArrivalDeclarationModal({
               {submitting ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.submitText}>Démarrer le ménage</Text>
+                <Text style={styles.submitText}>{submitLabel}</Text>
               )}
             </TouchableOpacity>
           </ScrollView>

@@ -266,6 +266,9 @@ export interface Menage {
   departure_photo_url?: string | null;
   departure_lat?: number | string | null;
   departure_lng?: number | string | null;
+  traveler_rating?: number | null;
+  has_degradation?: boolean | null;
+  degradation_note?: string | null;
   prix_prevu: number | string | null;
   client_price_ht?: number | string | null;
   client_vat_rate?: number | string | null;

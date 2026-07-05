@@ -24,6 +24,7 @@ import { useSwipeToClose } from '@/hooks/useSwipeToClose';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import SheetHandle from '@/components/SheetHandle';
 import * as ImagePicker from 'expo-image-picker';
+import * as Updates from 'expo-updates';
 import { uploadFile } from '@/api/upload';
 import { optimizeImage } from '@/utils/optimizeImage';
 import { useAuth } from '@/contexts/AuthContext';
@@ -665,6 +666,18 @@ export default function ProfilScreen() {
                 <LogOut size={IconSize.md} color={colors.red} />
                 <Text style={[styles.logoutText, { color: colors.red }]}>{t('profile.logout')}</Text>
               </TouchableOpacity>
+
+              {/* Version + provenance du bundle (build natif vs OTA) — permet de
+                  vérifier qu'une mise à jour OTA a bien été appliquée. */}
+              <Text style={[styles.versionText, { color: colors.mutedText }]}>
+                v{Updates.runtimeVersion ?? '?'}
+                {' · '}
+                {Updates.isEmbeddedLaunch
+                  ? 'build natif'
+                  : Updates.createdAt
+                    ? `MàJ ${Updates.createdAt.toLocaleDateString('fr-FR')} ${Updates.createdAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                    : 'OTA'}
+              </Text>
             </>
           )}
         </ScrollView>
@@ -899,6 +912,7 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xl,
   },
   logoutText: { fontSize: FontSize.base, fontWeight: FontWeight.medium },
+  versionText: { textAlign: 'center', fontSize: FontSize.xs, marginTop: Spacing.md },
 
   securityBtn: {
     flexDirection: 'row',

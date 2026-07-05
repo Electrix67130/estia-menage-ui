@@ -11,6 +11,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreateMenage } from '@/api/hooks/useMenages';
 import { useLogements } from '@/api/hooks/useLogements';
+import { prestationTypeLabel, prestationTypeColorKey, type PrestationType } from '@/api/types';
 import KeyboardAwareScroll from '@/components/KeyboardAwareScroll';
 import AutoScrollInput from '@/components/AutoScrollInput';
 import DatePickerField from '@/components/DatePickerField';
@@ -22,7 +23,7 @@ export default function CreateMenageScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
-  const params = useLocalSearchParams<{ logement_id?: string }>();
+  const params = useLocalSearchParams<{ logement_id?: string; type?: string }>();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const createMutation = useCreateMenage();
@@ -31,6 +32,9 @@ export default function CreateMenageScreen() {
   const preselectedLogementId = typeof params.logement_id === 'string' ? params.logement_id : '';
   const [logementId, setLogementId] = useState<string>(preselectedLogementId);
   const [logementPickerOpen, setLogementPickerOpen] = useState(false);
+  const initialType: PrestationType =
+    params.type === 'check_in' || params.type === 'check_out' ? params.type : 'menage';
+  const [prestationType, setPrestationType] = useState<PrestationType>(initialType);
   const [datePrevue, setDatePrevue] = useState('');
   const [horairePrevu, setHorairePrevu] = useState('');
   const [horaireFinPrevu, setHoraireFinPrevu] = useState('');
@@ -98,6 +102,7 @@ export default function CreateMenageScreen() {
     try {
       const menage = await createMutation.mutateAsync({
         logement_id: logementId,
+        prestation_type: prestationType,
         date_prevue: datePrevue.trim(),
         horaire_prevu: horairePrevu || undefined,
         horaire_fin_prevu: horaireFinPrevu || undefined,
@@ -127,11 +132,36 @@ export default function CreateMenageScreen() {
         >
           <ArrowLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Nouveau ménage</Text>
+        <Text style={[styles.title, { color: colors.text }]}>Nouvelle prestation</Text>
         <View style={{ width: IconSize.lg }} />
       </View>
 
       <KeyboardAwareScroll contentContainerStyle={styles.body}>
+        <Text style={[styles.section, { color: colors.text2 }]}>TYPE DE PRESTATION</Text>
+        <View style={styles.typeRow}>
+          {(['menage', 'check_in', 'check_out'] as PrestationType[]).map((t) => {
+            const active = prestationType === t;
+            const c = colors[prestationTypeColorKey(t)];
+            return (
+              <TouchableOpacity
+                key={t}
+                style={[
+                  styles.typeChip,
+                  { borderColor: active ? c : colors.border, backgroundColor: active ? c + '20' : colors.surface },
+                ]}
+                onPress={() => setPrestationType(t)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Text style={{ color: active ? c : colors.text2, fontWeight: FontWeight.semibold, fontSize: FontSize.sm }}>
+                  {prestationTypeLabel(t)}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         <Text style={[styles.section, { color: colors.text2 }]}>LOGEMENT</Text>
         <TouchableOpacity
           style={[
@@ -491,6 +521,14 @@ const styles = StyleSheet.create({
   title: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold },
   body: { padding: Spacing.lg, gap: Spacing.sm },
   section: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, letterSpacing: 0.5, marginTop: Spacing.md },
+  typeRow: { flexDirection: 'row', gap: Spacing.sm },
+  typeChip: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
   hint: { fontSize: FontSize.xs, marginTop: -Spacing.xs },
   input: { padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, fontSize: FontSize.md },
   optionRow: { padding: Spacing.md, borderRadius: Radius.md },

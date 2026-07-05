@@ -11,6 +11,7 @@ import {
   Image,
   Linking,
   Switch,
+  LayoutAnimation,
   Pressable} from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -151,9 +152,6 @@ export default function MenageDetailScreen() {
   const [arrivalProof, setArrivalProof] = useState<{ lat: number; lng: number } | null>(null);
   const [showEditDecl, setShowEditDecl] = useState(false);
   const [editDeclSubmitting, setEditDeclSubmitting] = useState(false);
-  // Offset écran → haut de la zone d'onglets (pour le KeyboardAvoidingView de la
-  // discussion, qui doit remonter l'input malgré le header au-dessus).
-  const [tabAreaTop, setTabAreaTop] = useState(0);
   // Discussion en plein écran quand on tape : on replie tout le haut (header +
   // infos + onglets) pour laisser la place au clavier ; restauré au blur.
   const [chatFullscreen, setChatFullscreen] = useState(false);
@@ -634,10 +632,7 @@ export default function MenageDetailScreen() {
       )}
 
       {/* Content */}
-      <View
-        style={{ flex: 1 }}
-        onLayout={(e) => setTabAreaTop(insets.top + e.nativeEvent.layout.y)}
-      >
+      <View style={{ flex: 1 }}>
         <ErrorBoundary key={activeTab} label="cet onglet">
         {activeTab === 'infos' && (
           <ScrollView
@@ -669,9 +664,18 @@ export default function MenageDetailScreen() {
             menageId={id!}
             canViewComments={true}
             readonly={menage.status === 'valide'}
-            keyboardVerticalOffset={tabAreaTop}
-            onInputFocus={() => setChatFullscreen(true)}
-            onInputBlur={() => setChatFullscreen(false)}
+            // La vue va jusqu'en bas de l'écran (safe-area bas retiré en plein
+            // écran) → offset 0, sinon le padding = keyboardHeight + offset et
+            // l'input flotte au-dessus du clavier (gap = offset).
+            keyboardVerticalOffset={0}
+            onInputFocus={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
+              setChatFullscreen(true);
+            }}
+            onInputBlur={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
+              setChatFullscreen(false);
+            }}
           />
         )}
         </ErrorBoundary>

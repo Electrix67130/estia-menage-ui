@@ -39,6 +39,7 @@ import {
   Star,
   LogIn,
   LogOut,
+  Info,
 } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
@@ -87,6 +88,7 @@ import { prestationTypeLabel, prestationTypeColorKey } from '@/api/types';
 import type { Menage, Logement, MenageStatus, UpdateMenageInput } from '@/api/types';
 
 const TABS = [
+  { key: 'infos', label: 'Infos', icon: Info },
   { key: 'check', label: 'Check', icon: ListChecks },
   { key: 'photos', label: 'Photos', icon: Camera },
   { key: 'comments', label: 'Discussion', icon: MessageSquare },
@@ -114,7 +116,7 @@ export default function MenageDetailScreen() {
   const rescheduleMutation = useCreateRescheduleRequest();
   const archiveMutation = useArchiveMenage();
 
-  const [activeTab, setActiveTab] = useState<TabKey>('check');
+  const [activeTab, setActiveTab] = useState<TabKey>('infos');
   const [showValidateModal, setShowValidateModal] = useState(false);
   // Toute la fiche est en consultation par défaut ; l'admin passe en édition
   // via le crayon (un seul mode édition pour tous les champs).
@@ -584,27 +586,6 @@ export default function MenageDetailScreen() {
         ) : null}
       </View>
 
-      {!isCheckInOut && (menage.arrived_at || menage.departed_at) ? (
-        <PointageSection menage={menage} colors={colors} />
-      ) : null}
-
-      {isAdmin && (menage.arrival_photo_url || menage.departure_photo_url) ? (
-        <PointageProofSection menage={menage} logement={logement} colors={colors} />
-      ) : null}
-
-      <AccessInfoSection menage={menage} logement={logement} colors={colors} />
-
-      {!isCheckInOut && menage.status !== 'a_venir' ? (
-        <DeclarationSection
-          menage={menage}
-          canEdit={(isPrestataire || isAdmin) && menage.status !== 'valide'}
-          onEdit={() => setShowEditDecl(true)}
-          colors={colors}
-        />
-      ) : null}
-
-      <BedsSection menage={menage} colors={colors} isAdmin={isAdmin} />
-
       {/* Tabs */}
       <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
         {(isCheckInOut ? TABS.filter((tb) => tb.key !== 'photos') : TABS).map((tab) => {
@@ -636,6 +617,29 @@ export default function MenageDetailScreen() {
 
       {/* Content */}
       <View style={{ flex: 1 }}>
+        {activeTab === 'infos' && (
+          <ScrollView
+            contentContainerStyle={{ paddingTop: Spacing.md, paddingBottom: Spacing.xl }}
+            showsVerticalScrollIndicator={false}
+          >
+            {!isCheckInOut && (menage.arrived_at || menage.departed_at) ? (
+              <PointageSection menage={menage} colors={colors} />
+            ) : null}
+            {isAdmin && (menage.arrival_photo_url || menage.departure_photo_url) ? (
+              <PointageProofSection menage={menage} logement={logement} colors={colors} />
+            ) : null}
+            <AccessInfoSection menage={menage} logement={logement} colors={colors} />
+            {!isCheckInOut && menage.status !== 'a_venir' ? (
+              <DeclarationSection
+                menage={menage}
+                canEdit={(isPrestataire || isAdmin) && menage.status !== 'valide'}
+                onEdit={() => setShowEditDecl(true)}
+                colors={colors}
+              />
+            ) : null}
+            <BedsSection menage={menage} colors={colors} isAdmin={isAdmin} />
+          </ScrollView>
+        )}
         {activeTab === 'check' && <MenageCheckList menageId={id!} readonly={menage.status === 'valide'} />}
         {activeTab === 'photos' && !isCheckInOut && <PhotoGallery menageId={id!} readonly={menage.status === 'valide'} />}
         {activeTab === 'comments' && (

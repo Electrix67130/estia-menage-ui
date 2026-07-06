@@ -16,6 +16,8 @@ export interface CheckTemplateSection {
   logement_id: string;
   logement_room_id: string | null;
   label: string;
+  /** Icône emoji de la section (null = aucune). */
+  icon: string | null;
   position: number;
   created_at: string;
   updated_at: string;
@@ -36,7 +38,7 @@ export function useCheckTemplate(logementId: string | undefined) {
 export function useCreateTemplateSection(logementId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { label: string; logement_room_id?: string }) =>
+    mutationFn: (input: { label: string; logement_room_id?: string; icon?: string | null }) =>
       apiFetch<CheckTemplateSection>(`/logement-check-template-sections`, {
         method: 'POST',
         body: { logement_id: logementId, ...input },
@@ -78,10 +80,10 @@ export function useDeleteTemplateItem(logementId: string) {
 export function useUpdateTemplateSection(logementId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, label }: { id: string; label: string }) =>
+    mutationFn: ({ id, label, icon }: { id: string; label?: string; icon?: string | null }) =>
       apiFetch<CheckTemplateSection>(`/logement-check-template-sections/${id}`, {
         method: 'PATCH',
-        body: { label },
+        body: { ...(label !== undefined ? { label } : {}), ...(icon !== undefined ? { icon } : {}) },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: [...KEY, logementId] }),
   });

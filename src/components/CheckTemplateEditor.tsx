@@ -79,6 +79,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
 
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [addingSection, setAddingSection] = useState(false);
+  const [iconPickerFor, setIconPickerFor] = useState<CheckTemplateSection | null>(null);
   const [addingItemFor, setAddingItemFor] = useState<CheckTemplateSection | null>(null);
   const [applyOpen, setApplyOpen] = useState(false);
   const [reorderOpen, setReorderOpen] = useState(false);
@@ -187,7 +188,26 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
                 ) : (
                   <ChevronDown size={IconSize.sm} color={colors.text2} />
                 )}
-                <ListChecks size={IconSize.sm} color={colors.primary} />
+                {isAdmin ? (
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      setIconPickerFor(s);
+                    }}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Choisir l'icône de la section"
+                  >
+                    {s.icon ? (
+                      <Text style={styles.sectionEmoji}>{s.icon}</Text>
+                    ) : (
+                      <ListChecks size={IconSize.sm} color={colors.text2} />
+                    )}
+                  </TouchableOpacity>
+                ) : s.icon ? (
+                  <Text style={styles.sectionEmoji}>{s.icon}</Text>
+                ) : (
+                  <ListChecks size={IconSize.sm} color={colors.primary} />
+                )}
                 <Text style={[styles.sectionLabel, { color: colors.text }]} numberOfLines={1}>
                   {s.label}
                 </Text>
@@ -326,6 +346,21 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
           try {
             await createSection.mutateAsync({ label });
             setAddingSection(false);
+          } catch (err) {
+            void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+          }
+        }}
+      />
+
+      <IconPickerModal
+        section={iconPickerFor}
+        onClose={() => setIconPickerFor(null)}
+        onPick={async (icon) => {
+          const s = iconPickerFor;
+          setIconPickerFor(null);
+          if (!s) return;
+          try {
+            await updateSection.mutateAsync({ id: s.id, icon });
           } catch (err) {
             void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
           }
@@ -674,6 +709,66 @@ function ItemRow({
 // AddSectionModal — bottom sheet pour ajouter une section
 // =============================================================================
 
+const SECTION_EMOJIS = [
+  '🍳', '🛋️', '🛏️', '🚿', '🚽', '🌳', '📦', '🧺', '✨', '🧹',
+  '🪣', '🧴', '🛒', '🔑', '📋', '🧼', '🚪', '🪟', '🛁', '☕',
+];
+
+/** Sélecteur d'icône (emoji) pour une section — palette + « Aucune ». */
+function IconPickerModal({
+  section,
+  onClose,
+  onPick,
+}: {
+  section: CheckTemplateSection | null;
+  onClose: () => void;
+  onPick: (icon: string | null) => void;
+}) {
+  const colorScheme = useColorScheme();
+  const colors = Colors[colorScheme];
+  return (
+    <Modal visible={!!section} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={sheetStyles.overlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={[sheetStyles.sheet, { backgroundColor: colors.surface }, Shadow.lg]}>
+          <View style={sheetStyles.handle}>
+            <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
+          </View>
+          <View style={sheetStyles.header}>
+            <Text style={[sheetStyles.title, { color: colors.text }]}>Icône de la section</Text>
+          </View>
+          <View style={pickerStyles.grid}>
+            {SECTION_EMOJIS.map((e) => {
+              const active = section?.icon === e;
+              return (
+                <TouchableOpacity
+                  key={e}
+                  style={[
+                    pickerStyles.cell,
+                    {
+                      borderColor: active ? colors.primary : colors.border,
+                      backgroundColor: active ? colors.primary + '20' : colors.itemBackground,
+                    },
+                  ]}
+                  onPress={() => onPick(e)}
+                >
+                  <Text style={pickerStyles.emoji}>{e}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <TouchableOpacity
+            style={[pickerStyles.noneBtn, { borderColor: colors.border }]}
+            onPress={() => onPick('')}
+          >
+            <Text style={{ color: colors.text2, fontWeight: FontWeight.semibold }}>Aucune icône</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function AddSectionModal({
   visible,
   onClose,
@@ -972,6 +1067,7 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
   },
   sectionLabel: { flex: 1, fontSize: FontSize.md, fontWeight: FontWeight.semibold },
+  sectionEmoji: { fontSize: 18 },
   countBadge: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
@@ -1033,6 +1129,27 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   applyTemplateText: { fontSize: FontSize.base, fontWeight: FontWeight.semibold },
+});
+
+const pickerStyles = StyleSheet.create({
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, justifyContent: 'center', marginTop: Spacing.sm },
+  cell: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emoji: { fontSize: 24 },
+  noneBtn: {
+    marginTop: Spacing.md,
+    marginBottom: Spacing.lg,
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
 });
 
 const sheetStyles = StyleSheet.create({

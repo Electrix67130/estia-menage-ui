@@ -113,6 +113,8 @@ export default function MenageDetailScreen() {
 
   const arrivalMutation = useArrival();
   const updateDeclarationMutation = useUpdateDeclaration();
+  // Tous les prestataires affectés (multi-presta), pas seulement le référent.
+  const assignedPrestas = useMenagePrestataires(id);
   const departureMutation = useDeparture();
   const validateMutation = useValidateReport();
   const rescheduleMutation = useCreateRescheduleRequest();
@@ -513,18 +515,38 @@ export default function MenageDetailScreen() {
         ]}
       >
         <View style={{ flex: 1 }}>
-          <Text style={[styles.prestataireLabel, { color: colors.text2 }]}>PRESTATAIRE</Text>
-          {menage.prestataire_user_id ? (
-            <Text style={[styles.prestataireName, { color: colors.text }]}>
-              {[menage.prestataire_first_name, menage.prestataire_last_name]
-                .filter(Boolean)
-                .join(' ') || 'Affecté'}
-            </Text>
-          ) : (
-            <View style={styles.prestataireUnassignedBadge}>
-              <Text style={styles.prestataireUnassignedText}>NON ASSIGNÉ</Text>
-            </View>
-          )}
+          {(() => {
+            const list = assignedPrestas.data ?? [];
+            const names = list.map(
+              (p) => [p.first_name, p.last_name].filter(Boolean).join(' ') || '—',
+            );
+            // Fallback sur le référent si la liste n'est pas encore chargée.
+            if (names.length === 0 && menage.prestataire_user_id) {
+              names.push(
+                [menage.prestataire_first_name, menage.prestataire_last_name]
+                  .filter(Boolean)
+                  .join(' ') || 'Affecté',
+              );
+            }
+            return (
+              <>
+                <Text style={[styles.prestataireLabel, { color: colors.text2 }]}>
+                  {names.length > 1 ? 'PRESTATAIRES' : 'PRESTATAIRE'}
+                </Text>
+                {names.length > 0 ? (
+                  names.map((n, i) => (
+                    <Text key={i} style={[styles.prestataireName, { color: colors.text }]}>
+                      {n}
+                    </Text>
+                  ))
+                ) : (
+                  <View style={styles.prestataireUnassignedBadge}>
+                    <Text style={styles.prestataireUnassignedText}>NON ASSIGNÉ</Text>
+                  </View>
+                )}
+              </>
+            );
+          })()}
         </View>
         {isAdmin && !isFinished ? (
           <TouchableOpacity
@@ -669,11 +691,13 @@ export default function MenageDetailScreen() {
             // l'input flotte au-dessus du clavier (gap = offset).
             keyboardVerticalOffset={0}
             onInputFocus={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
+              // Preset easeInEaseOut : anime position ET taille (pas juste l'opacité)
+              // → le haut se replie et la discussion s'agrandit en glissant.
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
               setChatFullscreen(true);
             }}
             onInputBlur={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.create(220, 'easeInEaseOut', 'opacity'));
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
               setChatFullscreen(false);
             }}
           />

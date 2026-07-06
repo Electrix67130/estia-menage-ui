@@ -70,10 +70,13 @@ export default function MenageCheckList({ menageId, readonly }: Props) {
         const total = section.items.length;
         const done = section.items.filter((i) => !!i.validated_at).length;
         const sectionAllDone = total > 0 && done === total;
+        // Icône : choisie (emoji) ; '' = aucune ; null/absent = défaut selon le type.
+        const sectionIcon =
+          section.icon === '' ? null : section.icon || SECTION_ICONS[section.section_type] || '•';
         return (
           <View key={section.id} style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionIcon]}>{SECTION_ICONS[section.section_type] || '•'}</Text>
+              {sectionIcon ? <Text style={[styles.sectionIcon]}>{sectionIcon}</Text> : null}
               <Text style={[styles.sectionTitle, { color: colors.text }]}>{section.section_label}</Text>
               <Text style={[styles.progress, { color: colors.text2 }]}>
                 {done}/{total}

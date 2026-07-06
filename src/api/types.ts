@@ -445,6 +445,8 @@ export interface MenageCheckSection {
   menage_id: string;
   section_type: SectionType;
   section_label: string;
+  /** Icône emoji (null = pas encore choisie → défaut ; '' = aucune). */
+  icon?: string | null;
   position: number;
   created_at: string;
   updated_at: string;

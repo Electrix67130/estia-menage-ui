@@ -148,7 +148,13 @@ function AdminMenagesScreen() {
         if (q && !menageLogementLabel(m).toLowerCase().includes(q)) return false;
         if (typeFilter && m.prestation_type !== typeFilter) return false;
         if (logementFilter && m.logement_id !== logementFilter) return false;
-        if (prestaFilter && m.prestataire_user_id !== prestaFilter) return false;
+        if (prestaFilter) {
+          if (prestaFilter === '__unassigned__') {
+            if (m.prestataire_user_id) return false;
+          } else if (m.prestataire_user_id !== prestaFilter) {
+            return false;
+          }
+        }
         if (creatorFilter) {
           if (creatorFilter.startsWith('src:')) {
             const src = creatorFilter.slice(4);
@@ -199,10 +205,13 @@ function AdminMenagesScreen() {
     return u ? [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email : '—';
   };
   const prestaOptions: FilterOption[] = React.useMemo(
-    () =>
-      allUsers
+    () => [
+      // Option « Non assigné » en tête du filtre prestataire.
+      { id: '__unassigned__', label: 'Non assigné' },
+      ...allUsers
         .filter((u) => u.role === 'prestataire')
         .map((u) => ({ id: u.id, label: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email })),
+    ],
     [allUsers],
   );
   // "Créateur" inclut à la fois les users qui ont créé un ménage manuellement

@@ -25,6 +25,8 @@ interface ListParams extends PaginationParams {
   prestataire_user_id?: string;
   logement_id?: string;
   validated?: boolean;
+  /** true = uniquement les ménages sans prestataire assigné. */
+  unassigned?: boolean;
   /** true = clôturés (valide/annule) → archives ; false = worklist active. */
   closed?: boolean;
   manager?: 'me';

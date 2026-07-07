@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getAccessToken, clearTokens } from '@/api/client';
+import { clearPersistedCache } from '@/lib/persist';
 import { useMe, useLogin, useRegister, useLogout } from '@/api/hooks/useAuth';
 import { unregisterPushToken } from '@/hooks/usePushRegistration';
 import type { MeResponse, LoginInput, RegisterInput } from '@/api/types';
@@ -66,6 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     await clearTokens();
     queryClient.clear();
+    // Purge aussi le cache persisté sur disque (ne rien laisser après logout).
+    await clearPersistedCache();
     setHasToken(false);
   }, [logoutMutation, queryClient]);
 

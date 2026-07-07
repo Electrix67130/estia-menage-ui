@@ -2,7 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { StatusBar } from 'expo-status-bar';
 import { Asset } from 'expo-asset';
 import * as SplashScreen from 'expo-splash-screen';
@@ -13,8 +14,14 @@ import { I18nProvider } from '@/contexts/I18nContext';
 import { DialogProvider } from '@/contexts/DialogContext';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { usePushRegistration } from '@/hooks/usePushRegistration';
+import { initOnlineManager } from '@/lib/network';
+import { persister, PERSIST_BUSTER } from '@/lib/persist';
+import OfflineBanner from '@/components/OfflineBanner';
 
 SplashScreen.preventAutoHideAsync();
+
+// Détection réseau (JS pur) → pause/reprise auto des requêtes React Query.
+initOnlineManager();
 
 // Afficher les notifications même quand l'app est au premier plan.
 Notifications.setNotificationHandler({
@@ -30,7 +37,15 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60 * 1000,
+      // Rétention 24 h : les requêtes doivent survivre en cache assez longtemps
+      // pour être persistées sur disque et rechargées hors ligne.
+      gcTime: 1000 * 60 * 60 * 24,
       retry: 2,
+    },
+    mutations: {
+      // Lecture seule offline : une action tentée hors ligne échoue tout de
+      // suite (au lieu d'être mise en file et rejouée au retour du réseau).
+      networkMode: 'always',
     },
   },
 });
@@ -96,13 +111,25 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardProvider>
-      <QueryClientProvider client={queryClient}>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{
+          persister,
+          maxAge: 1000 * 60 * 60 * 24, // 24 h : au-delà, cache considéré périmé
+          buster: PERSIST_BUSTER,
+          dehydrateOptions: {
+            // Ne persister que les requêtes réussies (jamais d'erreurs/loading).
+            shouldDehydrateQuery: (query) => query.state.status === 'success',
+          },
+        }}
+      >
         <I18nProvider>
           <ThemeProvider>
             <DialogProvider>
               <AuthProvider>
               <AuthGuard>
               <StatusBar style="auto" />
+              <OfflineBanner />
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="(auth)" />
                 <Stack.Screen name="(tabs)" />
@@ -113,7 +140,7 @@ export default function RootLayout() {
             </DialogProvider>
           </ThemeProvider>
         </I18nProvider>
-      </QueryClientProvider>
+      </PersistQueryClientProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>
   );

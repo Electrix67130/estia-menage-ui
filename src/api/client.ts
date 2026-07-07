@@ -6,6 +6,30 @@ const API_KEY = process.env.EXPO_PUBLIC_API_KEY || 'local-dev-api-key';
 const ACCESS_TOKEN_KEY = 'access_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 
+// --------------- Sonde de connectivité (offline) ---------------
+
+/**
+ * Teste si l'API est joignable. N'importe quelle réponse HTTP (même 401/404)
+ * signifie que le réseau est up → true. Seule une erreur réseau (fetch throw)
+ * ou un timeout de 4 s donne false. Pur JS → livrable en OTA.
+ */
+export async function probeApi(): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 4000);
+  try {
+    await fetch(`${API_URL}/health`, {
+      method: 'GET',
+      headers: { 'x-api-key': API_KEY },
+      signal: controller.signal,
+    });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 // --------------- Token management ---------------
 
 export async function getAccessToken(): Promise<string | null> {

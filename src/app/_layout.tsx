@@ -129,12 +129,13 @@ export default function RootLayout() {
               <AuthProvider>
               <AuthGuard>
               <StatusBar style="auto" />
-              <OfflineBanner />
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="+not-found" />
-              </Stack>
+              <OfflineBanner>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(tabs)" />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+              </OfflineBanner>
               </AuthGuard>
               </AuthProvider>
             </DialogProvider>

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../client';
 import { createCrudHooks } from './useCrud';
 import { menagesApi } from '../services';
@@ -17,6 +17,21 @@ export const menageHooks = createCrudHooks<Menage, CreateMenageInput, UpdateMena
   'menages',
   menagesApi,
 );
+
+/**
+ * Cherche un ménage dans le cache des listes déjà chargées.
+ * Sert de fallback hors ligne pour l'écran détail : on affiche l'élément connu
+ * de la liste (placeholder) tant que le détail complet n'a pas pu être fetché.
+ */
+export function findCachedMenage(qc: QueryClient, id?: string): Menage | undefined {
+  if (!id) return undefined;
+  const lists = qc.getQueriesData<PaginatedResponse<Menage>>({ queryKey: ['menages', 'list'] });
+  for (const [, page] of lists) {
+    const found = page?.data?.find((m) => m.id === id);
+    if (found) return found;
+  }
+  return undefined;
+}
 
 interface ListParams extends PaginationParams {
   status?: MenageStatus;

@@ -50,7 +50,8 @@ import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import SheetHandle from '@/components/SheetHandle';
-import { menageHooks, useArrival, useDeparture, useUpdateDeclaration, useValidateReport, useArchiveMenage, useEligiblePrestataires, useUpdateMenage } from '@/api/hooks/useMenages';
+import { useQueryClient } from '@tanstack/react-query';
+import { menageHooks, useArrival, useDeparture, useUpdateDeclaration, useValidateReport, useArchiveMenage, useEligiblePrestataires, useUpdateMenage, findCachedMenage } from '@/api/hooks/useMenages';
 import { useMenagePrestataires, useSetMenagePrestataires } from '@/api/hooks/useMenagePrestataires';
 import {
   useMenageResponses,
@@ -104,7 +105,12 @@ export default function MenageDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: menage, isLoading } = menageHooks.useById(id);
+  const queryClient = useQueryClient();
+  // Fallback hors ligne : si le détail n'a jamais été fetché, on affiche
+  // l'élément déjà connu de la liste en cache le temps de recharger en ligne.
+  const { data: menage, isLoading } = menageHooks.useById(id, {
+    placeholderData: () => findCachedMenage(queryClient, id),
+  });
   const { data: logement } = useLogement(menage?.logement_id);
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';

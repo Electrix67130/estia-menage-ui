@@ -5,7 +5,7 @@ import { useDialog } from '@/contexts/DialogContext';
 import Animated, { LinearTransition, FadeInLeft, FadeOutLeft, FadeInDown, FadeOutUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Plus, Trash2, X, Check, List, MapIcon, CalendarClock, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { Plus, Trash2, X, Check, List, MapIcon, CalendarClock, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -112,6 +112,37 @@ function AdminMenagesScreen() {
     const y = now.getFullYear() + periodOffset;
     return { min: `${y}-01-01`, max: `${y}-12-31`, label: String(y) };
   }, [periodFilter, periodOffset]);
+
+  // Filtres mémorisés (persistés) → invisibles au 1er coup d'œil. On les rend
+  // explicites (barre + Réinitialiser) pour éviter les « où sont mes prestations ? »
+  // quand un filtre discret (créateur/presta/période/type) masque tout.
+  const activeFilters = [
+    statusFilter !== 'all' && 'Statut',
+    (periodFilter !== 'all' || periodOffset !== 0) && 'Période',
+    typeFilter && 'Type',
+    logementFilter && 'Logement',
+    prestaFilter && 'Prestataire',
+    creatorFilter && 'Créateur',
+    searchQuery.trim() && 'Recherche',
+  ].filter(Boolean) as string[];
+
+  const resetFilters = useCallback(() => {
+    setStatusFilter('all');
+    setPeriodFilter('all');
+    setPeriodOffset(0);
+    setTypeFilter('');
+    setLogementFilter('');
+    setPrestaFilter('');
+    setCreatorFilter('');
+    setSearchQuery('');
+  }, [
+    setStatusFilter,
+    setPeriodFilter,
+    setTypeFilter,
+    setLogementFilter,
+    setPrestaFilter,
+    setCreatorFilter,
+  ]);
 
   // Filtre "À valider" = ménages terminés sans validation
   const isToValidate = statusFilter === 'to_validate';
@@ -608,6 +639,24 @@ function AdminMenagesScreen() {
         searchPlaceholder="Rechercher un créateur…"
       />
 
+      {activeFilters.length > 0 && viewMode !== 'map' ? (
+        <View
+          style={[
+            styles.filterBar,
+            { backgroundColor: colors.statusEnCours + '20', borderColor: colors.statusEnCours + '55' },
+          ]}
+        >
+          <SlidersHorizontal size={14} color={colors.statusEnCours} />
+          <Text style={[styles.filterBarText, { color: colors.text }]} numberOfLines={1}>
+            Filtres actifs : {activeFilters.join(', ')}
+          </Text>
+          <TouchableOpacity onPress={resetFilters} style={styles.filterBarReset} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <X size={13} color={colors.statusEnCours} />
+            <Text style={[styles.filterBarResetText, { color: colors.statusEnCours }]}>Réinitialiser</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -652,6 +701,20 @@ function AdminMenagesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  filterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  filterBarText: { flex: 1, fontSize: FontSize.sm, fontWeight: FontWeight.medium },
+  filterBarReset: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  filterBarResetText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

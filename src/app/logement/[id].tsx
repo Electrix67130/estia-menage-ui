@@ -16,11 +16,11 @@ import { useDialog } from '@/contexts/DialogContext';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Trash2, MapPin, Camera, Plus, DoorOpen, Image as ImageIcon, Trash } from 'lucide-react-native';
+import { ArrowLeft, Trash2, MapPin, Camera, Plus, DoorOpen, Image as ImageIcon, Trash, RotateCcw } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useLogement, useDeleteLogement, useUpdateLogement } from '@/api/hooks/useLogements';
+import { useLogement, useDeleteLogement, useUpdateLogement, useUnarchiveLogement } from '@/api/hooks/useLogements';
 import { uploadFile } from '@/api/upload';
 import { optimizeImage } from '@/utils/optimizeImage';
 import { useLogementMembers } from '@/api/hooks/useLogementMembers';
@@ -79,6 +79,7 @@ export default function LogementDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: logement, isLoading } = useLogement(id);
   const deleteMutation = useDeleteLogement();
+  const unarchiveMutation = useUnarchiveLogement();
   const updateMutation = useUpdateLogement();
   const [coverUploading, setCoverUploading] = useState(false);
 
@@ -157,6 +158,32 @@ export default function LogementDetailScreen() {
     }
   };
 
+  const handleUnarchive = async () => {
+    const ok = await dialog.confirm({
+      title: 'Restaurer le logement ?',
+      message:
+        'Le logement et les prestations/consommables archivés avec lui seront réactivés.',
+      confirmLabel: 'Restaurer',
+    });
+    if (!ok) return;
+    try {
+      const res = await unarchiveMutation.mutateAsync(id!);
+      const n = res?.unarchived_menages ?? 0;
+      void dialog.alert({
+        title: 'Logement restauré',
+        message:
+          n > 0
+            ? `${n} prestation${n > 1 ? 's' : ''} ${n > 1 ? 'ont' : 'a'} aussi été restaurée${n > 1 ? 's' : ''}.`
+            : 'Le logement a été restauré.',
+      });
+    } catch (err) {
+      void dialog.alert({
+        title: 'Erreur',
+        message: err instanceof Error ? err.message : 'Restauration impossible',
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -193,19 +220,31 @@ export default function LogementDetailScreen() {
         </Text>
         <View style={{ flexDirection: 'row', gap: Spacing.md, alignItems: 'center' }}>
           {isAdmin ? (
-            <>
+            logement.archived_at ? (
               <TouchableOpacity
-                onPress={() => router.push(`/menage/create?logement_id=${id}`)}
-                accessibilityLabel="Nouveau ménage"
+                onPress={handleUnarchive}
+                accessibilityLabel="Restaurer le logement"
                 style={[styles.headerCta, { backgroundColor: colors.primary }]}
+                disabled={unarchiveMutation.isPending}
               >
-                <Plus size={IconSize.sm} color="#FFFFFF" />
-                <Text style={styles.headerCtaText}>Ménage</Text>
+                <RotateCcw size={IconSize.sm} color="#FFFFFF" />
+                <Text style={styles.headerCtaText}>Restaurer</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleDelete} accessibilityLabel="Supprimer">
-                <Trash2 size={IconSize.md} color={colors.red} />
-              </TouchableOpacity>
-            </>
+            ) : (
+              <>
+                <TouchableOpacity
+                  onPress={() => router.push(`/menage/create?logement_id=${id}`)}
+                  accessibilityLabel="Nouveau ménage"
+                  style={[styles.headerCta, { backgroundColor: colors.primary }]}
+                >
+                  <Plus size={IconSize.sm} color="#FFFFFF" />
+                  <Text style={styles.headerCtaText}>Ménage</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleDelete} accessibilityLabel="Supprimer">
+                  <Trash2 size={IconSize.md} color={colors.red} />
+                </TouchableOpacity>
+              </>
+            )
           ) : null}
         </View>
       </View>

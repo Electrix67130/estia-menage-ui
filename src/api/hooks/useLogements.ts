@@ -57,6 +57,32 @@ export function useDeleteLogement() {
       apiFetch<{ archived_menages: number }>(`/logements/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['logements'] });
+      qc.invalidateQueries({ queryKey: ['logements-archived'] });
+      qc.invalidateQueries({ queryKey: ['menages'] });
+      qc.invalidateQueries({ queryKey: ['my-upcoming-menages'] });
+    },
+  });
+}
+
+/** Logements archivés (admin) — pour les retrouver et les restaurer. */
+export function useArchivedLogements(enabled = true) {
+  return useQuery({
+    queryKey: ['logements-archived'],
+    queryFn: () =>
+      apiFetch<PaginatedResponse<Logement>>('/logements?archived=true&limit=500'),
+    enabled,
+  });
+}
+
+/** Restaure un logement archivé (cascade inverse) — admin only. */
+export function useUnarchiveLogement() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<{ unarchived_menages: number }>(`/logements/${id}/unarchive`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['logements'] });
+      qc.invalidateQueries({ queryKey: ['logements-archived'] });
       qc.invalidateQueries({ queryKey: ['menages'] });
       qc.invalidateQueries({ queryKey: ['my-upcoming-menages'] });
     },

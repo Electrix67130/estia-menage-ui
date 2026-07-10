@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Plus, Home, Bed, Bath, Toilet, Utensils, Sofa, TreePine, ListChecks } from 'lucide-react-native';
+import { Plus, Home, Bed, Bath, Toilet, Utensils, Sofa, TreePine, ListChecks, RotateCcw, Archive } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useLogements } from '@/api/hooks/useLogements';
+import { useLogements, useArchivedLogements, useUnarchiveLogement } from '@/api/hooks/useLogements';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDialog } from '@/contexts/DialogContext';
 import AppHeader from '@/components/AppHeader';
 import type { Logement } from '@/api/types';
 
@@ -16,12 +17,36 @@ export default function LogementsScreen() {
   const colors = Colors[colorScheme];
   const router = useRouter();
   const { user } = useAuth();
+  const { confirm } = useDialog();
   const isAdmin = user?.role === 'admin';
+  const [showArchived, setShowArchived] = useState(false);
   const { data, isLoading, isRefetching, refetch } = useLogements();
+  const archived = useArchivedLogements(isAdmin && showArchived);
+  const unarchive = useUnarchiveLogement();
+
+  // Actifs + (si affichés) archivés à la suite.
+  const rows: Logement[] = [
+    ...(data?.data ?? []),
+    ...(showArchived ? archived.data?.data ?? [] : []),
+  ];
+
+  const handleUnarchive = async (item: Logement) => {
+    const ok = await confirm({
+      title: 'Restaurer ce logement ?',
+      message: `« ${item.name} » et les prestations/consommables archivés avec lui seront réactivés.`,
+      confirmLabel: 'Restaurer',
+    });
+    if (ok) await unarchive.mutateAsync(item.id);
+  };
 
   const renderItem = ({ item }: { item: Logement }) => (
     <TouchableOpacity
-      style={[styles.card, Shadow.sm, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      style={[
+        styles.card,
+        Shadow.sm,
+        { backgroundColor: colors.surface, borderColor: colors.border },
+        item.archived_at ? { opacity: 0.6 } : null,
+      ]}
       onPress={() => router.push(`/logement/${item.id}`)}
       activeOpacity={0.7}
     >
@@ -97,6 +122,24 @@ export default function LogementsScreen() {
           ) : null}
         </View>
       </View>
+      {item.archived_at ? (
+        <View style={styles.archivedCol}>
+          <View style={[styles.archivedBadge, { backgroundColor: colors.itemBackground }]}>
+            <Text style={[styles.archivedBadgeText, { color: colors.text2 }]}>Archivé</Text>
+          </View>
+          {isAdmin ? (
+            <TouchableOpacity
+              style={styles.restoreBtn}
+              onPress={() => handleUnarchive(item)}
+              disabled={unarchive.isPending}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <RotateCcw size={13} color={colors.primary} />
+              <Text style={[styles.restoreText, { color: colors.primary }]}>Restaurer</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
     </TouchableOpacity>
   );
 
@@ -106,15 +149,32 @@ export default function LogementsScreen() {
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: colors.text }]}>Logements</Text>
           {isAdmin ? (
-            <TouchableOpacity
-              style={[styles.headerBtn, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}
-              onPress={() => router.push('/checklist-template' as never)}
-              accessibilityLabel="Modèles de checklist"
-              accessibilityRole="button"
-            >
-              <ListChecks size={IconSize.sm} color={colors.primary} />
-              <Text style={[styles.headerBtnText, { color: colors.text }]}>Modèles</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: Spacing.xs }}>
+              <TouchableOpacity
+                style={[
+                  styles.headerBtn,
+                  {
+                    backgroundColor: showArchived ? colors.primary + '20' : colors.itemBackground,
+                    borderColor: showArchived ? colors.primary : colors.border,
+                  },
+                ]}
+                onPress={() => setShowArchived((v) => !v)}
+                accessibilityLabel="Afficher les logements archivés"
+                accessibilityRole="button"
+              >
+                <Archive size={IconSize.sm} color={showArchived ? colors.primary : colors.text2} />
+                <Text style={[styles.headerBtnText, { color: showArchived ? colors.primary : colors.text }]}>Archivés</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.headerBtn, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}
+                onPress={() => router.push('/checklist-template' as never)}
+                accessibilityLabel="Modèles de checklist"
+                accessibilityRole="button"
+              >
+                <ListChecks size={IconSize.sm} color={colors.primary} />
+                <Text style={[styles.headerBtnText, { color: colors.text }]}>Modèles</Text>
+              </TouchableOpacity>
+            </View>
           ) : null}
         </View>
       </AppHeader>
@@ -125,7 +185,7 @@ export default function LogementsScreen() {
         </View>
       ) : (
         <FlatList
-          data={data?.data ?? []}
+          data={rows}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 100 }}
@@ -191,6 +251,11 @@ const styles = StyleSheet.create({
   statsRow: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.xs, flexWrap: 'wrap' },
   stat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statText: { fontSize: FontSize.xs, fontWeight: FontWeight.medium },
+  archivedCol: { alignItems: 'flex-end', justifyContent: 'center', gap: Spacing.xs },
+  archivedBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.pill },
+  archivedBadgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, textTransform: 'uppercase' },
+  restoreBtn: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  restoreText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   fab: {
     position: 'absolute',
     bottom: Spacing.xl + 20,

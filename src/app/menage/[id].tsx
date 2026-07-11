@@ -472,12 +472,25 @@ export default function MenageDetailScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={async () => {
-                const ok = await dialog.confirm({
-                  title: 'Supprimer ce ménage ?',
-                  message: 'Action irréversible (photos, checklist, commentaires perdus).',
-                  confirmLabel: 'Supprimer',
-                  destructive: true,
-                });
+                // Presta AUTO (sync iCal) → « Retirer » : réversible, ne
+                // réapparaîtra plus au pull ; se remet depuis le dashboard (Historique).
+                const isAuto = !!menage.external_source;
+                const ok = await dialog.confirm(
+                  isAuto
+                    ? {
+                        title: 'Retirer cette prestation ?',
+                        message:
+                          'Créée automatiquement (calendrier). Elle sera retirée et ne réapparaîtra plus, même après synchronisation. Tu pourras la remettre depuis le dashboard (Historique).',
+                        confirmLabel: 'Retirer',
+                        destructive: true,
+                      }
+                    : {
+                        title: 'Supprimer ce ménage ?',
+                        message: 'Action irréversible (photos, checklist, commentaires perdus).',
+                        confirmLabel: 'Supprimer',
+                        destructive: true,
+                      },
+                );
                 if (!ok) return;
                 try {
                   await archiveMutation.mutateAsync(menage.id);
@@ -490,7 +503,7 @@ export default function MenageDetailScreen() {
                 }
               }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              accessibilityLabel="Supprimer"
+              accessibilityLabel="Retirer ou supprimer"
             >
               <Trash2 size={IconSize.md} color={colors.red} />
             </TouchableOpacity>

@@ -5,7 +5,7 @@ import { useDialog } from '@/contexts/DialogContext';
 import Animated, { LinearTransition, FadeInLeft, FadeOutLeft, FadeInDown, FadeOutUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Plus, Trash2, X, Check, List, MapIcon, CalendarClock, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react-native';
+import { Plus, Trash2, X, Check, List, MapIcon, CalendarClock, ChevronLeft, ChevronRight, SlidersHorizontal, History } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -393,6 +393,15 @@ function AdminMenagesScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader>
         <Text style={[styles.title, { color: colors.text }]}>{t('prestation.title')}</Text>
+        {/* Historique — prestations clôturées (validées/annulées/retirées). */}
+        <TouchableOpacity
+          style={[styles.reschedBtn, { backgroundColor: colors.itemBackground }]}
+          onPress={() => router.push('/historique' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Historique"
+        >
+          <History size={IconSize.md} color={colors.mutedText} />
+        </TouchableOpacity>
         {/* Demandes de changement — actif si pending > 0, muted sinon. */}
         <TouchableOpacity
           style={[

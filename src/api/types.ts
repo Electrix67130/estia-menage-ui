@@ -291,6 +291,8 @@ export interface Menage {
   updated_at: string;
   /** Origine : null = créé manuellement, `cal_<provider>` = calendrier externe. */
   external_source?: string | null;
+  /** true = presta auto « retirée » (sync_ignored) : ne réapparaît plus au pull, peut être remise. */
+  sync_ignored?: boolean;
   /** Champs joints depuis user (prestataire) — peuplés par GET /menages et GET /menages/:id */
   prestataire_first_name?: string | null;
   prestataire_last_name?: string | null;

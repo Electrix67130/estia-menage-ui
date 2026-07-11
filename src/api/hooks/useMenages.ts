@@ -177,6 +177,15 @@ export function useDeparture() {
   });
 }
 
+/** « Remettre » une prestation auto retirée (sync_ignored) — admin. */
+export function useRestoreMenage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch<{ restored: boolean }>(`/menages/${id}/restore`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['menages'] }),
+  });
+}
+
 export function useValidateReport() {
   const qc = useQueryClient();
   return useMutation({

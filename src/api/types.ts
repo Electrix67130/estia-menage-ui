@@ -71,6 +71,7 @@ export interface MeResponse {
   last_name: string;
   phone?: string;
   avatar_url?: string;
+  avatar_thumbnail_url?: string | null;
   role: UserRole;
   company_name?: string;
   /** Entreprise propre du prestataire (indépendante de l'org). */
@@ -122,6 +123,7 @@ export interface Logement {
   notes: string | null;
   key_safe_code: string | null;
   cover_photo_url: string | null;
+  cover_photo_thumbnail_url: string | null;
   default_duration_min: number | null;
   default_client_price_ht: number | string | null;
   default_client_vat_rate: number | string | null;
@@ -142,6 +144,7 @@ export interface CreateLogementInput {
   client_id?: string;
   key_safe_code?: string;
   cover_photo_url?: string;
+  cover_photo_thumbnail_url?: string;
   default_duration_min?: number;
   default_client_price_ht?: number;
   default_client_vat_rate?: number;
@@ -297,6 +300,7 @@ export interface Menage {
   prestataire_first_name?: string | null;
   prestataire_last_name?: string | null;
   prestataire_avatar_url?: string | null;
+  prestataire_avatar_thumbnail_url?: string | null;
   /** Champs joints depuis logement */
   logement_name?: string | null;
   logement_address?: string | null;
@@ -401,6 +405,7 @@ export interface LogementMember {
   phone?: string;
   company_name?: string;
   avatar_url?: string | null;
+  avatar_thumbnail_url?: string | null;
 }
 
 export interface CreateLogementMemberInput {

@@ -52,7 +52,11 @@ import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-ha
 import SheetHandle from '@/components/SheetHandle';
 import { useQueryClient } from '@tanstack/react-query';
 import { menageHooks, useArrival, useDeparture, useUpdateDeclaration, useValidateReport, useArchiveMenage, useEligiblePrestataires, useUpdateMenage, findCachedMenage } from '@/api/hooks/useMenages';
-import { useMenagePrestataires, useSetMenagePrestataires } from '@/api/hooks/useMenagePrestataires';
+import {
+  useMenagePrestataires,
+  useSetMenagePrestataires,
+  useSetMenageReferent,
+} from '@/api/hooks/useMenagePrestataires';
 import {
   useMenageResponses,
   useOverrideMenageResponse,
@@ -121,6 +125,7 @@ export default function MenageDetailScreen() {
   const updateDeclarationMutation = useUpdateDeclaration();
   // Tous les prestataires affectés (multi-presta), pas seulement le référent.
   const assignedPrestas = useMenagePrestataires(id);
+  const setReferent = useSetMenageReferent(id);
   const departureMutation = useDeparture();
   const validateMutation = useValidateReport();
   const rescheduleMutation = useCreateRescheduleRequest();
@@ -536,33 +541,86 @@ export default function MenageDetailScreen() {
         <View style={{ flex: 1 }}>
           {(() => {
             const list = assignedPrestas.data ?? [];
-            const names = list.map(
-              (p) => [p.first_name, p.last_name].filter(Boolean).join(' ') || '—',
-            );
+            // L'admin peut désigner le référent parmi les prestas affectés (2+).
+            const canEditReferent = isAdmin && !isFinished && list.length > 1;
+
+            const handleSetReferent = (userId: string, name: string) => {
+              void (async () => {
+                const ok = await dialog.confirm({
+                  title: 'Définir comme référent ?',
+                  message: `${name} deviendra le prestataire référent de cette prestation.`,
+                  confirmLabel: 'Définir référent',
+                });
+                if (!ok) return;
+                try {
+                  await setReferent.mutateAsync(userId);
+                } catch (err) {
+                  void dialog.alert({
+                    title: 'Erreur',
+                    message: err instanceof Error ? err.message : 'Échec de la mise à jour',
+                  });
+                }
+              })();
+            };
+
             // Fallback sur le référent si la liste n'est pas encore chargée.
-            if (names.length === 0 && menage.prestataire_user_id) {
-              names.push(
-                [menage.prestataire_first_name, menage.prestataire_last_name]
-                  .filter(Boolean)
-                  .join(' ') || 'Affecté',
+            if (list.length === 0) {
+              const fallbackName = menage.prestataire_user_id
+                ? [menage.prestataire_first_name, menage.prestataire_last_name]
+                    .filter(Boolean)
+                    .join(' ') || 'Affecté'
+                : null;
+              return (
+                <>
+                  <Text style={[styles.prestataireLabel, { color: colors.text2 }]}>
+                    PRESTATAIRE
+                  </Text>
+                  {fallbackName ? (
+                    <Text style={[styles.prestataireName, { color: colors.text }]}>
+                      {fallbackName}
+                    </Text>
+                  ) : (
+                    <View style={styles.prestataireUnassignedBadge}>
+                      <Text style={styles.prestataireUnassignedText}>NON ASSIGNÉ</Text>
+                    </View>
+                  )}
+                </>
               );
             }
+
             return (
               <>
                 <Text style={[styles.prestataireLabel, { color: colors.text2 }]}>
-                  {names.length > 1 ? 'PRESTATAIRES' : 'PRESTATAIRE'}
+                  {list.length > 1 ? 'PRESTATAIRES' : 'PRESTATAIRE'}
                 </Text>
-                {names.length > 0 ? (
-                  names.map((n, i) => (
-                    <Text key={i} style={[styles.prestataireName, { color: colors.text }]}>
-                      {n}
-                    </Text>
-                  ))
-                ) : (
-                  <View style={styles.prestataireUnassignedBadge}>
-                    <Text style={styles.prestataireUnassignedText}>NON ASSIGNÉ</Text>
-                  </View>
-                )}
+                {list.map((p) => {
+                  const n = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—';
+                  return (
+                    <View key={p.id} style={styles.prestataireRow}>
+                      <Text style={[styles.prestataireName, { color: colors.text }]}>{n}</Text>
+                      {p.is_primary ? (
+                        <View
+                          style={[styles.referentBadge, { backgroundColor: colors.primary + '20' }]}
+                        >
+                          <Text style={[styles.referentBadgeText, { color: colors.primary }]}>
+                            Référent
+                          </Text>
+                        </View>
+                      ) : canEditReferent ? (
+                        <TouchableOpacity
+                          onPress={() => handleSetReferent(p.user_id, n)}
+                          disabled={setReferent.isPending}
+                          style={[styles.referentAction, { borderColor: colors.primary }]}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        >
+                          <Text style={[styles.referentActionText, { color: colors.primary }]}>
+                            Définir référent
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  );
+                })}
               </>
             );
           })()}
@@ -2133,6 +2191,25 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   prestataireName: { fontSize: FontSize.md, fontWeight: FontWeight.medium },
+  prestataireRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginTop: 2,
+  },
+  referentBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+  },
+  referentBadgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
+  referentAction: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
+  },
+  referentActionText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
   assignBtn: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,

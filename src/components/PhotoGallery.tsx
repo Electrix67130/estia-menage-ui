@@ -114,6 +114,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
             ? undefined
             : (roomIdOverride ?? logementRoomId),
           url: uploaded.url,
+          thumbnail_url: uploaded.thumbnail_url ?? undefined,
           file_size: uploaded.file_size,
           mime_type: uploaded.mime_type,
           taken_at: new Date().toISOString(),

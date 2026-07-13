@@ -52,7 +52,7 @@ export default function LogementsScreen() {
     >
       {item.cover_photo_url ? (
         <Image
-          source={{ uri: item.cover_photo_url }}
+          source={{ uri: item.cover_photo_thumbnail_url ?? item.cover_photo_url }}
           style={[styles.cover, { borderColor: colors.border }]}
         />
       ) : (

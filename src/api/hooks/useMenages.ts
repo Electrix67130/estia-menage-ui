@@ -45,6 +45,9 @@ interface ListParams extends PaginationParams {
   /** true = clôturés (valide/annule) → archives ; false = worklist active. */
   closed?: boolean;
   manager?: 'me';
+  /** 'me' = uniquement les prestations où l'utilisateur est affecté (référent OU
+   *  co-presta). Historique presta : ne voir que ce qu'il a réellement fait. */
+  assigned?: 'me';
   from?: string;
   to?: string;
 }
@@ -60,6 +63,7 @@ export function useMenages(params?: ListParams) {
   if (params?.validated !== undefined) query.set('validated', String(params.validated));
   if (params?.closed !== undefined) query.set('closed', String(params.closed));
   if (params?.manager) query.set('manager', params.manager);
+  if (params?.assigned) query.set('assigned', params.assigned);
   if (params?.from) query.set('from', params.from);
   if (params?.to) query.set('to', params.to);
   if (params?.orderBy) query.set('orderBy', params.orderBy);

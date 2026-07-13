@@ -10,6 +10,7 @@ export interface MenagePrestataire {
   last_name: string | null;
   email: string | null;
   avatar_url: string | null;
+  avatar_thumbnail_url: string | null;
   /** Premier dans la liste (par created_at) — réplique de menage.prestataire_user_id */
   is_primary: boolean;
 }
@@ -34,6 +35,23 @@ export function useSetMenagePrestataires(menageId: string) {
         method: 'PUT',
         body: { prestataire_user_ids },
       }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['menage-prestataires', menageId] });
+      qc.invalidateQueries({ queryKey: ['menages'] });
+      qc.invalidateQueries({ queryKey: ['calendar-menages'] });
+    },
+  });
+}
+
+/** Désigne un prestataire déjà affecté comme référent (`is_primary`). */
+export function useSetMenageReferent(menageId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      apiFetch<{ data: MenagePrestataire[] }>(
+        `/menages/${menageId}/prestataires/${userId}/primary`,
+        { method: 'PUT' },
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['menage-prestataires', menageId] });
       qc.invalidateQueries({ queryKey: ['menages'] });

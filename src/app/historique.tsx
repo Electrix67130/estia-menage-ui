@@ -38,7 +38,13 @@ export default function HistoriqueScreen() {
   const [filter, setFilter] = useState<HistFilter>('all');
 
   // Prestations clôturées (validé/annulé) — c'est là que vivent les retirées.
-  const { data, isLoading, isRefetching, refetch } = useMenages({ closed: true, limit: 200 });
+  // Presta : ne voir que les prestations qu'il a réellement faites (affecté),
+  // pas toutes celles des logements dont il est membre. Admin : vue complète.
+  const { data, isLoading, isRefetching, refetch } = useMenages({
+    closed: true,
+    limit: 200,
+    ...(isAdmin ? {} : { assigned: 'me' }),
+  });
   const restore = useRestoreMenage();
 
   const items = useMemo(() => {

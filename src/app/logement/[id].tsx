@@ -103,7 +103,10 @@ export default function LogementDetailScreen() {
       );
       await updateMutation.mutateAsync({
         id: logement.id,
-        body: { cover_photo_url: uploaded.url },
+        body: {
+          cover_photo_url: uploaded.url,
+          cover_photo_thumbnail_url: uploaded.thumbnail_url ?? uploaded.url,
+        },
       });
     } catch (err) {
       void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Upload impossible' });

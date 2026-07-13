@@ -121,7 +121,10 @@ export default function ProfilScreen() {
     const asset = result.assets[0];
     const optimized = await optimizeImage(asset.uri, asset.width, asset.height);
     const uploaded = await uploadFile(optimized.uri, `avatar-${user.id}.jpg`, 'image/jpeg');
-    await updateProfile.mutateAsync({ id: user.id, body: { avatar_url: uploaded.url } });
+    await updateProfile.mutateAsync({
+      id: user.id,
+      body: { avatar_url: uploaded.url, avatar_thumbnail_url: uploaded.thumbnail_url ?? uploaded.url },
+    });
   };
 
   const handleSave = async () => {
@@ -231,7 +234,10 @@ export default function ProfilScreen() {
                 <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.7}>
                   <View style={[styles.avatar, { backgroundColor: colors.primary + '20' }]}>
                     {user.avatar_url ? (
-                      <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
+                      <Image
+                        source={{ uri: user.avatar_thumbnail_url ?? user.avatar_url }}
+                        style={styles.avatarImage}
+                      />
                     ) : (
                       <Text style={[styles.avatarText, { color: colors.primary }]}>
                         {user.first_name[0]}{user.last_name[0]}

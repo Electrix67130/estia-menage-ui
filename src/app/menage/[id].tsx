@@ -87,6 +87,8 @@ import AutoScrollInput from '@/components/AutoScrollInput';
 import KeyboardAwareScroll from '@/components/KeyboardAwareScroll';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { captureGeoPhoto, uploadGeoPhoto, GeoPhotoError } from '@/lib/captureGeoPhoto';
+import { onlineManager } from '@tanstack/react-query';
+import { enqueuePointage, usePendingPointage } from '@/lib/pointageQueue';
 import ArrivalDeclarationModal, { type ArrivalDeclaration } from '@/components/ArrivalDeclarationModal';
 import { uploadFile } from '@/api/upload';
 import { optimizeImage } from '@/utils/optimizeImage';
@@ -102,6 +104,13 @@ const TABS = [
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
+
+/** "14/07 à 09:32" — heure locale, pour le bandeau « pointage en attente ». */
+function formatShortDateTime(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} à ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export default function MenageDetailScreen() {
   const colorScheme = useColorScheme();
@@ -162,7 +171,16 @@ export default function MenageDetailScreen() {
   const [proposedDate, setProposedDate] = useState('');
   const [proposedTime, setProposedTime] = useState('');
   const [rescheduleReason, setRescheduleReason] = useState('');
-  const [arrivalProof, setArrivalProof] = useState<{ lat: number; lng: number } | null>(null);
+  const [arrivalProof, setArrivalProof] = useState<{
+    lat: number;
+    lng: number;
+    localUri: string;
+    width: number;
+    height: number;
+    at: string;
+  } | null>(null);
+  // Pointage en file d'attente hors ligne pour ce ménage (null si aucun).
+  const pendingPointage = usePendingPointage(id);
   const [showEditDecl, setShowEditDecl] = useState(false);
   const [editDeclSubmitting, setEditDeclSubmitting] = useState(false);
   // Discussion en plein écran quand on tape : on replie tout le haut (header +
@@ -182,7 +200,14 @@ export default function MenageDetailScreen() {
 
   const runPointage = async (
     kind: 'arrival' | 'departure',
-    mutateAsync: (p: { id: string; photo_url: string; lat: number; lng: number }) => Promise<unknown>,
+    mutateAsync: (p: {
+      id: string;
+      photo_url: string;
+      lat: number;
+      lng: number;
+      arrived_at?: string;
+      departed_at?: string;
+    }) => Promise<unknown>,
   ) => {
     const ok = await dialog.confirm({
       title: kind === 'arrival' ? "Pointer l'arrivée ?" : 'Pointer le départ ?',
@@ -199,8 +224,35 @@ export default function MenageDetailScreen() {
     await new Promise((r) => setTimeout(r, 650));
     try {
       const { localUri, width, height, lat, lng } = await captureGeoPhoto();
+      const at = new Date().toISOString();
+      // Hors ligne : on met en file d'attente (photo copiée en local + heure
+      // réelle) et on enverra au retour du réseau. On NE tente PAS l'upload.
+      if (!onlineManager.isOnline()) {
+        await enqueuePointage({
+          menageId: id!,
+          kind,
+          isCheck: false,
+          at,
+          lat,
+          lng,
+          photo: { uri: localUri, width, height },
+        });
+        void dialog.alert({
+          title: 'Hors ligne — pointage en attente',
+          message:
+            (kind === 'arrival' ? "L'arrivée" : 'Le départ') +
+            " sera envoyé(e) automatiquement au retour du réseau, à l'heure de maintenant.",
+        });
+        return true;
+      }
       const photoUrl = await uploadGeoPhoto(localUri, width, height);
-      await mutateAsync({ id: id!, photo_url: photoUrl, lat, lng });
+      await mutateAsync({
+        id: id!,
+        photo_url: photoUrl,
+        lat,
+        lng,
+        ...(kind === 'arrival' ? { arrived_at: at } : { departed_at: at }),
+      });
       return true;
     } catch (err) {
       if (err instanceof GeoPhotoError) {
@@ -231,6 +283,21 @@ export default function MenageDetailScreen() {
         confirmLabel: 'Confirmer',
       });
       if (!ok) return;
+      if (!onlineManager.isOnline()) {
+        await enqueuePointage({
+          menageId: id!,
+          kind: 'arrival',
+          isCheck: true,
+          at: new Date().toISOString(),
+          lat: null,
+          lng: null,
+        });
+        void dialog.alert({
+          title: 'Hors ligne — pointage en attente',
+          message: "L'arrivée sera envoyée automatiquement au retour du réseau.",
+        });
+        return;
+      }
       try {
         await arrivalMutation.mutateAsync({ id: id! });
       } catch (err) {
@@ -247,14 +314,28 @@ export default function MenageDetailScreen() {
     await new Promise((r) => setTimeout(r, 650));
     try {
       const proof = await captureGeoPhoto();
-      // Upload en arrière-plan pendant que le presta remplit la déclaration.
-      // On capture succès/erreur dans le then pour éviter tout unhandled reject.
-      arrivalUploadRef.current = uploadGeoPhoto(proof.localUri, proof.width, proof.height).then(
-        (url) => ({ url }),
-        (error) => ({ error }),
-      );
+      const at = new Date().toISOString();
+      // Hors ligne : pas d'upload (il échouerait). On garde la preuve locale ;
+      // `submitArrival` mettra tout en file d'attente après la déclaration.
+      if (onlineManager.isOnline()) {
+        // Upload en arrière-plan pendant que le presta remplit la déclaration.
+        // On capture succès/erreur dans le then pour éviter tout unhandled reject.
+        arrivalUploadRef.current = uploadGeoPhoto(proof.localUri, proof.width, proof.height).then(
+          (url) => ({ url }),
+          (error) => ({ error }),
+        );
+      } else {
+        arrivalUploadRef.current = null;
+      }
       // Modale affichée immédiatement (plus d'attente de l'upload).
-      setArrivalProof({ lat: proof.lat, lng: proof.lng });
+      setArrivalProof({
+        lat: proof.lat,
+        lng: proof.lng,
+        localUri: proof.localUri,
+        width: proof.width,
+        height: proof.height,
+        at,
+      });
     } catch (err) {
       if (err instanceof GeoPhotoError) {
         if (err.code !== 'cancelled') void dialog.alert({ title: 'Pointage impossible', message: err.message });
@@ -268,6 +349,39 @@ export default function MenageDetailScreen() {
     if (!arrivalProof) return;
     setArrivalSubmitting(true);
     try {
+      // Hors ligne : on met l'arrivée + la déclaration en file d'attente (photo
+      // de preuve + photos de dégradation copiées en local, heure réelle) et on
+      // enverra tout au retour du réseau.
+      if (!onlineManager.isOnline()) {
+        await enqueuePointage({
+          menageId: id!,
+          kind: 'arrival',
+          isCheck: false,
+          at: arrivalProof.at,
+          lat: arrivalProof.lat,
+          lng: arrivalProof.lng,
+          photo: {
+            uri: arrivalProof.localUri,
+            width: arrivalProof.width,
+            height: arrivalProof.height,
+          },
+          declaration: {
+            travelerRating: decl.rating,
+            hasDegradation: decl.hasDegradation,
+            note: decl.hasDegradation ? decl.note : undefined,
+            degradationPhotos: decl.hasDegradation
+              ? decl.assets.map((a) => ({ uri: a.uri, width: a.width, height: a.height }))
+              : undefined,
+          },
+        });
+        setArrivalProof(null);
+        arrivalUploadRef.current = null;
+        void dialog.alert({
+          title: 'Hors ligne — arrivée en attente',
+          message: "L'arrivée sera envoyée automatiquement au retour du réseau, à l'heure de maintenant.",
+        });
+        return;
+      }
       // Récupère l'upload lancé en fond à la capture (souvent déjà terminé).
       const up = arrivalUploadRef.current ? await arrivalUploadRef.current : null;
       if (!up || up.error || !up.url) {
@@ -288,6 +402,7 @@ export default function MenageDetailScreen() {
         photo_url,
         lat: arrivalProof.lat,
         lng: arrivalProof.lng,
+        arrived_at: arrivalProof.at,
         traveler_rating: decl.rating,
         has_degradation: decl.hasDegradation,
         degradation_note: decl.hasDegradation ? decl.note : undefined,
@@ -336,6 +451,21 @@ export default function MenageDetailScreen() {
         confirmLabel: 'Confirmer',
       });
       if (!ok) return;
+      if (!onlineManager.isOnline()) {
+        await enqueuePointage({
+          menageId: id!,
+          kind: 'departure',
+          isCheck: true,
+          at: new Date().toISOString(),
+          lat: null,
+          lng: null,
+        });
+        void dialog.alert({
+          title: 'Hors ligne — pointage en attente',
+          message: 'Le départ sera envoyé automatiquement au retour du réseau.',
+        });
+        return;
+      }
       try {
         await departureMutation.mutateAsync({ id: id! });
       } catch (err) {
@@ -387,8 +517,10 @@ export default function MenageDetailScreen() {
 
   const date = formatDateFr(menage.date_prevue, 'weekday');
 
-  const canArrive = isPrestataire && menage.status === 'a_venir';
-  const canDepart = isPrestataire && menage.status === 'en_cours';
+  // Un pointage en attente d'envoi (hors ligne) masque les boutons : l'action
+  // est déjà « prise », on attend juste le réseau.
+  const canArrive = isPrestataire && menage.status === 'a_venir' && !pendingPointage;
+  const canDepart = isPrestataire && menage.status === 'en_cours' && !pendingPointage;
   const canValidate = isAdmin && menage.status === 'termine';
   // Demande de changement : tout presta qui voit ce ménage (la liste presta
   // filtre déjà les ménages assignés à quelqu'un d'autre, donc s'il est ici
@@ -639,6 +771,30 @@ export default function MenageDetailScreen() {
       </View>
 
       {isAdmin && !isFinished ? <ResponsesSection menageId={menage.id} colors={colors} /> : null}
+
+      {/* Pointage en attente d'envoi (hors ligne) */}
+      {pendingPointage ? (
+        <View
+          style={[
+            styles.pendingPointage,
+            {
+              backgroundColor: colors.itemBackground,
+              borderColor: pendingPointage.status === 'error' ? '#EF4444' : colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.pendingPointageTitle, { color: colors.text }]}>
+            {pendingPointage.kind === 'arrival' ? '⏳ Arrivée en attente d’envoi' : '⏳ Départ en attente d’envoi'}
+          </Text>
+          <Text style={[styles.pendingPointageSub, { color: colors.mutedText }]}>
+            {pendingPointage.status === 'error'
+              ? "L'envoi a échoué plusieurs fois. Il sera retenté au prochain retour du réseau."
+              : 'Enregistré à ' +
+                formatShortDateTime(pendingPointage.at) +
+                '. Sera envoyé automatiquement dès le retour du réseau.'}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Action buttons */}
       <View style={styles.actions}>
@@ -2197,6 +2353,16 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginTop: 2,
   },
+  pendingPointage: {
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    gap: 4,
+  },
+  pendingPointageTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold },
+  pendingPointageSub: { fontSize: FontSize.sm },
   referentBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,

@@ -120,6 +120,10 @@ export interface PointagePayload {
   photo_url?: string;
   lat?: number;
   lng?: number;
+  /** Heure réelle du pointage (ISO) — préserve l'horodatage même quand l'envoi
+   *  a été différé (file d'attente hors ligne). Absent → l'API met `now`. */
+  arrived_at?: string;
+  departed_at?: string;
 }
 
 export interface DegradationPhotoInput {
@@ -172,10 +176,10 @@ export function useUpdateDeclaration() {
 export function useDeparture() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, photo_url, lat, lng }: PointagePayload) =>
+    mutationFn: ({ id, photo_url, lat, lng, departed_at }: PointagePayload) =>
       apiFetch<Menage>(`/menages/${id}/departure`, {
         method: 'POST',
-        body: { photo_url, lat, lng },
+        body: { photo_url, lat, lng, departed_at },
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['menages'] }),
   });

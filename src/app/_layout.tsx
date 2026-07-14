@@ -15,6 +15,7 @@ import { DialogProvider } from '@/contexts/DialogContext';
 import { useRealtimeSync } from '@/hooks/useRealtimeSync';
 import { usePushRegistration } from '@/hooks/usePushRegistration';
 import { initOnlineManager } from '@/lib/network';
+import { initPointageQueue } from '@/lib/pointageQueue';
 import { persister, PERSIST_BUSTER } from '@/lib/persist';
 import OfflineBanner from '@/components/OfflineBanner';
 
@@ -49,6 +50,9 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// File d'attente des pointages hors ligne : traitée au retour du réseau.
+initPointageQueue(queryClient);
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, logout } = useAuth();

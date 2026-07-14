@@ -226,6 +226,13 @@ export default function PrestaUpcomingList() {
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => router.push(`/menage/${item.id}` as never)}
+            // Appui long sur une prestation à venir → demande de changement
+            // (la modale s'ouvre pré-remplie sur le détail).
+            onLongPress={() => {
+              if (item.status === 'a_venir') {
+                router.push(`/menage/${item.id}?reschedule=1` as never);
+              }
+            }}
             style={[
               styles.card,
               Shadow.sm,

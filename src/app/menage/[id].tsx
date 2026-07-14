@@ -117,7 +117,7 @@ export default function MenageDetailScreen() {
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, reschedule } = useLocalSearchParams<{ id: string; reschedule?: string }>();
   const queryClient = useQueryClient();
   // Fallback hors ligne : si le détail n'a jamais été fetché, on affiche
   // l'élément déjà connu de la liste en cache le temps de recharger en ligne.
@@ -181,6 +181,18 @@ export default function MenageDetailScreen() {
   } | null>(null);
   // Pointage en file d'attente hors ligne pour ce ménage (null si aucun).
   const pendingPointage = usePendingPointage(id);
+  // Ouverture auto de la modale « changement » quand on arrive depuis un appui
+  // long sur une prestation dans la liste (`?reschedule=1`).
+  const rescheduleAutoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (rescheduleAutoOpenedRef.current) return;
+    if (reschedule !== '1' || !menage) return;
+    if (user?.role !== 'prestataire' || menage.status !== 'a_venir') return;
+    rescheduleAutoOpenedRef.current = true;
+    setProposedDate(menage.date_prevue.slice(0, 10));
+    setProposedTime(menage.horaire_prevu ? menage.horaire_prevu.slice(0, 5) : '');
+    setShowRescheduleModal(true);
+  }, [reschedule, menage, user]);
   const [showEditDecl, setShowEditDecl] = useState(false);
   const [editDeclSubmitting, setEditDeclSubmitting] = useState(false);
   // Discussion en plein écran quand on tape : on replie tout le haut (header +
@@ -522,10 +534,6 @@ export default function MenageDetailScreen() {
   const canArrive = isPrestataire && menage.status === 'a_venir' && !pendingPointage;
   const canDepart = isPrestataire && menage.status === 'en_cours' && !pendingPointage;
   const canValidate = isAdmin && menage.status === 'termine';
-  // Demande de changement : tout presta qui voit ce ménage (la liste presta
-  // filtre déjà les ménages assignés à quelqu'un d'autre, donc s'il est ici
-  // c'est qu'il y a accès — référent, multi-affecté, ou membre du logement).
-  const canRequestReschedule = user?.role === 'prestataire' && menage.status === 'a_venir';
   // Un ménage terminé ou validé : on ne change plus le prestataire affecté.
   const isFinished = menage.status === 'termine' || menage.status === 'valide';
 
@@ -827,21 +835,6 @@ export default function MenageDetailScreen() {
             <Text style={[styles.actionText, { color: colors.primary }]}>
               Relevé des consommables
             </Text>
-          </TouchableOpacity>
-        ) : null}
-        {canRequestReschedule ? (
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: colors.statusEnCours }]}
-            onPress={() => {
-              // Pré-remplit le calendrier sur la date actuelle du ménage et
-              // l'heure de début, pour partir directement du créneau prévu.
-              setProposedDate(menage.date_prevue.slice(0, 10));
-              setProposedTime(menage.horaire_prevu ? menage.horaire_prevu.slice(0, 5) : '');
-              setShowRescheduleModal(true);
-            }}
-          >
-            <Clock size={IconSize.md} color="#FFFFFF" />
-            <Text style={styles.actionText}>Demander un changement</Text>
           </TouchableOpacity>
         ) : null}
         {canValidate ? (

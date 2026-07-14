@@ -48,7 +48,7 @@ function PrestataireMenagesScreen() {
         <View style={{ flex: 1 }}>
           <Text style={[styles.title, { color: colors.text }]}>{t('prestation.title')}</Text>
           <Text style={{ color: colors.mutedText, fontSize: FontSize.xs, marginTop: 2 }}>
-            Indique si tu peux faire chaque prestation.
+            Indique si tu peux faire chaque prestation. Appui long = demander un changement.
           </Text>
         </View>
       </AppHeader>

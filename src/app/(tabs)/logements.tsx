@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -29,6 +29,18 @@ export default function LogementsScreen() {
     ...(data?.data ?? []),
     ...(showArchived ? archived.data?.data ?? [] : []),
   ];
+
+  // Préchauffe le cache avec les MINIATURES de couverture (≈30 Ko) dès que la
+  // liste est chargée → affichage instantané au scroll et au retour sur l'écran.
+  // On ne précharge que les vignettes (jamais le plein écran) pour ne pas gâcher
+  // de data. Prefetch complet du cache disque : à venir avec expo-image.
+  useEffect(() => {
+    for (const l of rows) {
+      const uri = l.cover_photo_thumbnail_url ?? l.cover_photo_url;
+      if (uri) void Image.prefetch(uri).catch(() => undefined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.data, archived.data?.data, showArchived]);
 
   const handleUnarchive = async (item: Logement) => {
     const ok = await confirm({

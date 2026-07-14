@@ -5,11 +5,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  Image,
   Modal,
   Pressable,
   TextInput,
 } from 'react-native';
+import { Image } from 'expo-image';
 import Animated from 'react-native-reanimated';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useDialog } from '@/contexts/DialogContext';
@@ -261,7 +261,7 @@ export default function LogementDetailScreen() {
             activeOpacity={isAdmin ? 0.7 : 1}
           >
             {logement.cover_photo_url ? (
-              <Image source={{ uri: logement.cover_photo_url }} style={styles.coverImage} resizeMode="cover" />
+              <Image source={{ uri: logement.cover_photo_url }} style={styles.coverImage} contentFit="cover" />
             ) : (
               <View style={styles.coverPlaceholder}>
                 <Camera size={IconSize.xl} color={colors.text2} />
@@ -446,7 +446,7 @@ function RoomsSection({
                 activeOpacity={onPress ? 0.7 : 1}
               >
                 {thumb ? (
-                  <Image source={{ uri: thumb }} style={styles.roomThumb} resizeMode="cover" />
+                  <Image source={{ uri: thumb }} style={styles.roomThumb} contentFit="cover" />
                 ) : (
                   <View style={[styles.roomThumb, styles.roomThumbPlaceholder, { backgroundColor: colors.itemBackground }]}>
                     <DoorOpen size={IconSize.lg} color={colors.text2} />
@@ -652,7 +652,7 @@ function RoomEditModal({
             activeOpacity={0.7}
           >
             {photoUrl ? (
-              <Image source={{ uri: photoUrl }} style={styles.coverPreview} resizeMode="cover" />
+              <Image source={{ uri: photoUrl }} style={styles.coverPreview} contentFit="cover" />
             ) : (
               <View style={styles.coverPickerPlaceholder}>
                 <ImageIcon size={IconSize.lg} color={colors.text2} />

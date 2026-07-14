@@ -1,5 +1,6 @@
 import React, { useCallback, useState, useMemo } from 'react';
-import { View, Text, Image, TouchableOpacity, FlatList, StyleSheet, Dimensions, RefreshControl, Modal, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, Dimensions, RefreshControl, Modal, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
 import { Camera, ImagePlus, Trash2, Share2, X } from 'lucide-react-native';
 import ImageView from 'react-native-image-viewing';
 import * as ImagePicker from 'expo-image-picker';
@@ -325,7 +326,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
             accessibilityRole="image"
             accessibilityLabel="Agrandir la photo"
           >
-            <Image source={{ uri: selectedPhoto.url }} style={styles.fullImage} resizeMode="contain" />
+            <Image source={{ uri: selectedPhoto.url }} style={styles.fullImage} contentFit="contain" />
           </TouchableOpacity>
           <View style={[styles.photoInfo, { backgroundColor: colors.surface }, Shadow.md]}>
             <Text style={[styles.photoAuthor, { color: colors.text }]}>

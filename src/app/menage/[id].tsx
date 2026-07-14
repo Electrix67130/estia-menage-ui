@@ -8,7 +8,6 @@ import {
   Modal,
   TextInput,
   ScrollView,
-  Image,
   Linking,
   Switch,
   LayoutAnimation,
@@ -88,6 +87,7 @@ import KeyboardAwareScroll from '@/components/KeyboardAwareScroll';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { captureGeoPhoto, uploadGeoPhoto, GeoPhotoError } from '@/lib/captureGeoPhoto';
 import { onlineManager } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { enqueuePointage, usePendingPointage } from '@/lib/pointageQueue';
 import ArrivalDeclarationModal, { type ArrivalDeclaration } from '@/components/ArrivalDeclarationModal';
 import { uploadFile } from '@/api/upload';

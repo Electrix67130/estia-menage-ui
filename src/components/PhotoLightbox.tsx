@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
-import { Modal, View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { X } from 'lucide-react-native';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 
@@ -44,7 +45,7 @@ export default function PhotoLightbox({
           </TouchableOpacity>
         </View>
         {photoUrl ? (
-          <Image source={{ uri: photoUrl }} style={styles.image} resizeMode="contain" />
+          <Image source={{ uri: photoUrl }} style={styles.image} contentFit="contain" />
         ) : null}
         {footer ? <View style={styles.footer}>{footer}</View> : null}
       </View>

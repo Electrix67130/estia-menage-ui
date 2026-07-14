@@ -2,7 +2,7 @@
   "expo": {
     "name": "Estia Clean Connect",
     "slug": "estia-clean-connect-",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "orientation": "portrait",
     "icon": "./src/assets/images/icon.png",
     "scheme": "estia-clean-connect",

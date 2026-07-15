@@ -11,6 +11,7 @@ import {
   TextInput,
   FlatList,
   RefreshControl,
+  Switch,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
@@ -64,7 +65,11 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
   const showPrestataireFilter = user?.role === 'admin';
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
 
-  const { from, to } = useMemo(() => monthRange(cursor), [cursor]);
+  const [weekView, setWeekView] = usePersistedState<boolean>('calendar.weekView', false);
+  const { from, to } = useMemo(
+    () => (weekView ? weekRange(cursor) : monthRange(cursor)),
+    [cursor, weekView],
+  );
   const menagesQuery = useMenages({ from, to, limit: 200 });
   const { data, isLoading, isRefetching, refetch } = menagesQuery;
   const allMenages = useMemo(() => data?.data ?? [], [data]);
@@ -130,6 +135,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
 
   const byDate = useMemo(() => groupByDate(filteredMenages), [filteredMenages]);
   const days = useMemo(() => buildMonthGrid(cursor), [cursor]);
+  const weekDays = useMemo(() => buildWeekDays(cursor), [cursor]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const todayIso = isoLocal(new Date());
 
@@ -199,26 +205,35 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
 
       <View style={styles.monthNav}>
         <TouchableOpacity
-          onPress={() => setCursor(addMonths(cursor, -1))}
+          onPress={() => setCursor(weekView ? addDays(cursor, -7) : addMonths(cursor, -1))}
           hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
           style={styles.monthNavBtn}
           accessibilityRole="button"
-          accessibilityLabel="Mois précédent"
+          accessibilityLabel={weekView ? 'Semaine précédente' : 'Mois précédent'}
         >
           <ChevronLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.monthLabel, { color: colors.text }]}>
-          {formatDateFr(cursor, 'month')}
+          {weekView ? weekTitle(cursor) : formatDateFr(cursor, 'month')}
         </Text>
         <TouchableOpacity
-          onPress={() => setCursor(addMonths(cursor, 1))}
+          onPress={() => setCursor(weekView ? addDays(cursor, 7) : addMonths(cursor, 1))}
           hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
           style={styles.monthNavBtn}
           accessibilityRole="button"
-          accessibilityLabel="Mois suivant"
+          accessibilityLabel={weekView ? 'Semaine suivante' : 'Mois suivant'}
         >
           <ChevronRight size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.weekToggleRow}>
+        <Text style={[styles.weekToggleLabel, { color: colors.text2 }]}>Vue semaine (durées)</Text>
+        <Switch
+          value={weekView}
+          onValueChange={setWeekView}
+          trackColor={{ true: colors.primary }}
+        />
       </View>
 
       <ScrollView
@@ -334,6 +349,19 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         ) : null}
       </ScrollView>
 
+      {weekView ? (
+        <WeekTimelineMobile
+          weekDays={weekDays}
+          byDate={byDate}
+          colors={colors}
+          todayIso={todayIso}
+          isLoading={isLoading}
+          refreshing={isRefetching || allUsers.isRefetching}
+          onRefresh={handleRefresh}
+          onOpenMenage={(mid) => router.push(`/menage/${mid}` as never)}
+        />
+      ) : (
+      <>
       <View style={styles.weekdayRow}>
         {WEEKDAYS.map((d, i) => (
           <Text key={i} style={[styles.weekdayLabel, { color: colors.text2 }]}>
@@ -486,6 +514,8 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
           })
         )}
       </ScrollView>
+      </>
+      )}
 
       <FilterPickerSheet
         visible={showPrestataireFilter && prestataireSheetOpen}
@@ -663,6 +693,15 @@ const styles = StyleSheet.create({
   },
   monthLabel: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, textTransform: 'capitalize' },
   monthNavBtn: { padding: Spacing.xs },
+  weekToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xs,
+  },
+  weekToggleLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -917,4 +956,280 @@ function groupByDate(menages: Menage[]): Map<string, Menage[]> {
     map.set(key, arr);
   }
   return map;
+}
+
+// ---------- Vue semaine chronologique (durées) ----------
+
+const WEEKDAYS_FULL = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
+const MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(d.getDate() + n);
+  return x;
+}
+
+function weekStart(d: Date): Date {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dow = (x.getDay() + 6) % 7; // 0 = lundi
+  x.setDate(x.getDate() - dow);
+  return x;
+}
+
+function weekRange(cursor: Date): { from: string; to: string } {
+  const s = weekStart(cursor);
+  return { from: isoLocal(s), to: isoLocal(addDays(s, 6)) };
+}
+
+function buildWeekDays(cursor: Date): Date[] {
+  const s = weekStart(cursor);
+  return Array.from({ length: 7 }, (_, i) => addDays(s, i));
+}
+
+function weekTitle(cursor: Date): string {
+  const s = weekStart(cursor);
+  const e = addDays(s, 6);
+  if (s.getMonth() === e.getMonth()) {
+    return `${s.getDate()} – ${e.getDate()} ${MONTHS_FR[s.getMonth()]}`;
+  }
+  return `${s.getDate()} ${MONTHS_FR[s.getMonth()]} – ${e.getDate()} ${MONTHS_FR[e.getMonth()]}`;
+}
+
+function minutesFromHoraire(h: string): number {
+  const [hh, mm] = h.slice(0, 5).split(':').map(Number);
+  return hh * 60 + (mm || 0);
+}
+
+function fmtHm(min: number): string {
+  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+}
+
+interface LaidOut {
+  m: Menage;
+  startMin: number;
+  endMin: number;
+  lane: number;
+  lanes: number;
+}
+
+/** Positionne les ménages horodatés d'un jour en couloirs (chevauchements). */
+function layoutDayMobile(events: Menage[]): LaidOut[] {
+  const timed: LaidOut[] = events
+    .filter((e) => e.horaire_prevu)
+    .map((e) => {
+      const startMin = minutesFromHoraire(e.horaire_prevu as string);
+      const endMin = startMin + Math.max(e.duree_estimee_min ?? 60, 30);
+      return { m: e, startMin, endMin, lane: 0, lanes: 1 };
+    })
+    .sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+
+  const result: LaidOut[] = [];
+  let i = 0;
+  while (i < timed.length) {
+    let j = i;
+    let clusterEnd = timed[i].endMin;
+    const laneEnds: number[] = [];
+    const group: LaidOut[] = [];
+    while (j < timed.length && timed[j].startMin < clusterEnd) {
+      let lane = laneEnds.findIndex((end) => end <= timed[j].startMin);
+      if (lane === -1) {
+        lane = laneEnds.length;
+        laneEnds.push(timed[j].endMin);
+      } else {
+        laneEnds[lane] = timed[j].endMin;
+      }
+      timed[j].lane = lane;
+      group.push(timed[j]);
+      clusterEnd = Math.max(clusterEnd, timed[j].endMin);
+      j++;
+    }
+    for (const g of group) {
+      g.lanes = laneEnds.length;
+      result.push(g);
+    }
+    i = j;
+  }
+  return result;
+}
+
+const TL_HOUR_PX = 44;
+const TL_COL_W = 118;
+const TL_GUTTER = 36;
+const TL_HEADER_H = 46;
+const TL_CHIP_H = 18;
+const TL_UNTIMED_MAX = 2;
+
+function WeekTimelineMobile({
+  weekDays,
+  byDate,
+  colors,
+  todayIso,
+  isLoading,
+  refreshing,
+  onRefresh,
+  onOpenMenage,
+}: {
+  weekDays: Date[];
+  byDate: Map<string, Menage[]>;
+  colors: (typeof Colors)['light'];
+  todayIso: string;
+  isLoading: boolean;
+  refreshing: boolean;
+  onRefresh: () => void;
+  onOpenMenage: (id: string) => void;
+}) {
+  if (isLoading) {
+    return <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />;
+  }
+  const perDay = weekDays.map((d) => {
+    const iso = isoLocal(d);
+    const evts = byDate.get(iso) ?? [];
+    return { d, iso, timed: layoutDayMobile(evts), untimed: evts.filter((e) => !e.horaire_prevu) };
+  });
+
+  let startHour = 7;
+  let endHour = 20;
+  for (const p of perDay) {
+    for (const it of p.timed) {
+      startHour = Math.min(startHour, Math.floor(it.startMin / 60));
+      endHour = Math.max(endHour, Math.ceil(it.endMin / 60));
+    }
+  }
+  const hours: number[] = [];
+  for (let h = startHour; h <= endHour; h++) hours.push(h);
+  const bodyHeight = (endHour - startHour) * TL_HOUR_PX;
+  const maxUntimed = perDay.reduce((mx, p) => Math.max(mx, p.untimed.length), 0);
+  const untimedH =
+    maxUntimed > 0
+      ? Math.min(maxUntimed, TL_UNTIMED_MAX) * (TL_CHIP_H + 3) + (maxUntimed > TL_UNTIMED_MAX ? 12 : 0) + 4
+      : 0;
+
+  return (
+    <ScrollView
+      style={{ flex: 1 }}
+      contentContainerStyle={{ paddingBottom: 120 }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
+      }
+    >
+      <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ paddingRight: Spacing.md }}>
+        <View style={{ flexDirection: 'row' }}>
+          {/* Gouttière des heures */}
+          <View style={{ width: TL_GUTTER }}>
+            <View style={{ height: TL_HEADER_H + untimedH }} />
+            <View style={{ height: bodyHeight }}>
+              {hours.map((h, i) => (
+                <Text
+                  key={h}
+                  style={{ position: 'absolute', right: 3, top: i * TL_HOUR_PX - 6, fontSize: 9, color: colors.text2 }}
+                >
+                  {String(h).padStart(2, '0')}h
+                </Text>
+              ))}
+            </View>
+          </View>
+
+          {perDay.map((p) => {
+            const isToday = p.iso === todayIso;
+            return (
+              <View key={p.iso} style={{ width: TL_COL_W, borderLeftWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
+                {/* En-tête jour */}
+                <View style={{ height: TL_HEADER_H, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontSize: 10, color: colors.text2, textTransform: 'uppercase' }}>
+                    {WEEKDAYS_FULL[(p.d.getDay() + 6) % 7]}
+                  </Text>
+                  <View
+                    style={{
+                      marginTop: 2,
+                      width: 24,
+                      height: 24,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: isToday ? colors.primary : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: FontWeight.semibold, color: isToday ? '#fff' : colors.text }}>
+                      {p.d.getDate()}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Sans heure */}
+                {untimedH > 0 ? (
+                  <View style={{ height: untimedH, paddingHorizontal: 2, gap: 2 }}>
+                    {p.untimed.slice(0, TL_UNTIMED_MAX).map((m) => (
+                      <TouchableOpacity
+                        key={m.id}
+                        onPress={() => onOpenMenage(m.id)}
+                        style={{
+                          height: TL_CHIP_H,
+                          borderRadius: 4,
+                          paddingHorizontal: 4,
+                          justifyContent: 'center',
+                          backgroundColor: m.logement_color ?? STATUS_COLOR[m.status],
+                        }}
+                      >
+                        <Text numberOfLines={1} style={{ fontSize: 9, color: '#fff', fontWeight: FontWeight.medium }}>
+                          {m.prestataire_user_id ? menagePrestataireLabel(m) : 'Non assigné'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                    {p.untimed.length > TL_UNTIMED_MAX ? (
+                      <Text style={{ fontSize: 9, color: colors.text2 }}>+{p.untimed.length - TL_UNTIMED_MAX}</Text>
+                    ) : null}
+                  </View>
+                ) : null}
+
+                {/* Corps chronologique */}
+                <View style={{ height: bodyHeight }}>
+                  {hours.map((h, i) => (
+                    <View
+                      key={h}
+                      style={{ position: 'absolute', left: 0, right: 0, top: i * TL_HOUR_PX, height: StyleSheet.hairlineWidth, backgroundColor: colors.border }}
+                    />
+                  ))}
+                  {p.timed.map((it) => {
+                    const top = ((it.startMin - startHour * 60) / 60) * TL_HOUR_PX;
+                    const height = Math.max(((it.endMin - it.startMin) / 60) * TL_HOUR_PX, 16);
+                    const widthPct = 100 / it.lanes;
+                    const bg = it.m.logement_color ?? STATUS_COLOR[it.m.status];
+                    return (
+                      <TouchableOpacity
+                        key={it.m.id}
+                        onPress={() => onOpenMenage(it.m.id)}
+                        activeOpacity={0.8}
+                        style={{
+                          position: 'absolute',
+                          top,
+                          height,
+                          left: `${it.lane * widthPct}%`,
+                          width: `${widthPct}%`,
+                          padding: 3,
+                          borderRadius: 5,
+                          borderWidth: 1,
+                          borderColor: 'rgba(0,0,0,0.06)',
+                          backgroundColor: bg,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <Text numberOfLines={1} style={{ fontSize: 9, fontWeight: FontWeight.semibold, color: '#fff' }}>
+                          {fmtHm(it.startMin)}
+                        </Text>
+                        {height > 26 ? (
+                          <Text numberOfLines={1} style={{ fontSize: 9, color: '#fff', opacity: 0.9 }}>
+                            {it.m.prestataire_user_id ? menagePrestataireLabel(it.m) : 'Non assigné'}
+                          </Text>
+                        ) : null}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </ScrollView>
+    </ScrollView>
+  );
 }

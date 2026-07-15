@@ -88,13 +88,14 @@ import KeyboardAwareScroll from '@/components/KeyboardAwareScroll';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { captureGeoPhoto, uploadGeoPhoto, GeoPhotoError } from '@/lib/captureGeoPhoto';
 import { onlineManager } from '@tanstack/react-query';
+import { usePhotos } from '@/api/hooks/usePhotos';
 import { enqueuePointage, usePendingPointage } from '@/lib/pointageQueue';
 import ArrivalDeclarationModal, { type ArrivalDeclaration } from '@/components/ArrivalDeclarationModal';
 import { uploadFile } from '@/api/upload';
 import { optimizeImage } from '@/utils/optimizeImage';
 import { haversineMeters, formatDistance, POINTAGE_DISTANCE_WARN_M } from '@/lib/geo-distance';
 import { prestationTypeLabel, prestationTypeColorKey } from '@/api/types';
-import type { Menage, Logement, MenageStatus, UpdateMenageInput } from '@/api/types';
+import type { Menage, Logement, MenageStatus, UpdateMenageInput, Photo } from '@/api/types';
 
 const TABS = [
   { key: 'infos', label: 'Infos', icon: Info },
@@ -110,6 +111,21 @@ function formatShortDateTime(iso: string): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} à ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Grille de vignettes pour le récap de validation (dégradations / photos ménage). */
+function ReportPhotoGrid({ photos, colors }: { photos: Photo[]; colors: (typeof Colors)['light'] }) {
+  return (
+    <View style={styles.recapGrid}>
+      {photos.map((p) => (
+        <Image
+          key={p.id}
+          source={{ uri: p.thumbnail_url ?? p.url }}
+          style={[styles.recapThumb, { borderColor: colors.border }]}
+        />
+      ))}
+    </View>
+  );
 }
 
 export default function MenageDetailScreen() {
@@ -137,6 +153,8 @@ export default function MenageDetailScreen() {
   const setReferent = useSetMenageReferent(id);
   const departureMutation = useDeparture();
   const validateMutation = useValidateReport();
+  // Photos pour le récap de validation (comme le dashboard : dégradations + ménage).
+  const reportPhotos = usePhotos(id);
   const rescheduleMutation = useCreateRescheduleRequest();
   const archiveMutation = useArchiveMenage();
 
@@ -952,20 +970,97 @@ export default function MenageDetailScreen() {
             >
               <SheetHandle gesture={validateSwipe.gesture} />
               <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.sm }]}>Valider le rapport</Text>
-            <Text style={{ color: colors.text2, marginBottom: Spacing.sm }}>
-              Prix prévu : {menage.prix_prevu ?? '—'} €
-            </Text>
-            <Text style={[styles.label, { color: colors.text2 }]}>
-              Prix final (laisser vide pour garder le prix prévu)
-            </Text>
-            <TextInput
-              style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
-              value={overridePrice}
-              onChangeText={setOverridePrice}
-              placeholder={String(menage.prix_prevu ?? '')}
-              placeholderTextColor={colors.placeholder}
-              keyboardType="decimal-pad"
-            />
+            <ScrollView
+              style={{ maxHeight: 400 }}
+              contentContainerStyle={{ gap: Spacing.md, paddingBottom: Spacing.sm }}
+              showsVerticalScrollIndicator={false}
+            >
+              {(() => {
+                const all = reportPhotos.data?.data ?? [];
+                const deg = all.filter((p) => p.is_degradation);
+                const menagePhotos = all.filter((p) => !p.is_degradation);
+                const rating = menage.traveler_rating ?? null;
+                return (
+                  <View style={{ gap: Spacing.md }}>
+                    {/* Note voyageurs */}
+                    <View style={styles.recapRow}>
+                      <Text style={[styles.recapLabel, { color: colors.text2 }]}>Note voyageurs</Text>
+                      {rating != null ? (
+                        <Text style={{ color: '#F59E0B', fontWeight: FontWeight.semibold }}>
+                          {'★'.repeat(rating)}
+                          <Text style={{ color: colors.border }}>{'★'.repeat(5 - rating)}</Text>
+                          <Text style={{ color: colors.text2 }}>{`  ${rating}/5`}</Text>
+                        </Text>
+                      ) : (
+                        <Text style={{ color: colors.mutedText }}>non renseignée</Text>
+                      )}
+                    </View>
+
+                    {/* Dégradations */}
+                    <View
+                      style={[
+                        styles.recapBox,
+                        {
+                          borderColor: menage.has_degradation ? '#FCA5A5' : colors.border,
+                          backgroundColor: menage.has_degradation ? 'rgba(244,63,94,0.08)' : colors.itemBackground,
+                        },
+                      ]}
+                    >
+                      <View style={styles.recapBoxHead}>
+                        <AlertTriangle size={14} color={menage.has_degradation ? '#E11D48' : colors.text2} />
+                        <Text style={[styles.recapBoxTitle, { color: menage.has_degradation ? '#E11D48' : colors.text2 }]}>
+                          {`Dégradations${menage.has_degradation ? ` · ${deg.length}` : ''}`}
+                        </Text>
+                      </View>
+                      {menage.has_degradation ? (
+                        <>
+                          {menage.degradation_note ? (
+                            <Text style={{ color: colors.text, marginTop: 4 }}>{menage.degradation_note}</Text>
+                          ) : null}
+                          {deg.length > 0 ? (
+                            <ReportPhotoGrid photos={deg} colors={colors} />
+                          ) : (
+                            <Text style={{ color: colors.mutedText, marginTop: 4 }}>Aucune photo jointe.</Text>
+                          )}
+                        </>
+                      ) : (
+                        <Text style={{ color: '#10B981', marginTop: 4 }}>Aucune dégradation signalée.</Text>
+                      )}
+                    </View>
+
+                    {/* Photos du ménage */}
+                    <View style={[styles.recapBox, { borderColor: colors.border, backgroundColor: colors.itemBackground }]}>
+                      <Text style={[styles.recapBoxTitle, { color: colors.text2 }]}>
+                        {`Photos du ménage · ${menagePhotos.length}`}
+                      </Text>
+                      {menagePhotos.length > 0 ? (
+                        <ReportPhotoGrid photos={menagePhotos} colors={colors} />
+                      ) : (
+                        <Text style={{ color: colors.mutedText, marginTop: 4 }}>Aucune photo.</Text>
+                      )}
+                    </View>
+
+                    {/* Prix */}
+                    <View>
+                      <Text style={{ color: colors.text2, marginBottom: Spacing.sm }}>
+                        Prix prévu : {menage.prix_prevu ?? '—'} €
+                      </Text>
+                      <Text style={[styles.label, { color: colors.text2 }]}>
+                        Prix final (laisser vide pour garder le prix prévu)
+                      </Text>
+                      <TextInput
+                        style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
+                        value={overridePrice}
+                        onChangeText={setOverridePrice}
+                        placeholder={String(menage.prix_prevu ?? '')}
+                        placeholderTextColor={colors.placeholder}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                  </View>
+                );
+              })()}
+            </ScrollView>
             <TouchableOpacity
               style={[styles.submit, { backgroundColor: colors.statusValide }]}
               onPress={handleValidate}
@@ -2356,6 +2451,13 @@ const styles = StyleSheet.create({
   },
   pendingPointageTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold },
   pendingPointageSub: { fontSize: FontSize.sm },
+  recapRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm },
+  recapLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
+  recapBox: { borderWidth: 1, borderRadius: Radius.md, padding: Spacing.sm },
+  recapBoxHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  recapBoxTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, textTransform: 'uppercase', letterSpacing: 0.4 },
+  recapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs, marginTop: Spacing.sm },
+  recapThumb: { width: 72, height: 72, borderRadius: Radius.sm, borderWidth: 1 },
   referentBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,

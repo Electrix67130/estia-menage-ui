@@ -541,6 +541,8 @@ export interface Photo {
   taken_at: string;
   file_size: number | null;
   mime_type: string | null;
+  /** true = photo de dégradation (déclaration voyageurs), séparée des photos de ménage. */
+  is_degradation?: boolean | null;
   created_at: string;
   updated_at: string;
 }

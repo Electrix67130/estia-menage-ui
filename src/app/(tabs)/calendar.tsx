@@ -944,7 +944,7 @@ function groupByDate(menages: Menage[]): Map<string, Menage[]> {
 
 // ---------- Barres de séjour (grille mensuelle) ----------
 
-const SPAN_LANE_H = 18;
+const SPAN_LANE_H = 5; // barres de séjour fines (façon Calendrier Apple)
 const MAX_LANES = 3;
 const SPAN_GAP = 0.03; // retrait (fraction de journée) sur les extrémités réelles d'une barre → petit espace entre deux prestations
 
@@ -1190,9 +1190,9 @@ function MonthSpanGridMobile({
                         ({ s, g }) => laneOf.get(s.key) === lane && g.lo < dayIdx + 1 && g.hi > dayIdx,
                       );
                       if (hits.length === 0)
-                        return <View key={lane} style={{ height: SPAN_LANE_H, marginBottom: 1 }} />;
+                        return <View key={lane} style={{ height: SPAN_LANE_H, marginBottom: 2 }} />;
                       return (
-                        <View key={lane} style={{ height: SPAN_LANE_H, marginBottom: 1 }}>
+                        <View key={lane} style={{ height: SPAN_LANE_H, marginBottom: 2 }}>
                           {hits.map(({ s, g }) => {
                             const segLo = Math.max(g.lo, dayIdx);
                             const segHi = Math.min(g.hi, dayIdx + 1);
@@ -1211,10 +1211,10 @@ function MonthSpanGridMobile({
                                   left: `${(dispLo - dayIdx) * 100}%`,
                                   width: `${(dispHi - dispLo) * 100}%`,
                                   backgroundColor: s.color,
-                                  borderTopLeftRadius: roundLeft ? 4 : 0,
-                                  borderBottomLeftRadius: roundLeft ? 4 : 0,
-                                  borderTopRightRadius: roundRight ? 4 : 0,
-                                  borderBottomRightRadius: roundRight ? 4 : 0,
+                                  borderTopLeftRadius: roundLeft ? 3 : 0,
+                                  borderBottomLeftRadius: roundLeft ? 3 : 0,
+                                  borderTopRightRadius: roundRight ? 3 : 0,
+                                  borderBottomRightRadius: roundRight ? 3 : 0,
                                   borderWidth: s.needsAttention ? 1 : 0,
                                   borderColor: s.needsAttention ? '#EF4444' : 'transparent',
                                 }}

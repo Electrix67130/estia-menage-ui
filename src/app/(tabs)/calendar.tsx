@@ -138,7 +138,15 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const todayIso = isoLocal(new Date());
 
-  const selectedItems = selectedDate ? byDate.get(selectedDate) ?? [] : [];
+  // Agenda du jour : trié par heure (les sans-heure en dernier) pour une lecture
+  // chronologique — un turnover se lit check-out → ménage → check-in.
+  const selectedItems = useMemo(
+    () =>
+      (selectedDate ? byDate.get(selectedDate) ?? [] : [])
+        .slice()
+        .sort((a, b) => (a.horaire_prevu ?? '99:99').localeCompare(b.horaire_prevu ?? '99:99')),
+    [selectedDate, byDate],
+  );
   const filtersActive =
     prestataireFilter !== PRESTATAIRE_ALL ||
     logementFilter !== LOGEMENT_ALL ||
@@ -385,83 +393,75 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
           />
         }
       >
-        <Text style={[styles.detailTitle, { color: colors.text }]}>
+        <Text
+          style={[
+            styles.detailTitle,
+            { color: selectedDate && selectedDate.slice(0, 10) === todayIso ? colors.red : colors.text },
+          ]}
+        >
           {selectedDate ? formatDateFr(selectedDate.slice(0, 10), 'long') : 'Sélectionne une date'}
         </Text>
         {selectedItems.length === 0 ? (
           <Text style={[styles.empty, { color: colors.mutedText }]}>
-            {selectedDate ? 'Aucun ménage ce jour.' : ''}
+            {selectedDate ? 'Aucune prestation ce jour.' : ''}
           </Text>
         ) : (
-          selectedItems.map((m) => {
-            const unassigned = !m.prestataire_user_id;
-            const needsAttention = !!m.needs_attention;
-            return (
-              <TouchableOpacity
-                key={m.id}
-                style={[
-                  styles.itemRow,
-                  {
-                    backgroundColor: needsAttention ? colors.red + '12' : colors.surface,
-                    borderColor: needsAttention ? colors.red + '55' : colors.border,
-                  },
-                ]}
-                onPress={() => router.push(`/menage/${m.id}` as never)}
-                activeOpacity={0.7}
-              >
-                <View
+          <View style={[styles.agendaCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {selectedItems.map((m, idx) => {
+              const unassigned = !m.prestataire_user_id;
+              const needsAttention = !!m.needs_attention;
+              const typeColor = colors[prestationTypeColorKey(m.prestation_type)];
+              return (
+                <TouchableOpacity
+                  key={m.id}
                   style={[
-                    styles.statusBar,
-                    { backgroundColor: m.logement_color ?? STATUS_COLOR[m.status] },
+                    styles.agendaRow,
+                    idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+                    needsAttention && { backgroundColor: colors.red + '0F' },
                   ]}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.itemTime, { color: colors.text }]}>
-                    {m.horaire_prevu?.slice(0, 5) ?? 'Heure non précisée'}
-                    {' · '}
-                    <Text style={{ color: colors.text2 }}>{menageLogementLabel(m)}</Text>
-                  </Text>
-                  <View style={styles.itemMetaRow}>
-                    {(() => {
-                      const typeColor = colors[prestationTypeColorKey(m.prestation_type)];
-                      return (
-                        <View
-                          style={[styles.badgeType, { backgroundColor: typeColor + '20' }]}
-                          accessibilityLabel={prestationTypeLabel(m.prestation_type)}
-                        >
-                          <Text style={[styles.badgeTypeText, { color: typeColor }]}>
-                            {prestationTypeLabel(m.prestation_type)}
-                          </Text>
-                        </View>
-                      );
-                    })()}
+                  onPress={() => router.push(`/menage/${m.id}` as never)}
+                  activeOpacity={0.6}
+                >
+                  <View style={styles.agendaTime}>
+                    <Text style={[styles.agendaTimeText, { color: colors.text }]}>
+                      {m.horaire_prevu?.slice(0, 5) ?? '—'}
+                    </Text>
+                  </View>
+                  <View style={[styles.agendaStripe, { backgroundColor: typeColor }]} />
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.agendaTitleRow}>
+                      <Text style={[styles.agendaTitle, { color: colors.text }]} numberOfLines={1}>
+                        {menageLogementLabel(m)}
+                      </Text>
+                      <View
+                        style={[styles.badgeType, { backgroundColor: typeColor + '20' }]}
+                        accessibilityLabel={prestationTypeLabel(m.prestation_type)}
+                      >
+                        <Text style={[styles.badgeTypeText, { color: typeColor }]}>
+                          {prestationTypeLabel(m.prestation_type)}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.agendaSub, { color: colors.text2 }]} numberOfLines={1}>
+                      {unassigned ? 'Non assigné' : menagePrestataireLabel(m)}
+                      {' · '}
+                      {labelForStatus(m.status)}
+                    </Text>
                     {needsAttention ? (
                       <View
-                        style={[styles.badgeLate, { backgroundColor: colors.red + '20' }]}
+                        style={[styles.badgeLate, { backgroundColor: colors.red + '20', alignSelf: 'flex-start', marginTop: 4, marginRight: 0 }]}
                         accessibilityLabel="Jour passé sans pointage"
                       >
                         <AlertTriangle size={11} color={colors.red} />
                         <Text style={[styles.badgeLateText, { color: colors.red }]}>Non pointé</Text>
                       </View>
                     ) : null}
-                    {unassigned ? (
-                      <View style={styles.badgeUnassigned}>
-                        <Text style={styles.badgeUnassignedText}>NON ASSIGNÉ</Text>
-                      </View>
-                    ) : (
-                      <Text style={[styles.itemSub, { color: colors.text2 }]}>
-                        Prestataire : {menagePrestataireLabel(m)}
-                      </Text>
-                    )}
-                    <Text style={[styles.itemSub, { color: colors.mutedText }]}>
-                      {' · '}
-                      {labelForStatus(m.status)}
-                    </Text>
                   </View>
-                </View>
-              </TouchableOpacity>
-            );
-          })
+                  <ChevronRight size={16} color={colors.mutedText} />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         )}
       </ScrollView>
 
@@ -769,6 +769,25 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
     letterSpacing: 0.5,
   },
+  // Agenda du jour (style liste Calendrier Apple)
+  agendaCard: {
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  agendaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  agendaTime: { width: 52, alignItems: 'flex-end' },
+  agendaTimeText: { fontSize: FontSize.md, fontWeight: FontWeight.medium, fontVariant: ['tabular-nums'] },
+  agendaStripe: { width: 4, alignSelf: 'stretch', borderRadius: 2, marginVertical: 2 },
+  agendaTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  agendaTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, flexShrink: 1 },
+  agendaSub: { fontSize: FontSize.sm, marginTop: 1 },
 });
 
 const sheetStyles = StyleSheet.create({
@@ -811,6 +830,22 @@ const sheetStyles = StyleSheet.create({
     paddingVertical: Spacing.md,
   },
 });
+
+/**
+ * Style du numéro de jour façon Calendrier Apple :
+ * aujourd'hui = pastille rouge, jour sélectionné = pastille pleine (inversée),
+ * hors mois = grisé.
+ */
+function dayNumColors(
+  colors: (typeof Colors)['light'],
+  isToday: boolean,
+  isSelected: boolean,
+  inMonth: boolean,
+): { bg: string; fg: string; weight: (typeof FontWeight)[keyof typeof FontWeight] } {
+  if (isToday) return { bg: colors.red, fg: '#fff', weight: FontWeight.bold };
+  if (isSelected) return { bg: colors.text, fg: colors.background, weight: FontWeight.semibold };
+  return { bg: 'transparent', fg: inMonth ? colors.text : colors.mutedText, weight: FontWeight.regular };
+}
 
 function labelForStatus(s: MenageStatus): string {
   switch (s) {
@@ -1118,6 +1153,7 @@ function MonthSpanGridMobile({
               const hidden = inWeek.filter(
                 ({ s, g }) => g.lo < dayIdx + 1 && g.hi > dayIdx && (laneOf.get(s.key) ?? 0) >= MAX_LANES,
               ).length;
+              const dc = dayNumColors(colors, isToday, isSelected, cell.inMonth);
               return (
                 <TouchableOpacity
                   key={iso}
@@ -1128,7 +1164,6 @@ function MonthSpanGridMobile({
                     paddingBottom: 3,
                     borderBottomWidth: StyleSheet.hairlineWidth,
                     borderColor: colors.border,
-                    backgroundColor: isSelected ? colors.itemBackground : 'transparent',
                   }}
                 >
                   <View style={{ alignItems: 'center', paddingTop: 3 }}>
@@ -1139,16 +1174,10 @@ function MonthSpanGridMobile({
                         borderRadius: 11,
                         alignItems: 'center',
                         justifyContent: 'center',
-                        backgroundColor: isToday ? colors.primary : 'transparent',
+                        backgroundColor: dc.bg,
                       }}
                     >
-                      <Text
-                        style={{
-                          fontSize: FontSize.xs,
-                          fontWeight: isToday ? FontWeight.bold : FontWeight.regular,
-                          color: isToday ? '#fff' : cell.inMonth ? colors.text : colors.mutedText,
-                        }}
-                      >
+                      <Text style={{ fontSize: FontSize.xs, fontWeight: dc.weight, color: dc.fg }}>
                         {cell.date.getDate()}
                       </Text>
                     </View>
@@ -1232,22 +1261,11 @@ function MonthClassicGridMobile({
         const items = byDate.get(iso) ?? [];
         const isToday = iso === todayIso;
         const isSelected = iso === selectedDate;
+        const dc = dayNumColors(colors, isToday, isSelected, inMonth);
         return (
           <TouchableOpacity key={iso} style={styles.dayCell} onPress={() => onSelectDay(iso)} activeOpacity={0.6}>
-            <View
-              style={[
-                styles.dayCircle,
-                isToday && { backgroundColor: colors.primary },
-                isSelected && !isToday && { backgroundColor: colors.itemBackground },
-              ]}
-            >
-              <Text
-                style={{
-                  color: isToday ? '#fff' : inMonth ? colors.text : colors.mutedText,
-                  fontSize: FontSize.sm,
-                  fontWeight: isToday ? FontWeight.bold : FontWeight.regular,
-                }}
-              >
+            <View style={[styles.dayCircle, { backgroundColor: dc.bg }]}>
+              <Text style={{ color: dc.fg, fontSize: FontSize.sm, fontWeight: dc.weight }}>
                 {date.getDate()}
               </Text>
             </View>

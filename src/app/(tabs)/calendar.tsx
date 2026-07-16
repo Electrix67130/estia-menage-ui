@@ -396,7 +396,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         <Text
           style={[
             styles.detailTitle,
-            { color: selectedDate && selectedDate.slice(0, 10) === todayIso ? colors.red : colors.text },
+            { color: selectedDate && selectedDate.slice(0, 10) === todayIso ? colors.primary : colors.text },
           ]}
         >
           {selectedDate ? formatDateFr(selectedDate.slice(0, 10), 'long') : 'Sélectionne une date'}
@@ -842,7 +842,7 @@ function dayNumColors(
   isSelected: boolean,
   inMonth: boolean,
 ): { bg: string; fg: string; weight: (typeof FontWeight)[keyof typeof FontWeight] } {
-  if (isToday) return { bg: colors.red, fg: '#fff', weight: FontWeight.bold };
+  if (isToday) return { bg: colors.primary, fg: '#fff', weight: FontWeight.bold };
   if (isSelected) return { bg: colors.text, fg: colors.background, weight: FontWeight.semibold };
   return { bg: 'transparent', fg: inMonth ? colors.text : colors.mutedText, weight: FontWeight.regular };
 }

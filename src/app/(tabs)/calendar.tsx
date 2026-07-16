@@ -11,7 +11,6 @@ import {
   TextInput,
   FlatList,
   RefreshControl,
-  Switch,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
@@ -65,11 +64,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
   const showPrestataireFilter = user?.role === 'admin';
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
 
-  const [weekView, setWeekView] = usePersistedState<boolean>('calendar.weekView', false);
-  const { from, to } = useMemo(
-    () => (weekView ? weekRange(cursor) : monthRange(cursor)),
-    [cursor, weekView],
-  );
+  const { from, to } = useMemo(() => monthRange(cursor), [cursor]);
   const menagesQuery = useMenages({ from, to, limit: 200 });
   const { data, isLoading, isRefetching, refetch } = menagesQuery;
   const allMenages = useMemo(() => data?.data ?? [], [data]);
@@ -135,7 +130,8 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
 
   const byDate = useMemo(() => groupByDate(filteredMenages), [filteredMenages]);
   const days = useMemo(() => buildMonthGrid(cursor), [cursor]);
-  const weekDays = useMemo(() => buildWeekDays(cursor), [cursor]);
+  // Séjours = barres multi-jours (check-in → check-out), pour la grille mensuelle.
+  const spans = useMemo(() => buildSpans(filteredMenages), [filteredMenages]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const todayIso = isoLocal(new Date());
 
@@ -205,35 +201,26 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
 
       <View style={styles.monthNav}>
         <TouchableOpacity
-          onPress={() => setCursor(weekView ? addDays(cursor, -7) : addMonths(cursor, -1))}
+          onPress={() => setCursor(addMonths(cursor, -1))}
           hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
           style={styles.monthNavBtn}
           accessibilityRole="button"
-          accessibilityLabel={weekView ? 'Semaine précédente' : 'Mois précédent'}
+          accessibilityLabel="Mois précédent"
         >
           <ChevronLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.monthLabel, { color: colors.text }]}>
-          {weekView ? weekTitle(cursor) : formatDateFr(cursor, 'month')}
+          {formatDateFr(cursor, 'month')}
         </Text>
         <TouchableOpacity
-          onPress={() => setCursor(weekView ? addDays(cursor, 7) : addMonths(cursor, 1))}
+          onPress={() => setCursor(addMonths(cursor, 1))}
           hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
           style={styles.monthNavBtn}
           accessibilityRole="button"
-          accessibilityLabel={weekView ? 'Semaine suivante' : 'Mois suivant'}
+          accessibilityLabel="Mois suivant"
         >
           <ChevronRight size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
-      </View>
-
-      <View style={styles.weekToggleRow}>
-        <Text style={[styles.weekToggleLabel, { color: colors.text2 }]}>Vue semaine (durées)</Text>
-        <Switch
-          value={weekView}
-          onValueChange={setWeekView}
-          trackColor={{ true: colors.primary }}
-        />
       </View>
 
       <ScrollView
@@ -349,19 +336,6 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         ) : null}
       </ScrollView>
 
-      {weekView ? (
-        <WeekTimelineMobile
-          weekDays={weekDays}
-          byDate={byDate}
-          colors={colors}
-          todayIso={todayIso}
-          isLoading={isLoading}
-          refreshing={isRefetching || allUsers.isRefetching}
-          onRefresh={handleRefresh}
-          onOpenMenage={(mid) => router.push(`/menage/${mid}` as never)}
-        />
-      ) : (
-      <>
       <View style={styles.weekdayRow}>
         {WEEKDAYS.map((d, i) => (
           <Text key={i} style={[styles.weekdayLabel, { color: colors.text2 }]}>
@@ -373,55 +347,14 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
       {isLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />
       ) : (
-        <View style={styles.grid}>
-          {days.map(({ date, inMonth }) => {
-            const iso = isoLocal(date);
-            const items = byDate.get(iso) ?? [];
-            const isToday = iso === todayIso;
-            const isSelected = iso === selectedDate;
-            return (
-              <TouchableOpacity
-                key={iso}
-                style={styles.dayCell}
-                onPress={() => setSelectedDate(iso)}
-                activeOpacity={0.6}
-              >
-                <View
-                  style={[
-                    styles.dayCircle,
-                    isToday && { backgroundColor: colors.primary },
-                    isSelected && !isToday && { backgroundColor: colors.itemBackground },
-                  ]}
-                >
-                  <Text
-                    style={{
-                      color: isToday
-                        ? '#fff'
-                        : inMonth
-                          ? colors.text
-                          : colors.mutedText,
-                      fontSize: FontSize.sm,
-                      fontWeight: isToday ? FontWeight.bold : FontWeight.regular,
-                    }}
-                  >
-                    {date.getDate()}
-                  </Text>
-                </View>
-                <View style={styles.dotsRow}>
-                  {items.slice(0, 3).map((m) => (
-                    <View
-                      key={m.id}
-                      style={[
-                        styles.dot,
-                        { backgroundColor: m.logement_color ?? STATUS_COLOR[m.status] },
-                      ]}
-                    />
-                  ))}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        <MonthSpanGridMobile
+          days={days}
+          spans={spans}
+          colors={colors}
+          todayIso={todayIso}
+          selectedDate={selectedDate}
+          onSelectDay={setSelectedDate}
+        />
       )}
 
       <ScrollView
@@ -514,8 +447,6 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
           })
         )}
       </ScrollView>
-      </>
-      )}
 
       <FilterPickerSheet
         visible={showPrestataireFilter && prestataireSheetOpen}
@@ -958,10 +889,21 @@ function groupByDate(menages: Menage[]): Map<string, Menage[]> {
   return map;
 }
 
-// ---------- Vue semaine chronologique (durées) ----------
 
-const WEEKDAYS_FULL = ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim'];
-const MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+// ---------- Barres de séjour (grille mensuelle) ----------
+
+const SPAN_LANE_H = 18;
+const MAX_LANES = 3;
+
+interface Span {
+  key: string;
+  startIso: string;
+  endIso: string;
+  color: string;
+  isStay: boolean;
+  needsAttention: boolean;
+  hasCheckIn: boolean;
+}
 
 function addDays(d: Date, n: number): Date {
   const x = new Date(d);
@@ -969,267 +911,210 @@ function addDays(d: Date, n: number): Date {
   return x;
 }
 
-function weekStart(d: Date): Date {
-  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const dow = (x.getDay() + 6) % 7; // 0 = lundi
-  x.setDate(x.getDate() - dow);
-  return x;
+function dayIndex(iso: string): number {
+  return Math.round(new Date(`${iso}T00:00:00Z`).getTime() / 86400000);
 }
 
-function weekRange(cursor: Date): { from: string; to: string } {
-  const s = weekStart(cursor);
-  return { from: isoLocal(s), to: isoLocal(addDays(s, 6)) };
-}
-
-function buildWeekDays(cursor: Date): Date[] {
-  const s = weekStart(cursor);
-  return Array.from({ length: 7 }, (_, i) => addDays(s, i));
-}
-
-function weekTitle(cursor: Date): string {
-  const s = weekStart(cursor);
-  const e = addDays(s, 6);
-  if (s.getMonth() === e.getMonth()) {
-    return `${s.getDate()} – ${e.getDate()} ${MONTHS_FR[s.getMonth()]}`;
-  }
-  return `${s.getDate()} ${MONTHS_FR[s.getMonth()]} – ${e.getDate()} ${MONTHS_FR[e.getMonth()]}`;
-}
-
-function minutesFromHoraire(h: string): number {
-  const [hh, mm] = h.slice(0, 5).split(':').map(Number);
-  return hh * 60 + (mm || 0);
-}
-
-function fmtHm(min: number): string {
-  return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
-}
-
-interface LaidOut {
-  m: Menage;
-  startMin: number;
-  endMin: number;
-  lane: number;
-  lanes: number;
-}
-
-/** Positionne les ménages horodatés d'un jour en couloirs (chevauchements). */
-function layoutDayMobile(events: Menage[]): LaidOut[] {
-  const timed: LaidOut[] = events
-    .filter((e) => e.horaire_prevu)
-    .map((e) => {
-      const startMin = minutesFromHoraire(e.horaire_prevu as string);
-      const endMin = startMin + Math.max(e.duree_estimee_min ?? 60, 30);
-      return { m: e, startMin, endMin, lane: 0, lanes: 1 };
-    })
-    .sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
-
-  const result: LaidOut[] = [];
-  let i = 0;
-  while (i < timed.length) {
-    let j = i;
-    let clusterEnd = timed[i].endMin;
-    const laneEnds: number[] = [];
-    const group: LaidOut[] = [];
-    while (j < timed.length && timed[j].startMin < clusterEnd) {
-      let lane = laneEnds.findIndex((end) => end <= timed[j].startMin);
-      if (lane === -1) {
-        lane = laneEnds.length;
-        laneEnds.push(timed[j].endMin);
-      } else {
-        laneEnds[lane] = timed[j].endMin;
-      }
-      timed[j].lane = lane;
-      group.push(timed[j]);
-      clusterEnd = Math.max(clusterEnd, timed[j].endMin);
-      j++;
+/**
+ * Regroupe ménage / check-in / check-out d'une même réservation (external_event_uid)
+ * en un séjour ; les ménages manuels (sans uid) deviennent des événements 1 jour.
+ */
+function buildSpans(menages: Menage[]): Span[] {
+  const groups = new Map<string, Menage[]>();
+  const singles: Menage[] = [];
+  for (const m of menages) {
+    if (m.external_event_uid) {
+      const arr = groups.get(m.external_event_uid) ?? [];
+      arr.push(m);
+      groups.set(m.external_event_uid, arr);
+    } else {
+      singles.push(m);
     }
-    for (const g of group) {
-      g.lanes = laneEnds.length;
-      result.push(g);
-    }
-    i = j;
   }
-  return result;
+
+  const spans: Span[] = [];
+  for (const rows of groups.values()) {
+    const menage = rows.find((r) => r.prestation_type === 'menage');
+    const checkIn = rows.find((r) => r.prestation_type === 'check_in');
+    const checkOut = rows.find((r) => r.prestation_type === 'check_out');
+    const anchor = menage ?? checkOut ?? checkIn ?? rows[0];
+    const endIso = (checkOut ?? menage ?? anchor).date_prevue.slice(0, 10);
+    let startIso: string;
+    if (checkIn) startIso = checkIn.date_prevue.slice(0, 10);
+    else if (menage?.stay_nights) startIso = isoLocal(addDays(new Date(`${endIso}T00:00:00`), -menage.stay_nights));
+    else startIso = endIso;
+    spans.push({
+      key: anchor.id,
+      startIso,
+      endIso,
+      color: anchor.logement_color ?? STATUS_COLOR[anchor.status],
+      isStay: startIso < endIso,
+      needsAttention: rows.some((r) => !!r.needs_attention),
+      hasCheckIn: !!checkIn,
+    });
+  }
+
+  for (const m of singles) {
+    const endIso = m.date_prevue.slice(0, 10);
+    const startIso = m.stay_nights
+      ? isoLocal(addDays(new Date(`${endIso}T00:00:00`), -m.stay_nights))
+      : endIso;
+    spans.push({
+      key: m.id,
+      startIso,
+      endIso,
+      color: m.logement_color ?? STATUS_COLOR[m.status],
+      isStay: startIso < endIso,
+      needsAttention: !!m.needs_attention,
+      hasCheckIn: false,
+    });
+  }
+  return spans.sort((a, b) => a.startIso.localeCompare(b.startIso) || a.endIso.localeCompare(b.endIso));
 }
 
-const TL_HOUR_PX = 44;
-const TL_COL_W = 118;
-const TL_GUTTER = 36;
-const TL_HEADER_H = 46;
-const TL_CHIP_H = 18;
-const TL_UNTIMED_MAX = 2;
-
-function WeekTimelineMobile({
-  weekDays,
-  byDate,
+/**
+ * Grille mensuelle : chaque séjour = une barre colorée s'étendant du check-in au
+ * check-out. Demi-journées aux extrémités (turnover côte à côte) ; un ménage 1
+ * jour se scinde aussi s'il partage sa date avec un check-in. Tap une case →
+ * sélectionne le jour (le détail s'affiche dessous).
+ */
+function MonthSpanGridMobile({
+  days,
+  spans,
   colors,
   todayIso,
-  isLoading,
-  refreshing,
-  onRefresh,
-  onOpenMenage,
+  selectedDate,
+  onSelectDay,
 }: {
-  weekDays: Date[];
-  byDate: Map<string, Menage[]>;
+  days: { date: Date; inMonth: boolean }[];
+  spans: Span[];
   colors: (typeof Colors)['light'];
   todayIso: string;
-  isLoading: boolean;
-  refreshing: boolean;
-  onRefresh: () => void;
-  onOpenMenage: (id: string) => void;
+  selectedDate: string | null;
+  onSelectDay: (iso: string) => void;
 }) {
-  if (isLoading) {
-    return <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />;
-  }
-  const perDay = weekDays.map((d) => {
-    const iso = isoLocal(d);
-    const evts = byDate.get(iso) ?? [];
-    return { d, iso, timed: layoutDayMobile(evts), untimed: evts.filter((e) => !e.horaire_prevu) };
-  });
+  const weeks: { date: Date; inMonth: boolean }[][] = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
 
-  let startHour = 7;
-  let endHour = 20;
-  for (const p of perDay) {
-    for (const it of p.timed) {
-      startHour = Math.min(startHour, Math.floor(it.startMin / 60));
-      endHour = Math.max(endHour, Math.ceil(it.endMin / 60));
-    }
-  }
-  const hours: number[] = [];
-  for (let h = startHour; h <= endHour; h++) hours.push(h);
-  const bodyHeight = (endHour - startHour) * TL_HOUR_PX;
-  const maxUntimed = perDay.reduce((mx, p) => Math.max(mx, p.untimed.length), 0);
-  const untimedH =
-    maxUntimed > 0
-      ? Math.min(maxUntimed, TL_UNTIMED_MAX) * (TL_CHIP_H + 3) + (maxUntimed > TL_UNTIMED_MAX ? 12 : 0) + 4
-      : 0;
+  const checkInDays = new Set<number>();
+  for (const s of spans) if (s.hasCheckIn) checkInDays.add(dayIndex(s.startIso));
+
+  const geom = (s: Span) => {
+    const si = dayIndex(s.startIso);
+    const ei = dayIndex(s.endIso);
+    if (s.isStay) return { si, ei, lo: si + 0.5, hi: ei + 0.5 };
+    const split = checkInDays.has(si);
+    return { si, ei, lo: si, hi: split ? si + 0.5 : si + 1 };
+  };
 
   return (
-    <ScrollView
-      style={{ flex: 1 }}
-      contentContainerStyle={{ paddingBottom: 120 }}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />
-      }
-    >
-      <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ paddingRight: Spacing.md }}>
-        <View style={{ flexDirection: 'row' }}>
-          {/* Gouttière des heures */}
-          <View style={{ width: TL_GUTTER }}>
-            <View style={{ height: TL_HEADER_H + untimedH }} />
-            <View style={{ height: bodyHeight }}>
-              {hours.map((h, i) => (
-                <Text
-                  key={h}
-                  style={{ position: 'absolute', right: 3, top: i * TL_HOUR_PX - 6, fontSize: 9, color: colors.text2 }}
+    <View>
+      {weeks.map((week, wi) => {
+        const w0 = dayIndex(isoLocal(week[0].date));
+        const w6 = w0 + 6;
+        const inWeek = spans
+          .map((s) => ({ s, g: geom(s) }))
+          .filter(({ g }) => g.hi > w0 && g.lo < w6 + 1);
+        const laneHi: number[] = [];
+        const laneOf = new Map<string, number>();
+        for (const { s, g } of inWeek) {
+          let lane = laneHi.findIndex((hi) => hi <= g.lo);
+          if (lane === -1) {
+            lane = laneHi.length;
+            laneHi.push(0);
+          }
+          laneHi[lane] = g.hi;
+          laneOf.set(s.key, lane);
+        }
+        const laneCount = Math.min(laneHi.length, MAX_LANES);
+
+        return (
+          <View key={wi} style={{ flexDirection: 'row' }}>
+            {week.map((cell, di) => {
+              const dayIdx = w0 + di;
+              const iso = isoLocal(cell.date);
+              const isToday = iso === todayIso;
+              const isSelected = iso === selectedDate;
+              const hidden = inWeek.filter(
+                ({ s, g }) => g.lo < dayIdx + 1 && g.hi > dayIdx && (laneOf.get(s.key) ?? 0) >= MAX_LANES,
+              ).length;
+              return (
+                <TouchableOpacity
+                  key={iso}
+                  activeOpacity={0.6}
+                  onPress={() => onSelectDay(iso)}
+                  style={{
+                    flex: 1,
+                    paddingBottom: 3,
+                    borderBottomWidth: StyleSheet.hairlineWidth,
+                    borderColor: colors.border,
+                    backgroundColor: isSelected ? colors.itemBackground : 'transparent',
+                  }}
                 >
-                  {String(h).padStart(2, '0')}h
-                </Text>
-              ))}
-            </View>
-          </View>
-
-          {perDay.map((p) => {
-            const isToday = p.iso === todayIso;
-            return (
-              <View key={p.iso} style={{ width: TL_COL_W, borderLeftWidth: StyleSheet.hairlineWidth, borderColor: colors.border }}>
-                {/* En-tête jour */}
-                <View style={{ height: TL_HEADER_H, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ fontSize: 10, color: colors.text2, textTransform: 'uppercase' }}>
-                    {WEEKDAYS_FULL[(p.d.getDay() + 6) % 7]}
-                  </Text>
-                  <View
-                    style={{
-                      marginTop: 2,
-                      width: 24,
-                      height: 24,
-                      borderRadius: 12,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: isToday ? colors.primary : 'transparent',
-                    }}
-                  >
-                    <Text style={{ fontSize: 12, fontWeight: FontWeight.semibold, color: isToday ? '#fff' : colors.text }}>
-                      {p.d.getDate()}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Sans heure */}
-                {untimedH > 0 ? (
-                  <View style={{ height: untimedH, paddingHorizontal: 2, gap: 2 }}>
-                    {p.untimed.slice(0, TL_UNTIMED_MAX).map((m) => (
-                      <TouchableOpacity
-                        key={m.id}
-                        onPress={() => onOpenMenage(m.id)}
+                  <View style={{ alignItems: 'center', paddingTop: 3 }}>
+                    <View
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: isToday ? colors.primary : 'transparent',
+                      }}
+                    >
+                      <Text
                         style={{
-                          height: TL_CHIP_H,
-                          borderRadius: 4,
-                          paddingHorizontal: 4,
-                          justifyContent: 'center',
-                          backgroundColor: m.logement_color ?? STATUS_COLOR[m.status],
+                          fontSize: FontSize.xs,
+                          fontWeight: isToday ? FontWeight.bold : FontWeight.regular,
+                          color: isToday ? '#fff' : cell.inMonth ? colors.text : colors.mutedText,
                         }}
                       >
-                        <Text numberOfLines={1} style={{ fontSize: 9, color: '#fff', fontWeight: FontWeight.medium }}>
-                          {m.prestataire_user_id ? menagePrestataireLabel(m) : 'Non assigné'}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                    {p.untimed.length > TL_UNTIMED_MAX ? (
-                      <Text style={{ fontSize: 9, color: colors.text2 }}>+{p.untimed.length - TL_UNTIMED_MAX}</Text>
+                        {cell.date.getDate()}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{ marginTop: 2 }}>
+                    {Array.from({ length: laneCount }).map((_, lane) => {
+                      const hit = inWeek.find(
+                        ({ s, g }) => laneOf.get(s.key) === lane && g.lo < dayIdx + 1 && g.hi > dayIdx,
+                      );
+                      if (!hit) return <View key={lane} style={{ height: SPAN_LANE_H, marginBottom: 1 }} />;
+                      const { s, g } = hit;
+                      const segLo = Math.max(g.lo, dayIdx);
+                      const segHi = Math.min(g.hi, dayIdx + 1);
+                      const roundLeft = segLo === g.lo;
+                      const roundRight = segHi === g.hi;
+                      return (
+                        <View key={lane} style={{ height: SPAN_LANE_H, marginBottom: 1 }}>
+                          <View
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              bottom: 0,
+                              left: `${(segLo - dayIdx) * 100}%`,
+                              width: `${(segHi - segLo) * 100}%`,
+                              backgroundColor: s.color,
+                              borderTopLeftRadius: roundLeft ? 4 : 0,
+                              borderBottomLeftRadius: roundLeft ? 4 : 0,
+                              borderTopRightRadius: roundRight ? 4 : 0,
+                              borderBottomRightRadius: roundRight ? 4 : 0,
+                              borderWidth: s.needsAttention ? 1 : 0,
+                              borderColor: s.needsAttention ? '#EF4444' : 'transparent',
+                            }}
+                          />
+                        </View>
+                      );
+                    })}
+                    {hidden > 0 ? (
+                      <Text style={{ fontSize: 8, color: colors.mutedText, textAlign: 'center' }}>+{hidden}</Text>
                     ) : null}
                   </View>
-                ) : null}
-
-                {/* Corps chronologique */}
-                <View style={{ height: bodyHeight }}>
-                  {hours.map((h, i) => (
-                    <View
-                      key={h}
-                      style={{ position: 'absolute', left: 0, right: 0, top: i * TL_HOUR_PX, height: StyleSheet.hairlineWidth, backgroundColor: colors.border }}
-                    />
-                  ))}
-                  {p.timed.map((it) => {
-                    const top = ((it.startMin - startHour * 60) / 60) * TL_HOUR_PX;
-                    const height = Math.max(((it.endMin - it.startMin) / 60) * TL_HOUR_PX, 16);
-                    const widthPct = 100 / it.lanes;
-                    const bg = it.m.logement_color ?? STATUS_COLOR[it.m.status];
-                    return (
-                      <TouchableOpacity
-                        key={it.m.id}
-                        onPress={() => onOpenMenage(it.m.id)}
-                        activeOpacity={0.8}
-                        style={{
-                          position: 'absolute',
-                          top,
-                          height,
-                          left: `${it.lane * widthPct}%`,
-                          width: `${widthPct}%`,
-                          padding: 3,
-                          borderRadius: 5,
-                          borderWidth: 1,
-                          borderColor: 'rgba(0,0,0,0.06)',
-                          backgroundColor: bg,
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <Text numberOfLines={1} style={{ fontSize: 9, fontWeight: FontWeight.semibold, color: '#fff' }}>
-                          {fmtHm(it.startMin)}
-                        </Text>
-                        {height > 26 ? (
-                          <Text numberOfLines={1} style={{ fontSize: 9, color: '#fff', opacity: 0.9 }}>
-                            {it.m.prestataire_user_id ? menagePrestataireLabel(it.m) : 'Non assigné'}
-                          </Text>
-                        ) : null}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      </ScrollView>
-    </ScrollView>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
+      })}
+    </View>
   );
 }

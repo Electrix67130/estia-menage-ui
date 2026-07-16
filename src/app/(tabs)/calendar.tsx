@@ -1152,33 +1152,40 @@ function MonthSpanGridMobile({
                   </View>
                   <View style={{ marginTop: 2 }}>
                     {Array.from({ length: laneCount }).map((_, lane) => {
-                      const hit = inWeek.find(
+                      // Toutes les barres du couloir touchant ce jour : un turnover en
+                      // pose deux (départ le matin + arrivée l'après-midi) → filter, pas find.
+                      const hits = inWeek.filter(
                         ({ s, g }) => laneOf.get(s.key) === lane && g.lo < dayIdx + 1 && g.hi > dayIdx,
                       );
-                      if (!hit) return <View key={lane} style={{ height: SPAN_LANE_H, marginBottom: 1 }} />;
-                      const { s, g } = hit;
-                      const segLo = Math.max(g.lo, dayIdx);
-                      const segHi = Math.min(g.hi, dayIdx + 1);
-                      const roundLeft = segLo === g.lo;
-                      const roundRight = segHi === g.hi;
+                      if (hits.length === 0)
+                        return <View key={lane} style={{ height: SPAN_LANE_H, marginBottom: 1 }} />;
                       return (
                         <View key={lane} style={{ height: SPAN_LANE_H, marginBottom: 1 }}>
-                          <View
-                            style={{
-                              position: 'absolute',
-                              top: 0,
-                              bottom: 0,
-                              left: `${(segLo - dayIdx) * 100}%`,
-                              width: `${(segHi - segLo) * 100}%`,
-                              backgroundColor: s.color,
-                              borderTopLeftRadius: roundLeft ? 4 : 0,
-                              borderBottomLeftRadius: roundLeft ? 4 : 0,
-                              borderTopRightRadius: roundRight ? 4 : 0,
-                              borderBottomRightRadius: roundRight ? 4 : 0,
-                              borderWidth: s.needsAttention ? 1 : 0,
-                              borderColor: s.needsAttention ? '#EF4444' : 'transparent',
-                            }}
-                          />
+                          {hits.map(({ s, g }) => {
+                            const segLo = Math.max(g.lo, dayIdx);
+                            const segHi = Math.min(g.hi, dayIdx + 1);
+                            const roundLeft = segLo === g.lo;
+                            const roundRight = segHi === g.hi;
+                            return (
+                              <View
+                                key={s.key}
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  bottom: 0,
+                                  left: `${(segLo - dayIdx) * 100}%`,
+                                  width: `${(segHi - segLo) * 100}%`,
+                                  backgroundColor: s.color,
+                                  borderTopLeftRadius: roundLeft ? 4 : 0,
+                                  borderBottomLeftRadius: roundLeft ? 4 : 0,
+                                  borderTopRightRadius: roundRight ? 4 : 0,
+                                  borderBottomRightRadius: roundRight ? 4 : 0,
+                                  borderWidth: s.needsAttention ? 1 : 0,
+                                  borderColor: s.needsAttention ? '#EF4444' : 'transparent',
+                                }}
+                              />
+                            );
+                          })}
                         </View>
                       );
                     })}

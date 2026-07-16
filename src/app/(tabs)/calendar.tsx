@@ -1083,7 +1083,9 @@ function MonthSpanGridMobile({
   };
 
   return (
-    <View>
+    // Marge horizontale = en-tête des jours / vue classique → les barres ne
+    // touchent plus les bords de l'écran (fini l'effet « ça sort à gauche/droite »).
+    <View style={{ paddingHorizontal: Spacing.sm }}>
       {weeks.map((week, wi) => {
         const w0 = dayIndex(isoLocal(week[0].date));
         const w6 = w0 + 6;

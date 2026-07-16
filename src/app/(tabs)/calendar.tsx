@@ -11,7 +11,6 @@ import {
   TextInput,
   FlatList,
   RefreshControl,
-  Switch,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
@@ -44,6 +43,14 @@ const PRESTATAIRE_ALL = '';
 const PRESTATAIRE_UNASSIGNED = '__unassigned__';
 const LOGEMENT_ALL = '';
 const TYPE_ALL = '';
+
+/** Vues du calendrier : mois en barres de séjour, mois en pastilles, ou liste agenda. */
+type CalendarView = 'sejours' | 'pastilles' | 'planning';
+const VIEW_SEGMENTS: { id: CalendarView; label: string }[] = [
+  { id: 'sejours', label: 'Séjours' },
+  { id: 'pastilles', label: 'Pastilles' },
+  { id: 'planning', label: 'Planning' },
+];
 
 interface CalendarScreenProps {
   /**
@@ -133,10 +140,25 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
   const days = useMemo(() => buildMonthGrid(cursor), [cursor]);
   // Séjours = barres multi-jours (check-in → check-out), pour la grille mensuelle.
   const spans = useMemo(() => buildSpans(filteredMenages), [filteredMenages]);
-  // Vue « séjours » (barres) vs vue classique (pastilles). Classique par défaut.
-  const [spanView, setSpanView] = usePersistedState<boolean>('calendar.spanView', false);
+  // Vue : grille mois en barres de séjour, grille mois en pastilles, ou liste agenda (Planning).
+  const [viewMode, setViewMode] = usePersistedState<CalendarView>('calendar.viewMode', 'sejours');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const todayIso = isoLocal(new Date());
+
+  // Planning (liste agenda) : tous les jours du mois qui ont des prestations,
+  // triés chronologiquement, chaque jour trié par heure.
+  const planningDays = useMemo(
+    () =>
+      Array.from(byDate.entries())
+        .map(([date, items]) => ({
+          date,
+          items: items
+            .slice()
+            .sort((a, b) => (a.horaire_prevu ?? '99:99').localeCompare(b.horaire_prevu ?? '99:99')),
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+    [byDate],
+  );
 
   // Agenda du jour : trié par heure (les sans-heure en dernier) pour une lecture
   // chronologique — un turnover se lit check-out → ménage → check-in.
@@ -147,6 +169,70 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         .sort((a, b) => (a.horaire_prevu ?? '99:99').localeCompare(b.horaire_prevu ?? '99:99')),
     [selectedDate, byDate],
   );
+  // Carte agenda (style liste Calendrier Apple) — réutilisée pour le détail du
+  // jour et pour la vue Planning.
+  const renderAgendaCard = (items: Menage[]) => (
+    <View style={[styles.agendaCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {items.map((m, idx) => {
+        const unassigned = !m.prestataire_user_id;
+        const needsAttention = !!m.needs_attention;
+        const typeColor = colors[prestationTypeColorKey(m.prestation_type)];
+        return (
+          <TouchableOpacity
+            key={m.id}
+            style={[
+              styles.agendaRow,
+              idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
+              needsAttention && { backgroundColor: colors.red + '0F' },
+            ]}
+            onPress={() => router.push(`/menage/${m.id}` as never)}
+            activeOpacity={0.6}
+          >
+            <View style={styles.agendaTime}>
+              <Text style={[styles.agendaTimeText, { color: colors.text }]}>
+                {m.horaire_prevu?.slice(0, 5) ?? '—'}
+              </Text>
+            </View>
+            <View style={[styles.agendaStripe, { backgroundColor: typeColor }]} />
+            <View style={{ flex: 1 }}>
+              <View style={styles.agendaTitleRow}>
+                <Text style={[styles.agendaTitle, { color: colors.text }]} numberOfLines={1}>
+                  {menageLogementLabel(m)}
+                </Text>
+                <View
+                  style={[styles.badgeType, { backgroundColor: typeColor + '20' }]}
+                  accessibilityLabel={prestationTypeLabel(m.prestation_type)}
+                >
+                  <Text style={[styles.badgeTypeText, { color: typeColor }]}>
+                    {prestationTypeLabel(m.prestation_type)}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.agendaSub, { color: colors.text2 }]} numberOfLines={1}>
+                {unassigned ? 'Non assigné' : menagePrestataireLabel(m)}
+                {' · '}
+                {labelForStatus(m.status)}
+              </Text>
+              {needsAttention ? (
+                <View
+                  style={[
+                    styles.badgeLate,
+                    { backgroundColor: colors.red + '20', alignSelf: 'flex-start', marginTop: 4, marginRight: 0 },
+                  ]}
+                  accessibilityLabel="Jour passé sans pointage"
+                >
+                  <AlertTriangle size={11} color={colors.red} />
+                  <Text style={[styles.badgeLateText, { color: colors.red }]}>Non pointé</Text>
+                </View>
+              ) : null}
+            </View>
+            <ChevronRight size={16} color={colors.mutedText} />
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
   const filtersActive =
     prestataireFilter !== PRESTATAIRE_ALL ||
     logementFilter !== LOGEMENT_ALL ||
@@ -234,9 +320,29 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         </TouchableOpacity>
       </View>
 
-      <View style={styles.weekToggleRow}>
-        <Text style={[styles.weekToggleLabel, { color: colors.text2 }]}>Vue séjours</Text>
-        <Switch value={spanView} onValueChange={setSpanView} trackColor={{ true: colors.primary }} />
+      <View style={[styles.segmented, { backgroundColor: colors.itemBackground }]}>
+        {VIEW_SEGMENTS.map((seg) => {
+          const active = viewMode === seg.id;
+          return (
+            <TouchableOpacity
+              key={seg.id}
+              style={[styles.segment, active && [styles.segmentActive, { backgroundColor: colors.surface }]]}
+              onPress={() => setViewMode(seg.id)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`Vue ${seg.label}`}
+            >
+              <Text
+                style={[
+                  styles.segmentText,
+                  { color: active ? colors.text : colors.text2, fontWeight: active ? FontWeight.semibold : FontWeight.medium },
+                ]}
+              >
+                {seg.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <ScrollView
@@ -352,17 +458,19 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         ) : null}
       </ScrollView>
 
-      <View style={styles.weekdayRow}>
-        {WEEKDAYS.map((d, i) => (
-          <Text key={i} style={[styles.weekdayLabel, { color: colors.text2 }]}>
-            {d}
-          </Text>
-        ))}
-      </View>
+      {viewMode !== 'planning' ? (
+        <View style={styles.weekdayRow}>
+          {WEEKDAYS.map((d, i) => (
+            <Text key={i} style={[styles.weekdayLabel, { color: colors.text2 }]}>
+              {d}
+            </Text>
+          ))}
+        </View>
+      ) : null}
 
-      {isLoading ? (
+      {viewMode === 'planning' ? null : isLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />
-      ) : spanView ? (
+      ) : viewMode === 'sejours' ? (
         <MonthSpanGridMobile
           days={days}
           spans={spans}
@@ -393,75 +501,44 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
           />
         }
       >
-        <Text
-          style={[
-            styles.detailTitle,
-            { color: selectedDate && selectedDate.slice(0, 10) === todayIso ? colors.primary : colors.text },
-          ]}
-        >
-          {selectedDate ? formatDateFr(selectedDate.slice(0, 10), 'long') : 'Sélectionne une date'}
-        </Text>
-        {selectedItems.length === 0 ? (
-          <Text style={[styles.empty, { color: colors.mutedText }]}>
-            {selectedDate ? 'Aucune prestation ce jour.' : ''}
-          </Text>
-        ) : (
-          <View style={[styles.agendaCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {selectedItems.map((m, idx) => {
-              const unassigned = !m.prestataire_user_id;
-              const needsAttention = !!m.needs_attention;
-              const typeColor = colors[prestationTypeColorKey(m.prestation_type)];
-              return (
-                <TouchableOpacity
-                  key={m.id}
+        {viewMode === 'planning' ? (
+          isLoading ? (
+            <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />
+          ) : planningDays.length === 0 ? (
+            <Text style={[styles.empty, { color: colors.mutedText }]}>Aucune prestation ce mois-ci.</Text>
+          ) : (
+            planningDays.map(({ date, items }) => (
+              <View key={date} style={{ marginBottom: Spacing.md }}>
+                <Text
                   style={[
-                    styles.agendaRow,
-                    idx > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-                    needsAttention && { backgroundColor: colors.red + '0F' },
+                    styles.detailTitle,
+                    { color: date === todayIso ? colors.primary : colors.text, marginBottom: Spacing.xs },
                   ]}
-                  onPress={() => router.push(`/menage/${m.id}` as never)}
-                  activeOpacity={0.6}
                 >
-                  <View style={styles.agendaTime}>
-                    <Text style={[styles.agendaTimeText, { color: colors.text }]}>
-                      {m.horaire_prevu?.slice(0, 5) ?? '—'}
-                    </Text>
-                  </View>
-                  <View style={[styles.agendaStripe, { backgroundColor: typeColor }]} />
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.agendaTitleRow}>
-                      <Text style={[styles.agendaTitle, { color: colors.text }]} numberOfLines={1}>
-                        {menageLogementLabel(m)}
-                      </Text>
-                      <View
-                        style={[styles.badgeType, { backgroundColor: typeColor + '20' }]}
-                        accessibilityLabel={prestationTypeLabel(m.prestation_type)}
-                      >
-                        <Text style={[styles.badgeTypeText, { color: typeColor }]}>
-                          {prestationTypeLabel(m.prestation_type)}
-                        </Text>
-                      </View>
-                    </View>
-                    <Text style={[styles.agendaSub, { color: colors.text2 }]} numberOfLines={1}>
-                      {unassigned ? 'Non assigné' : menagePrestataireLabel(m)}
-                      {' · '}
-                      {labelForStatus(m.status)}
-                    </Text>
-                    {needsAttention ? (
-                      <View
-                        style={[styles.badgeLate, { backgroundColor: colors.red + '20', alignSelf: 'flex-start', marginTop: 4, marginRight: 0 }]}
-                        accessibilityLabel="Jour passé sans pointage"
-                      >
-                        <AlertTriangle size={11} color={colors.red} />
-                        <Text style={[styles.badgeLateText, { color: colors.red }]}>Non pointé</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <ChevronRight size={16} color={colors.mutedText} />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+                  {formatDateFr(date, 'long')}
+                </Text>
+                {renderAgendaCard(items)}
+              </View>
+            ))
+          )
+        ) : (
+          <>
+            <Text
+              style={[
+                styles.detailTitle,
+                { color: selectedDate && selectedDate.slice(0, 10) === todayIso ? colors.primary : colors.text },
+              ]}
+            >
+              {selectedDate ? formatDateFr(selectedDate.slice(0, 10), 'long') : 'Sélectionne une date'}
+            </Text>
+            {selectedItems.length === 0 ? (
+              <Text style={[styles.empty, { color: colors.mutedText }]}>
+                {selectedDate ? 'Aucune prestation ce jour.' : ''}
+              </Text>
+            ) : (
+              renderAgendaCard(selectedItems)
+            )}
+          </>
         )}
       </ScrollView>
 
@@ -641,15 +718,24 @@ const styles = StyleSheet.create({
   },
   monthLabel: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, textTransform: 'capitalize' },
   monthNavBtn: { padding: Spacing.xs },
-  weekToggleRow: {
+  segmented: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xs,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    borderRadius: 9,
+    padding: 2,
   },
-  weekToggleLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
+  segment: {
+    flex: 1,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 7,
+  },
+  segmentActive: {
+    ...Shadow.sm,
+  },
+  segmentText: { fontSize: FontSize.sm },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',

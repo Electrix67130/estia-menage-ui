@@ -11,6 +11,7 @@ import {
   TextInput,
   FlatList,
   RefreshControl,
+  Switch,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
@@ -132,6 +133,8 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
   const days = useMemo(() => buildMonthGrid(cursor), [cursor]);
   // Séjours = barres multi-jours (check-in → check-out), pour la grille mensuelle.
   const spans = useMemo(() => buildSpans(filteredMenages), [filteredMenages]);
+  // Vue « séjours » (barres) vs vue classique (pastilles). Classique par défaut.
+  const [spanView, setSpanView] = usePersistedState<boolean>('calendar.spanView', false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const todayIso = isoLocal(new Date());
 
@@ -221,6 +224,11 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         >
           <ChevronRight size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.weekToggleRow}>
+        <Text style={[styles.weekToggleLabel, { color: colors.text2 }]}>Vue séjours</Text>
+        <Switch value={spanView} onValueChange={setSpanView} trackColor={{ true: colors.primary }} />
       </View>
 
       <ScrollView
@@ -346,10 +354,19 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
 
       {isLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />
-      ) : (
+      ) : spanView ? (
         <MonthSpanGridMobile
           days={days}
           spans={spans}
+          colors={colors}
+          todayIso={todayIso}
+          selectedDate={selectedDate}
+          onSelectDay={setSelectedDate}
+        />
+      ) : (
+        <MonthClassicGridMobile
+          days={days}
+          byDate={byDate}
           colors={colors}
           todayIso={todayIso}
           selectedDate={selectedDate}
@@ -903,6 +920,8 @@ interface Span {
   isStay: boolean;
   needsAttention: boolean;
   hasCheckIn: boolean;
+  /** 'stay' (séjour iCal) ou le type de la presta (géométrie demi-journée). */
+  kind: 'stay' | 'menage' | 'check_in' | 'check_out';
 }
 
 function addDays(d: Date, n: number): Date {
@@ -951,6 +970,7 @@ function buildSpans(menages: Menage[]): Span[] {
       isStay: startIso < endIso,
       needsAttention: rows.some((r) => !!r.needs_attention),
       hasCheckIn: !!checkIn,
+      kind: 'stay',
     });
   }
 
@@ -966,7 +986,8 @@ function buildSpans(menages: Menage[]): Span[] {
       color: m.logement_color ?? STATUS_COLOR[m.status],
       isStay: startIso < endIso,
       needsAttention: !!m.needs_attention,
-      hasCheckIn: false,
+      hasCheckIn: m.prestation_type === 'check_in',
+      kind: m.prestation_type,
     });
   }
   return spans.sort((a, b) => a.startIso.localeCompare(b.startIso) || a.endIso.localeCompare(b.endIso));
@@ -1003,8 +1024,9 @@ function MonthSpanGridMobile({
     const si = dayIndex(s.startIso);
     const ei = dayIndex(s.endIso);
     if (s.isStay) return { si, ei, lo: si + 0.5, hi: ei + 0.5 };
-    const split = checkInDays.has(si);
-    return { si, ei, lo: si, hi: split ? si + 0.5 : si + 1 };
+    if (s.kind === 'check_in') return { si, ei, lo: si + 0.5, hi: si + 1 };
+    if (s.kind === 'check_out') return { si, ei, lo: si, hi: si + 0.5 };
+    return { si, ei, lo: si, hi: checkInDays.has(si) ? si + 0.5 : si + 1 };
   };
 
   return (
@@ -1113,6 +1135,63 @@ function MonthSpanGridMobile({
               );
             })}
           </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Vue mensuelle classique : numéro du jour + pastilles (jusqu'à 3) par jour. */
+function MonthClassicGridMobile({
+  days,
+  byDate,
+  colors,
+  todayIso,
+  selectedDate,
+  onSelectDay,
+}: {
+  days: { date: Date; inMonth: boolean }[];
+  byDate: Map<string, Menage[]>;
+  colors: (typeof Colors)['light'];
+  todayIso: string;
+  selectedDate: string | null;
+  onSelectDay: (iso: string) => void;
+}) {
+  return (
+    <View style={styles.grid}>
+      {days.map(({ date, inMonth }) => {
+        const iso = isoLocal(date);
+        const items = byDate.get(iso) ?? [];
+        const isToday = iso === todayIso;
+        const isSelected = iso === selectedDate;
+        return (
+          <TouchableOpacity key={iso} style={styles.dayCell} onPress={() => onSelectDay(iso)} activeOpacity={0.6}>
+            <View
+              style={[
+                styles.dayCircle,
+                isToday && { backgroundColor: colors.primary },
+                isSelected && !isToday && { backgroundColor: colors.itemBackground },
+              ]}
+            >
+              <Text
+                style={{
+                  color: isToday ? '#fff' : inMonth ? colors.text : colors.mutedText,
+                  fontSize: FontSize.sm,
+                  fontWeight: isToday ? FontWeight.bold : FontWeight.regular,
+                }}
+              >
+                {date.getDate()}
+              </Text>
+            </View>
+            <View style={styles.dotsRow}>
+              {items.slice(0, 3).map((m) => (
+                <View
+                  key={m.id}
+                  style={[styles.dot, { backgroundColor: m.logement_color ?? STATUS_COLOR[m.status] }]}
+                />
+              ))}
+            </View>
+          </TouchableOpacity>
         );
       })}
     </View>

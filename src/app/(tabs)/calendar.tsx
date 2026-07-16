@@ -491,6 +491,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
       )}
 
       <ScrollView
+        style={{ flex: 1 }}
         contentContainerStyle={styles.detailScroll}
         refreshControl={
           <RefreshControl

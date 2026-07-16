@@ -1017,8 +1017,57 @@ function MonthSpanGridMobile({
   const weeks: { date: Date; inMonth: boolean }[][] = [];
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
 
-  const checkInDays = new Set<number>();
-  for (const s of spans) if (s.hasCheckIn) checkInDays.add(dayIndex(s.startIso));
+  // Occupation des demi-journées par jour : matin = check-out / départ de séjour ;
+  // après-midi = check-in / arrivée de séjour ; jours intermédiaires = journée pleine.
+  const amClaimed = new Set<number>();
+  const pmClaimed = new Set<number>();
+  for (const s of spans) {
+    const si = dayIndex(s.startIso);
+    const ei = dayIndex(s.endIso);
+    if (s.isStay) {
+      pmClaimed.add(si);
+      amClaimed.add(ei);
+      for (let d = si + 1; d < ei; d++) {
+        amClaimed.add(d);
+        pmClaimed.add(d);
+      }
+    } else if (s.kind === 'check_in') {
+      pmClaimed.add(si);
+    } else if (s.kind === 'check_out') {
+      amClaimed.add(si);
+    }
+  }
+
+  // Un ménage 1 jour ne prend toute la journée que s'il est seul ce jour-là ;
+  // sinon il se cale sur la moitié libre (deux ménages → matin / après-midi).
+  const menageHalf = new Map<string, 'am' | 'pm' | 'full'>();
+  const menagesByDay = new Map<number, Span[]>();
+  for (const s of spans) {
+    if (s.isStay || s.kind !== 'menage') continue;
+    const d = dayIndex(s.startIso);
+    const arr = menagesByDay.get(d) ?? [];
+    arr.push(s);
+    menagesByDay.set(d, arr);
+  }
+  for (const list of menagesByDay.values()) {
+    const d = dayIndex(list[0].startIso);
+    let am = amClaimed.has(d);
+    let pm = pmClaimed.has(d);
+    for (const s of list) {
+      if (pm && !am) {
+        menageHalf.set(s.key, 'am');
+        am = true;
+      } else if (am && !pm) {
+        menageHalf.set(s.key, 'pm');
+        pm = true;
+      } else if (!am && !pm && list.length > 1) {
+        menageHalf.set(s.key, 'am');
+        am = true;
+      } else {
+        menageHalf.set(s.key, 'full');
+      }
+    }
+  }
 
   const geom = (s: Span) => {
     const si = dayIndex(s.startIso);
@@ -1026,7 +1075,10 @@ function MonthSpanGridMobile({
     if (s.isStay) return { si, ei, lo: si + 0.5, hi: ei + 0.5 };
     if (s.kind === 'check_in') return { si, ei, lo: si + 0.5, hi: si + 1 };
     if (s.kind === 'check_out') return { si, ei, lo: si, hi: si + 0.5 };
-    return { si, ei, lo: si, hi: checkInDays.has(si) ? si + 0.5 : si + 1 };
+    const half = menageHalf.get(s.key) ?? 'full';
+    if (half === 'am') return { si, ei, lo: si, hi: si + 0.5 };
+    if (half === 'pm') return { si, ei, lo: si + 0.5, hi: si + 1 };
+    return { si, ei, lo: si, hi: si + 1 };
   };
 
   return (
@@ -1036,7 +1088,10 @@ function MonthSpanGridMobile({
         const w6 = w0 + 6;
         const inWeek = spans
           .map((s) => ({ s, g: geom(s) }))
-          .filter(({ g }) => g.hi > w0 && g.lo < w6 + 1);
+          .filter(({ g }) => g.hi > w0 && g.lo < w6 + 1)
+          // Tri par position (lo puis hi) : le first-fit remet côte à côte un
+          // matin + un après-midi du même jour (turnover) sans les empiler.
+          .sort((a, b) => a.g.lo - b.g.lo || a.g.hi - b.g.hi);
         const laneHi: number[] = [];
         const laneOf = new Map<string, number>();
         for (const { s, g } of inWeek) {

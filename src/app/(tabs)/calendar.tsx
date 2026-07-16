@@ -911,6 +911,7 @@ function groupByDate(menages: Menage[]): Map<string, Menage[]> {
 
 const SPAN_LANE_H = 18;
 const MAX_LANES = 3;
+const SPAN_GAP = 0.03; // retrait (fraction de journée) sur les extrémités réelles d'une barre → petit espace entre deux prestations
 
 interface Span {
   key: string;
@@ -1166,6 +1167,9 @@ function MonthSpanGridMobile({
                             const segHi = Math.min(g.hi, dayIdx + 1);
                             const roundLeft = segLo === g.lo;
                             const roundRight = segHi === g.hi;
+                            // Petit retrait aux extrémités réelles → espace entre 2 prestations.
+                            const dispLo = segLo + (roundLeft ? SPAN_GAP : 0);
+                            const dispHi = segHi - (roundRight ? SPAN_GAP : 0);
                             return (
                               <View
                                 key={s.key}
@@ -1173,8 +1177,8 @@ function MonthSpanGridMobile({
                                   position: 'absolute',
                                   top: 0,
                                   bottom: 0,
-                                  left: `${(segLo - dayIdx) * 100}%`,
-                                  width: `${(segHi - segLo) * 100}%`,
+                                  left: `${(dispLo - dayIdx) * 100}%`,
+                                  width: `${(dispHi - dispLo) * 100}%`,
                                   backgroundColor: s.color,
                                   borderTopLeftRadius: roundLeft ? 4 : 0,
                                   borderBottomLeftRadius: roundLeft ? 4 : 0,

@@ -42,6 +42,7 @@ function PrestataireMenagesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const { t } = useTranslation();
+  const router = useRouter();
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader>
@@ -51,6 +52,15 @@ function PrestataireMenagesScreen() {
             Indique si tu peux faire chaque prestation. Appui long = demander un changement.
           </Text>
         </View>
+        {/* Historique — ses prestations clôturées (validées/annulées). */}
+        <TouchableOpacity
+          style={[styles.reschedBtn, { backgroundColor: colors.itemBackground }]}
+          onPress={() => router.push('/historique' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Historique"
+        >
+          <History size={IconSize.md} color={colors.mutedText} />
+        </TouchableOpacity>
       </AppHeader>
       <PrestaUpcomingList />
     </SafeAreaView>

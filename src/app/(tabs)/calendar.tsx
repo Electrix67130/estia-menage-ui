@@ -523,72 +523,56 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
             }
           />
         )
+      ) : isLoading ? (
+        <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />
       ) : (
-        <>
-          {isLoading ? (
-            <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />
+        // La grille occupe tout l'écran ; le détail du jour glisse depuis le bas
+        // (bottom sheet) au tap d'une case — pas de zone détail permanente.
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching || allUsers.isRefetching}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        >
+          {viewMode === 'sejours' ? (
+            <MonthSpanGridMobile
+              days={days}
+              spans={spans}
+              colors={colors}
+              todayIso={todayIso}
+              selectedDate={selectedDate}
+              onSelectDay={setSelectedDate}
+            />
           ) : (
-            // La grille prend la majeure partie de l'écran (façon Calendrier Apple) ;
-            // la timeline horaire du jour occupe le reste dessous.
-            <View style={{ flex: 3 }}>
-              {viewMode === 'sejours' ? (
-                <MonthSpanGridMobile
-                  days={days}
-                  spans={spans}
-                  colors={colors}
-                  todayIso={todayIso}
-                  selectedDate={selectedDate}
-                  onSelectDay={setSelectedDate}
-                />
-              ) : (
-                <MonthClassicGridMobile
-                  days={days}
-                  byDate={byDate}
-                  colors={colors}
-                  todayIso={todayIso}
-                  selectedDate={selectedDate}
-                  onSelectDay={setSelectedDate}
-                />
-              )}
-            </View>
+            <MonthClassicGridMobile
+              days={days}
+              byDate={byDate}
+              colors={colors}
+              todayIso={todayIso}
+              selectedDate={selectedDate}
+              onSelectDay={setSelectedDate}
+            />
           )}
-
-          <ScrollView
-            style={{ flex: 2 }}
-            contentContainerStyle={styles.detailScroll}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefetching || allUsers.isRefetching}
-                onRefresh={handleRefresh}
-                tintColor={colors.primary}
-                colors={[colors.primary]}
-              />
-            }
-          >
-            <Text
-              style={[
-                styles.detailTitle,
-                { color: selectedDate && selectedDate.slice(0, 10) === todayIso ? colors.primary : colors.text },
-              ]}
-            >
-              {selectedDate ? formatDateFr(selectedDate.slice(0, 10), 'long') : 'Sélectionne une date'}
-            </Text>
-            {selectedItems.length === 0 ? (
-              <Text style={[styles.empty, { color: colors.mutedText }]}>
-                {selectedDate ? 'Aucune prestation ce jour.' : ''}
-              </Text>
-            ) : (
-              <DayTimeline
-                items={selectedItems}
-                colors={colors}
-                onPressItem={(id) => router.push(`/menage/${id}` as never)}
-                renderRow={renderAgendaRow}
-              />
-            )}
-          </ScrollView>
-        </>
+        </ScrollView>
       )}
+
+      <DayTimelineSheet
+        visible={viewMode !== 'planning' && selectedDate != null}
+        dateIso={selectedDate}
+        isToday={!!selectedDate && selectedDate.slice(0, 10) === todayIso}
+        items={selectedItems}
+        colors={colors}
+        onClose={() => setSelectedDate(null)}
+        onPressItem={(id) => router.push(`/menage/${id}` as never)}
+        renderRow={renderAgendaRow}
+      />
 
       <FilterPickerSheet
         visible={showPrestataireFilter && prestataireSheetOpen}
@@ -762,14 +746,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.xs,
   },
   monthLabel: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, textTransform: 'capitalize' },
   monthNavBtn: { padding: Spacing.xs },
   segmented: {
     flexDirection: 'row',
     marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
     borderRadius: 9,
     padding: 2,
   },
@@ -788,8 +772,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingBottom: Spacing.xs,
   },
   filterButton: {
     flexDirection: 'row',
@@ -829,18 +813,6 @@ const styles = StyleSheet.create({
   },
   dotsRow: { flexDirection: 'row', gap: 3 },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  detailScroll: {
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xxxl,
-    gap: Spacing.sm,
-  },
-  detailTitle: {
-    fontSize: FontSize.lg,
-    fontWeight: FontWeight.semibold,
-    textTransform: 'capitalize',
-    marginBottom: Spacing.sm,
-  },
   empty: { fontSize: FontSize.sm },
   itemRow: {
     flexDirection: 'row',
@@ -1602,3 +1574,93 @@ function DayTimeline({
     </View>
   );
 }
+
+/**
+ * Bottom sheet du détail du jour : glisse depuis le bas par-dessus la grille
+ * (Séjours/Pastilles) au tap d'une case, prend la majeure partie de l'écran, et
+ * affiche la timeline horaire. Fermé par défaut (aucune zone détail permanente).
+ */
+function DayTimelineSheet({
+  visible,
+  dateIso,
+  isToday,
+  items,
+  colors,
+  onClose,
+  onPressItem,
+  renderRow,
+}: {
+  visible: boolean;
+  dateIso: string | null;
+  isToday: boolean;
+  items: Menage[];
+  colors: (typeof Colors)['light'];
+  onClose: () => void;
+  onPressItem: (id: string) => void;
+  renderRow: (m: Menage, opts?: { topBorder?: boolean; surface?: boolean }) => React.ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={sheetStyles.overlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={[timelineSheetStyles.sheet, { backgroundColor: colors.background }]}>
+          <View style={sheetStyles.handle}>
+            <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
+          </View>
+          <View style={timelineSheetStyles.header}>
+            <Text
+              style={[timelineSheetStyles.title, { color: isToday ? colors.primary : colors.text }]}
+              numberOfLines={1}
+            >
+              {dateIso ? formatDateFr(dateIso.slice(0, 10), 'long') : ''}
+            </Text>
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
+            >
+              <X size={IconSize.md} color={colors.text2} />
+            </TouchableOpacity>
+          </View>
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{
+              paddingHorizontal: Spacing.lg,
+              paddingTop: Spacing.sm,
+              paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.md,
+            }}
+            showsVerticalScrollIndicator={false}
+          >
+            {items.length === 0 ? (
+              <Text style={[styles.empty, { color: colors.mutedText, marginTop: Spacing.md }]}>
+                Aucune prestation ce jour.
+              </Text>
+            ) : (
+              <DayTimeline items={items} colors={colors} onPressItem={onPressItem} renderRow={renderRow} />
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const timelineSheetStyles = StyleSheet.create({
+  sheet: {
+    height: '82%',
+    borderTopLeftRadius: Radius.xxl,
+    borderTopRightRadius: Radius.xxl,
+    overflow: 'hidden',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+    gap: Spacing.md,
+  },
+  title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, textTransform: 'capitalize', flexShrink: 1 },
+});

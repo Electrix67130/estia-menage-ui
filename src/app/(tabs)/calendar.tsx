@@ -50,7 +50,7 @@ const TYPE_ALL = '';
 type CalendarView = 'sejours' | 'pastilles' | 'planning';
 const VIEW_SEGMENTS: { id: CalendarView; label: string }[] = [
   { id: 'sejours', label: 'Séjours' },
-  { id: 'pastilles', label: 'Pastilles' },
+  { id: 'pastilles', label: 'Prestations' },
   { id: 'planning', label: 'Planning' },
 ];
 
@@ -1221,6 +1221,8 @@ function MonthSpanGridMobile({
                                   left: `${(dispLo - dayIdx) * 100}%`,
                                   width: `${(dispHi - dispLo) * 100}%`,
                                   backgroundColor: s.color,
+                                  // Couleurs adoucies (façon Calendrier Apple).
+                                  opacity: 0.8,
                                   borderTopLeftRadius: roundLeft ? 3 : 0,
                                   borderBottomLeftRadius: roundLeft ? 3 : 0,
                                   borderTopRightRadius: roundRight ? 3 : 0,

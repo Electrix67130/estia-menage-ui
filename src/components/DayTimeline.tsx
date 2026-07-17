@@ -49,6 +49,8 @@ export function AgendaRow({
   const unassigned = !m.prestataire_user_id;
   const needsAttention = !!m.needs_attention;
   const typeColor = colors[prestationTypeColorKey(m.prestation_type)];
+  // Liseré = couleur du logement (le tag de type reste, lui, coloré par type).
+  const logementColor = m.logement_color ?? typeColor;
   return (
     <TouchableOpacity
       style={[
@@ -63,7 +65,7 @@ export function AgendaRow({
       <View style={styles.agendaTime}>
         <Text style={[styles.agendaTimeText, { color: colors.text }]}>{m.horaire_prevu?.slice(0, 5) ?? '—'}</Text>
       </View>
-      <View style={[styles.agendaStripe, { backgroundColor: typeColor }]} />
+      <View style={[styles.agendaStripe, { backgroundColor: logementColor }]} />
       <View style={{ flex: 1 }}>
         <View style={styles.agendaTitleRow}>
           <Text style={[styles.agendaTitle, { color: colors.text }]} numberOfLines={1}>
@@ -216,7 +218,8 @@ export function DayTimeline({
               const top = ((e.start - minH * 60) / 60) * TL_HOUR_H;
               const height = Math.max(((e.end - e.start) / 60) * TL_HOUR_H - 2, 24);
               const widthPct = 100 / e.cols;
-              const typeColor = colors[prestationTypeColorKey(e.m.prestation_type)];
+              // Bloc coloré par logement (fallback couleur de type), fond adouci.
+              const evColor = e.m.logement_color ?? colors[prestationTypeColorKey(e.m.prestation_type)];
               return (
                 <TouchableOpacity
                   key={e.m.id}
@@ -224,7 +227,7 @@ export function DayTimeline({
                   onPress={() => onPressItem(e.m.id)}
                   style={[styles.tlEvent, { top, height, left: `${e.col * widthPct}%`, width: `${widthPct}%` }]}
                 >
-                  <View style={[styles.tlEventInner, { backgroundColor: typeColor + '26', borderLeftColor: typeColor }]}>
+                  <View style={[styles.tlEventInner, { backgroundColor: evColor + '26', borderLeftColor: evColor }]}>
                     <Text numberOfLines={1} style={[styles.tlEventTitle, { color: colors.text }]}>
                       {menageLogementLabel(e.m)}
                     </Text>

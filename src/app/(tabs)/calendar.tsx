@@ -1222,7 +1222,7 @@ function MonthSpanGridMobile({
                                   width: `${(dispHi - dispLo) * 100}%`,
                                   backgroundColor: s.color,
                                   // Couleurs adoucies (façon Calendrier Apple).
-                                  opacity: 0.8,
+                                  opacity: 0.7,
                                   borderTopLeftRadius: roundLeft ? 3 : 0,
                                   borderBottomLeftRadius: roundLeft ? 3 : 0,
                                   borderTopRightRadius: roundRight ? 3 : 0,

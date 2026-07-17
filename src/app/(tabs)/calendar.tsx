@@ -470,28 +470,34 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
 
       {viewMode === 'planning' ? null : isLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />
-      ) : viewMode === 'sejours' ? (
-        <MonthSpanGridMobile
-          days={days}
-          spans={spans}
-          colors={colors}
-          todayIso={todayIso}
-          selectedDate={selectedDate}
-          onSelectDay={setSelectedDate}
-        />
       ) : (
-        <MonthClassicGridMobile
-          days={days}
-          byDate={byDate}
-          colors={colors}
-          todayIso={todayIso}
-          selectedDate={selectedDate}
-          onSelectDay={setSelectedDate}
-        />
+        // La grille prend la majeure partie de l'écran (façon Calendrier Apple) ;
+        // la liste agenda du jour occupe le reste dessous.
+        <View style={{ flex: 3 }}>
+          {viewMode === 'sejours' ? (
+            <MonthSpanGridMobile
+              days={days}
+              spans={spans}
+              colors={colors}
+              todayIso={todayIso}
+              selectedDate={selectedDate}
+              onSelectDay={setSelectedDate}
+            />
+          ) : (
+            <MonthClassicGridMobile
+              days={days}
+              byDate={byDate}
+              colors={colors}
+              todayIso={todayIso}
+              selectedDate={selectedDate}
+              onSelectDay={setSelectedDate}
+            />
+          )}
+        </View>
       )}
 
       <ScrollView
-        style={{ flex: 1 }}
+        style={{ flex: viewMode === 'planning' ? 1 : 2 }}
         contentContainerStyle={styles.detailScroll}
         refreshControl={
           <RefreshControl
@@ -773,18 +779,6 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     fontWeight: FontWeight.semibold,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: Spacing.sm,
-  },
-  dayCell: {
-    width: `${100 / 7}%`,
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
   dayCircle: {
     width: 32,
     height: 32,
@@ -792,8 +786,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dotsRow: { flexDirection: 'row', gap: 2 },
-  dot: { width: 4, height: 4, borderRadius: 2 },
+  dotsRow: { flexDirection: 'row', gap: 3 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
   detailScroll: {
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
@@ -1207,7 +1201,8 @@ function MonthSpanGridMobile({
   return (
     // Marge horizontale = en-tête des jours / vue classique → les barres ne
     // touchent plus les bords de l'écran (fini l'effet « ça sort à gauche/droite »).
-    <View style={{ paddingHorizontal: Spacing.sm }}>
+    // flex:1 + semaines en flex:1 → la grille remplit la hauteur dispo (grandes cases).
+    <View style={{ paddingHorizontal: Spacing.sm, flex: 1 }}>
       {weeks.map((week, wi) => {
         const w0 = dayIndex(isoLocal(week[0].date));
         const w6 = w0 + 6;
@@ -1231,7 +1226,7 @@ function MonthSpanGridMobile({
         const laneCount = Math.min(laneHi.length, MAX_LANES);
 
         return (
-          <View key={wi} style={{ flexDirection: 'row' }}>
+          <View key={wi} style={{ flexDirection: 'row', flex: 1 }}>
             {week.map((cell, di) => {
               const dayIdx = w0 + di;
               const iso = isoLocal(cell.date);
@@ -1253,18 +1248,18 @@ function MonthSpanGridMobile({
                     borderColor: colors.border,
                   }}
                 >
-                  <View style={{ alignItems: 'center', paddingTop: 3 }}>
+                  <View style={{ alignItems: 'center', paddingTop: 4 }}>
                     <View
                       style={{
-                        width: 22,
-                        height: 22,
-                        borderRadius: 11,
+                        width: 28,
+                        height: 28,
+                        borderRadius: 14,
                         alignItems: 'center',
                         justifyContent: 'center',
                         backgroundColor: dc.bg,
                       }}
                     >
-                      <Text style={{ fontSize: FontSize.xs, fontWeight: dc.weight, color: dc.fg }}>
+                      <Text style={{ fontSize: FontSize.sm, fontWeight: dc.weight, color: dc.fg }}>
                         {cell.date.getDate()}
                       </Text>
                     </View>
@@ -1341,32 +1336,51 @@ function MonthClassicGridMobile({
   selectedDate: string | null;
   onSelectDay: (iso: string) => void;
 }) {
+  const weeks: { date: Date; inMonth: boolean }[][] = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
   return (
-    <View style={styles.grid}>
-      {days.map(({ date, inMonth }) => {
-        const iso = isoLocal(date);
-        const items = byDate.get(iso) ?? [];
-        const isToday = iso === todayIso;
-        const isSelected = iso === selectedDate;
-        const dc = dayNumColors(colors, isToday, isSelected, inMonth);
-        return (
-          <TouchableOpacity key={iso} style={styles.dayCell} onPress={() => onSelectDay(iso)} activeOpacity={0.6}>
-            <View style={[styles.dayCircle, { backgroundColor: dc.bg }]}>
-              <Text style={{ color: dc.fg, fontSize: FontSize.sm, fontWeight: dc.weight }}>
-                {date.getDate()}
-              </Text>
-            </View>
-            <View style={styles.dotsRow}>
-              {items.slice(0, 3).map((m) => (
-                <View
-                  key={m.id}
-                  style={[styles.dot, { backgroundColor: m.logement_color ?? STATUS_COLOR[m.status] }]}
-                />
-              ))}
-            </View>
-          </TouchableOpacity>
-        );
-      })}
+    // flex:1 + semaines en flex:1 → les cases s'étirent pour remplir la hauteur.
+    <View style={{ flex: 1, paddingHorizontal: Spacing.sm }}>
+      {weeks.map((week, wi) => (
+        <View key={wi} style={{ flexDirection: 'row', flex: 1 }}>
+          {week.map(({ date, inMonth }) => {
+            const iso = isoLocal(date);
+            const items = byDate.get(iso) ?? [];
+            const isToday = iso === todayIso;
+            const isSelected = iso === selectedDate;
+            const dc = dayNumColors(colors, isToday, isSelected, inMonth);
+            return (
+              <TouchableOpacity
+                key={iso}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  paddingTop: 6,
+                  gap: 5,
+                  borderBottomWidth: StyleSheet.hairlineWidth,
+                  borderColor: colors.border,
+                }}
+                onPress={() => onSelectDay(iso)}
+                activeOpacity={0.6}
+              >
+                <View style={[styles.dayCircle, { backgroundColor: dc.bg }]}>
+                  <Text style={{ color: dc.fg, fontSize: FontSize.md, fontWeight: dc.weight }}>
+                    {date.getDate()}
+                  </Text>
+                </View>
+                <View style={styles.dotsRow}>
+                  {items.slice(0, 3).map((m) => (
+                    <View
+                      key={m.id}
+                      style={[styles.dot, { backgroundColor: m.logement_color ?? STATUS_COLOR[m.status] }]}
+                    />
+                  ))}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
     </View>
   );
 }

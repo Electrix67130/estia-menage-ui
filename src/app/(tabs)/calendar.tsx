@@ -16,7 +16,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Search, X, AlertTriangle } from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react-native';
 import { useMenages } from '@/api/hooks/useMenages';
 import { useAllUsers } from '@/api/hooks/useLogementMembers';
 import { useLogements } from '@/api/hooks/useLogements';
@@ -27,8 +27,9 @@ import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Menage, MenageStatus, PrestationType } from '@/api/types';
-import { menagePrestataireLabel, menageLogementLabel, prestationTypeLabel, prestationTypeColorKey } from '@/api/types';
+import { menagePrestataireLabel, menageLogementLabel, prestationTypeLabel } from '@/api/types';
 import { formatDateFr } from '@/lib/date-fr';
+import { AgendaRow, DayTimeline } from '@/components/DayTimeline';
 
 const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
@@ -39,10 +40,6 @@ const STATUS_COLOR: Record<MenageStatus, string> = {
   valide: '#0F766E',
   annule: '#94A3B8',
 };
-
-// Timeline horaire (détail du jour) : hauteur d'une heure + largeur de la gouttière des heures.
-const TL_HOUR_H = 56;
-const TL_GUTTER = 52;
 
 const PRESTATAIRE_ALL = '';
 const PRESTATAIRE_UNASSIGNED = '__unassigned__';
@@ -165,75 +162,15 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
     [byDate],
   );
 
-  // Agenda du jour : trié par heure (les sans-heure en dernier) pour une lecture
-  // chronologique — un turnover se lit check-out → ménage → check-in.
-  const selectedItems = useMemo(
-    () =>
-      (selectedDate ? byDate.get(selectedDate) ?? [] : [])
-        .slice()
-        .sort((a, b) => (a.horaire_prevu ?? '99:99').localeCompare(b.horaire_prevu ?? '99:99')),
-    [selectedDate, byDate],
+  // Tap d'un jour (grille) → nouvelle page « détail du jour » (route dédiée),
+  // pas de modale. On mémorise la date sélectionnée pour la surbrillance.
+  const handleSelectDay = React.useCallback(
+    (iso: string) => {
+      setSelectedDate(iso);
+      router.push(`/day/${iso}` as never);
+    },
+    [router],
   );
-  // Une ligne agenda (style liste Calendrier Apple). `surface` = fond plein (vue
-  // Planning en SectionList) ; `topBorder` = filet de séparation (carte groupée).
-  const renderAgendaRow = (m: Menage, opts?: { topBorder?: boolean; surface?: boolean }) => {
-    const unassigned = !m.prestataire_user_id;
-    const needsAttention = !!m.needs_attention;
-    const typeColor = colors[prestationTypeColorKey(m.prestation_type)];
-    return (
-      <TouchableOpacity
-        key={m.id}
-        style={[
-          styles.agendaRow,
-          opts?.surface && { backgroundColor: colors.surface },
-          opts?.topBorder && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-          needsAttention && { backgroundColor: colors.red + '0F' },
-        ]}
-        onPress={() => router.push(`/menage/${m.id}` as never)}
-        activeOpacity={0.6}
-      >
-        <View style={styles.agendaTime}>
-          <Text style={[styles.agendaTimeText, { color: colors.text }]}>
-            {m.horaire_prevu?.slice(0, 5) ?? '—'}
-          </Text>
-        </View>
-        <View style={[styles.agendaStripe, { backgroundColor: typeColor }]} />
-        <View style={{ flex: 1 }}>
-          <View style={styles.agendaTitleRow}>
-            <Text style={[styles.agendaTitle, { color: colors.text }]} numberOfLines={1}>
-              {menageLogementLabel(m)}
-            </Text>
-            <View
-              style={[styles.badgeType, { backgroundColor: typeColor + '20' }]}
-              accessibilityLabel={prestationTypeLabel(m.prestation_type)}
-            >
-              <Text style={[styles.badgeTypeText, { color: typeColor }]}>
-                {prestationTypeLabel(m.prestation_type)}
-              </Text>
-            </View>
-          </View>
-          <Text style={[styles.agendaSub, { color: colors.text2 }]} numberOfLines={1}>
-            {unassigned ? 'Non assigné' : menagePrestataireLabel(m)}
-            {' · '}
-            {labelForStatus(m.status)}
-          </Text>
-          {needsAttention ? (
-            <View
-              style={[
-                styles.badgeLate,
-                { backgroundColor: colors.red + '20', alignSelf: 'flex-start', marginTop: 4, marginRight: 0 },
-              ]}
-              accessibilityLabel="Jour passé sans pointage"
-            >
-              <AlertTriangle size={11} color={colors.red} />
-              <Text style={[styles.badgeLateText, { color: colors.red }]}>Non pointé</Text>
-            </View>
-          ) : null}
-        </View>
-        <ChevronRight size={16} color={colors.mutedText} />
-      </TouchableOpacity>
-    );
-  };
 
   // Planning = agenda plein écran (SectionList), un en-tête collant par jour.
   const planningSections = useMemo(
@@ -356,6 +293,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
         contentContainerStyle={styles.filterRow}
       >
         <TouchableOpacity
@@ -512,7 +450,14 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
                 </Text>
               </View>
             )}
-            renderItem={({ item }) => renderAgendaRow(item, { surface: true })}
+            renderItem={({ item }) => (
+              <AgendaRow
+                menage={item}
+                colors={colors}
+                onPress={() => router.push(`/menage/${item.id}` as never)}
+                surface
+              />
+            )}
             ItemSeparatorComponent={() => (
               <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: 60 }} />
             )}
@@ -548,7 +493,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
               colors={colors}
               todayIso={todayIso}
               selectedDate={selectedDate}
-              onSelectDay={setSelectedDate}
+              onSelectDay={handleSelectDay}
             />
           ) : (
             <MonthClassicGridMobile
@@ -557,22 +502,11 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
               colors={colors}
               todayIso={todayIso}
               selectedDate={selectedDate}
-              onSelectDay={setSelectedDate}
+              onSelectDay={handleSelectDay}
             />
           )}
         </ScrollView>
       )}
-
-      <DayTimelineSheet
-        visible={viewMode !== 'planning' && selectedDate != null}
-        dateIso={selectedDate}
-        isToday={!!selectedDate && selectedDate.slice(0, 10) === todayIso}
-        items={selectedItems}
-        colors={colors}
-        onClose={() => setSelectedDate(null)}
-        onPressItem={(id) => router.push(`/menage/${id}` as never)}
-        renderRow={renderAgendaRow}
-      />
 
       <FilterPickerSheet
         visible={showPrestataireFilter && prestataireSheetOpen}
@@ -768,12 +702,15 @@ const styles = StyleSheet.create({
     ...Shadow.sm,
   },
   segmentText: { fontSize: FontSize.sm },
+  // Sans contrainte, une ScrollView horizontale s'étire verticalement → les chips
+  // (centrés) laissent de gros vides au-dessus/en-dessous. On borne sa hauteur.
+  filterScroll: { flexGrow: 0, flexShrink: 0 },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: Spacing.sm,
-    paddingBottom: Spacing.xs,
+    paddingVertical: Spacing.xs,
   },
   filterButton: {
     flexDirection: 'row',
@@ -863,25 +800,6 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
     letterSpacing: 0.5,
   },
-  // Agenda du jour (style liste Calendrier Apple)
-  agendaCard: {
-    borderRadius: Radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    overflow: 'hidden',
-  },
-  agendaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-  },
-  agendaTime: { width: 52, alignItems: 'flex-end' },
-  agendaTimeText: { fontSize: FontSize.md, fontWeight: FontWeight.medium, fontVariant: ['tabular-nums'] },
-  agendaStripe: { width: 4, alignSelf: 'stretch', borderRadius: 2, marginVertical: 2 },
-  agendaTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  agendaTitle: { fontSize: FontSize.md, fontWeight: FontWeight.semibold, flexShrink: 1 },
-  agendaSub: { fontSize: FontSize.sm, marginTop: 1 },
   // Planning (SectionList plein écran)
   planningHeader: {
     paddingHorizontal: Spacing.lg,
@@ -894,26 +812,6 @@ const styles = StyleSheet.create({
     fontWeight: FontWeight.bold,
     textTransform: 'capitalize',
   },
-  // Timeline horaire (détail du jour, façon Calendrier Apple)
-  tlHourRow: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', alignItems: 'center' },
-  tlHourLabel: {
-    width: TL_GUTTER - 8,
-    textAlign: 'right',
-    fontSize: FontSize.xs,
-    fontVariant: ['tabular-nums'],
-  },
-  tlHourLine: { flex: 1, height: StyleSheet.hairlineWidth, marginLeft: 8 },
-  tlEvent: { position: 'absolute', paddingHorizontal: 1.5 },
-  tlEventInner: {
-    flex: 1,
-    borderLeftWidth: 3,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    overflow: 'hidden',
-  },
-  tlEventTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
-  tlEventSub: { fontSize: 10, marginTop: 1, fontVariant: ['tabular-nums'] },
 });
 
 const sheetStyles = StyleSheet.create({
@@ -971,21 +869,6 @@ function dayNumColors(
   if (isToday) return { bg: colors.primary, fg: '#fff', weight: FontWeight.bold };
   if (isSelected) return { bg: colors.text, fg: colors.background, weight: FontWeight.semibold };
   return { bg: 'transparent', fg: inMonth ? colors.text : colors.mutedText, weight: FontWeight.regular };
-}
-
-function labelForStatus(s: MenageStatus): string {
-  switch (s) {
-    case 'a_venir':
-      return 'À venir';
-    case 'en_cours':
-      return 'En cours';
-    case 'termine':
-      return 'Terminé';
-    case 'valide':
-      return 'Validé';
-    case 'annule':
-      return 'Annulé';
-  }
 }
 
 function startOfMonth(d: Date) {
@@ -1430,237 +1313,3 @@ function MonthClassicGridMobile({
   );
 }
 
-// ---------- Timeline horaire du jour (façon Calendrier Apple) ----------
-
-function toMinutes(t: string): number {
-  const [h, m] = t.slice(0, 5).split(':').map(Number);
-  return (h || 0) * 60 + (m || 0);
-}
-function fmtMinutes(min: number): string {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
-interface TimelineEvent {
-  m: Menage;
-  start: number;
-  end: number;
-  col: number;
-  cols: number;
-}
-
-/**
- * Assigne à chaque événement une colonne au sein de son groupe de chevauchement
- * (algorithme d'intervalle glouton) → les prestations qui se chevauchent se
- * placent côte à côte, comme dans Calendrier Apple.
- */
-function assignColumns(evs: TimelineEvent[]): void {
-  let i = 0;
-  while (i < evs.length) {
-    let j = i;
-    let clusterEnd = evs[i].end;
-    while (j + 1 < evs.length && evs[j + 1].start < clusterEnd) {
-      j++;
-      clusterEnd = Math.max(clusterEnd, evs[j].end);
-    }
-    const cluster = evs.slice(i, j + 1);
-    const colEnds: number[] = [];
-    for (const e of cluster) {
-      let placed = false;
-      for (let c = 0; c < colEnds.length; c++) {
-        if (colEnds[c] <= e.start) {
-          e.col = c;
-          colEnds[c] = e.end;
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) {
-        e.col = colEnds.length;
-        colEnds.push(e.end);
-      }
-    }
-    for (const e of cluster) e.cols = colEnds.length;
-    i = j + 1;
-  }
-}
-
-/**
- * Journée en timeline : gouttière d'heures à gauche, chaque prestation = un bloc
- * positionné (heure de début) et dimensionné (durée estimée), coloré par type.
- * Les prestations sans heure sont listées au-dessus (lignes agenda).
- */
-function DayTimeline({
-  items,
-  colors,
-  onPressItem,
-  renderRow,
-}: {
-  items: Menage[];
-  colors: (typeof Colors)['light'];
-  onPressItem: (id: string) => void;
-  renderRow: (m: Menage, opts?: { topBorder?: boolean; surface?: boolean }) => React.ReactNode;
-}) {
-  const untimed = items.filter((m) => !m.horaire_prevu);
-  const evs: TimelineEvent[] = items
-    .filter((m) => m.horaire_prevu)
-    .map((m) => {
-      const start = toMinutes(m.horaire_prevu!);
-      const dur = Math.max(m.duree_estimee_min ?? (m.prestation_type === 'menage' ? 60 : 30), 30);
-      return { m, start, end: start + dur, col: 0, cols: 1 };
-    })
-    .sort((a, b) => a.start - b.start || a.end - b.end);
-  assignColumns(evs);
-
-  // Plage horaire affichée : 8h→20h par défaut, élargie pour couvrir tous les événements.
-  let minH = 8;
-  let maxH = 20;
-  for (const e of evs) {
-    minH = Math.min(minH, Math.floor(e.start / 60));
-    maxH = Math.max(maxH, Math.ceil(e.end / 60));
-  }
-  minH = Math.max(0, minH);
-  maxH = Math.min(24, maxH);
-  const hours: number[] = [];
-  for (let h = minH; h <= maxH; h++) hours.push(h);
-  const bodyH = (maxH - minH) * TL_HOUR_H;
-
-  return (
-    <View>
-      {untimed.length > 0 ? (
-        <View style={[styles.agendaCard, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: Spacing.md }]}>
-          {untimed.map((m, idx) => renderRow(m, { topBorder: idx > 0 }))}
-        </View>
-      ) : null}
-
-      {evs.length > 0 ? (
-        <View style={{ height: bodyH }}>
-          {hours.map((h) => (
-            <View key={h} style={[styles.tlHourRow, { top: (h - minH) * TL_HOUR_H }]}>
-              <Text style={[styles.tlHourLabel, { color: colors.mutedText }]}>{`${String(h).padStart(2, '0')}:00`}</Text>
-              <View style={[styles.tlHourLine, { backgroundColor: colors.border }]} />
-            </View>
-          ))}
-          <View style={{ position: 'absolute', left: TL_GUTTER, right: 0, top: 0, bottom: 0 }}>
-            {evs.map((e) => {
-              const top = ((e.start - minH * 60) / 60) * TL_HOUR_H;
-              const height = Math.max(((e.end - e.start) / 60) * TL_HOUR_H - 2, 24);
-              const widthPct = 100 / e.cols;
-              const typeColor = colors[prestationTypeColorKey(e.m.prestation_type)];
-              return (
-                <TouchableOpacity
-                  key={e.m.id}
-                  activeOpacity={0.7}
-                  onPress={() => onPressItem(e.m.id)}
-                  style={[styles.tlEvent, { top, height, left: `${e.col * widthPct}%`, width: `${widthPct}%` }]}
-                >
-                  <View style={[styles.tlEventInner, { backgroundColor: typeColor + '26', borderLeftColor: typeColor }]}>
-                    <Text numberOfLines={1} style={[styles.tlEventTitle, { color: colors.text }]}>
-                      {menageLogementLabel(e.m)}
-                    </Text>
-                    {height > 34 ? (
-                      <Text numberOfLines={1} style={[styles.tlEventSub, { color: colors.text2 }]}>
-                        {`${fmtMinutes(e.start)}–${fmtMinutes(e.end)}`}
-                      </Text>
-                    ) : null}
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-/**
- * Bottom sheet du détail du jour : glisse depuis le bas par-dessus la grille
- * (Séjours/Pastilles) au tap d'une case, prend la majeure partie de l'écran, et
- * affiche la timeline horaire. Fermé par défaut (aucune zone détail permanente).
- */
-function DayTimelineSheet({
-  visible,
-  dateIso,
-  isToday,
-  items,
-  colors,
-  onClose,
-  onPressItem,
-  renderRow,
-}: {
-  visible: boolean;
-  dateIso: string | null;
-  isToday: boolean;
-  items: Menage[];
-  colors: (typeof Colors)['light'];
-  onClose: () => void;
-  onPressItem: (id: string) => void;
-  renderRow: (m: Menage, opts?: { topBorder?: boolean; surface?: boolean }) => React.ReactNode;
-}) {
-  const insets = useSafeAreaInsets();
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={sheetStyles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[timelineSheetStyles.sheet, { backgroundColor: colors.background }]}>
-          <View style={sheetStyles.handle}>
-            <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
-          </View>
-          <View style={timelineSheetStyles.header}>
-            <Text
-              style={[timelineSheetStyles.title, { color: isToday ? colors.primary : colors.text }]}
-              numberOfLines={1}
-            >
-              {dateIso ? formatDateFr(dateIso.slice(0, 10), 'long') : ''}
-            </Text>
-            <TouchableOpacity
-              onPress={onClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              accessibilityRole="button"
-              accessibilityLabel="Fermer"
-            >
-              <X size={IconSize.md} color={colors.text2} />
-            </TouchableOpacity>
-          </View>
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{
-              paddingHorizontal: Spacing.lg,
-              paddingTop: Spacing.sm,
-              paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.md,
-            }}
-            showsVerticalScrollIndicator={false}
-          >
-            {items.length === 0 ? (
-              <Text style={[styles.empty, { color: colors.mutedText, marginTop: Spacing.md }]}>
-                Aucune prestation ce jour.
-              </Text>
-            ) : (
-              <DayTimeline items={items} colors={colors} onPressItem={onPressItem} renderRow={renderRow} />
-            )}
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
-const timelineSheetStyles = StyleSheet.create({
-  sheet: {
-    height: '82%',
-    borderTopLeftRadius: Radius.xxl,
-    borderTopRightRadius: Radius.xxl,
-    overflow: 'hidden',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    gap: Spacing.md,
-  },
-  title: { fontSize: FontSize.lg, fontWeight: FontWeight.bold, textTransform: 'capitalize', flexShrink: 1 },
-});

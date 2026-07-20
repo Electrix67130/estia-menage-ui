@@ -16,7 +16,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react-native';
+import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, RotateCw, Search, X } from 'lucide-react-native';
 import { useMenages } from '@/api/hooks/useMenages';
 import { useAllUsers } from '@/api/hooks/useLogementMembers';
 import { useLogements } from '@/api/hooks/useLogements';
@@ -242,26 +242,42 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
       ) : null}
 
       <View style={styles.monthNav}>
+        {/* Spacer gauche pour équilibrer le bouton refresh → nav centrée. */}
+        <View style={{ width: 32 }} />
+        <View style={styles.monthNavCenter}>
+          <TouchableOpacity
+            onPress={() => setCursor(addMonths(cursor, -1))}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            style={styles.monthNavBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Mois précédent"
+          >
+            <ChevronLeft size={IconSize.lg} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.monthLabel, { color: colors.text }]}>{formatDateFr(cursor, 'month')}</Text>
+          <TouchableOpacity
+            onPress={() => setCursor(addMonths(cursor, 1))}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            style={styles.monthNavBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Mois suivant"
+          >
+            <ChevronRight size={IconSize.lg} color={colors.text} />
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
-          onPress={() => setCursor(addMonths(cursor, -1))}
+          onPress={handleRefresh}
           hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-          style={styles.monthNavBtn}
+          style={{ width: 32, alignItems: 'flex-end' }}
           accessibilityRole="button"
-          accessibilityLabel="Mois précédent"
+          accessibilityLabel="Rafraîchir"
+          disabled={isRefetching || allUsers.isRefetching}
         >
-          <ChevronLeft size={IconSize.lg} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.monthLabel, { color: colors.text }]}>
-          {formatDateFr(cursor, 'month')}
-        </Text>
-        <TouchableOpacity
-          onPress={() => setCursor(addMonths(cursor, 1))}
-          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-          style={styles.monthNavBtn}
-          accessibilityRole="button"
-          accessibilityLabel="Mois suivant"
-        >
-          <ChevronRight size={IconSize.lg} color={colors.text} />
+          {isRefetching || allUsers.isRefetching ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <RotateCw size={IconSize.md} color={colors.text2} />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -473,9 +489,8 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />
       ) : (
         // La grille occupe tout l'écran ; le détail du jour glisse depuis le bas
-        // au tap. Chaque grille est une FlatList dont les SEMAINES sont les items
-        // (vrais items → pull-to-refresh fluide comme la liste des prestas ;
-        // l'ancienne ListEmptyComponent démontait la grille = « téléportation »).
+        // au tap. Pas de pull-to-refresh ici (grille pleine hauteur = artefacts) :
+        // le rafraîchissement se fait via le bouton ↻ de l'en-tête.
         viewMode === 'sejours' ? (
           <MonthSpanGridMobile
             days={days}
@@ -484,14 +499,6 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
             todayIso={todayIso}
             selectedDate={selectedDate}
             onSelectDay={handleSelectDay}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefetching || allUsers.isRefetching}
-                onRefresh={handleRefresh}
-                tintColor={colors.primary}
-                colors={[colors.primary]}
-              />
-            }
           />
         ) : (
           <MonthClassicGridMobile
@@ -501,14 +508,6 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
             todayIso={todayIso}
             selectedDate={selectedDate}
             onSelectDay={handleSelectDay}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefetching || allUsers.isRefetching}
-                onRefresh={handleRefresh}
-                tintColor={colors.primary}
-                colors={[colors.primary]}
-              />
-            }
           />
         )
       )}
@@ -687,6 +686,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.xs,
   },
+  monthNavCenter: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   monthLabel: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, textTransform: 'capitalize' },
   monthNavBtn: { padding: Spacing.xs },
   segmented: {
@@ -1056,7 +1056,6 @@ function MonthSpanGridMobile({
   todayIso,
   selectedDate,
   onSelectDay,
-  refreshControl,
 }: {
   days: { date: Date; inMonth: boolean }[];
   spans: Span[];
@@ -1064,7 +1063,6 @@ function MonthSpanGridMobile({
   todayIso: string;
   selectedDate: string | null;
   onSelectDay: (iso: string) => void;
-  refreshControl?: React.ReactElement<React.ComponentProps<typeof RefreshControl>>;
 }) {
   const [listH, setListH] = useState(0);
   // Mémoïsé → référence stable : sinon la FlatList re-render tous ses items à
@@ -1269,15 +1267,9 @@ function MonthSpanGridMobile({
       keyExtractor={(_, i) => String(i)}
       renderItem={renderWeek}
       getItemLayout={(_, index) => ({ length: rowH, offset: rowH * index, index })}
-      refreshControl={refreshControl}
       showsVerticalScrollIndicator={false}
-      alwaysBounceVertical
+      scrollEnabled={false}
       removeClippedSubviews={false}
-      // Petit espace sous la grille → le contenu dépasse l'écran donc devient
-      // réellement défilable → le pull-to-refresh natif est fluide (comme la page
-      // jour / la liste des prestas), au lieu de « téléporter » sur un contenu pile
-      // à la hauteur de l'écran.
-      ListFooterComponent={<View style={{ height: 48 }} />}
       onLayout={(e) => {
         const h = e.nativeEvent.layout.height;
         if (h > 0 && Math.abs(h - listH) > 1) setListH(h);
@@ -1294,7 +1286,6 @@ function MonthClassicGridMobile({
   todayIso,
   selectedDate,
   onSelectDay,
-  refreshControl,
 }: {
   days: { date: Date; inMonth: boolean }[];
   byDate: Map<string, Menage[]>;
@@ -1302,7 +1293,6 @@ function MonthClassicGridMobile({
   todayIso: string;
   selectedDate: string | null;
   onSelectDay: (iso: string) => void;
-  refreshControl?: React.ReactElement<React.ComponentProps<typeof RefreshControl>>;
 }) {
   const [listH, setListH] = useState(0);
   const weeks = useMemo(() => {
@@ -1361,15 +1351,9 @@ function MonthClassicGridMobile({
       keyExtractor={(_, i) => String(i)}
       renderItem={renderWeek}
       getItemLayout={(_, index) => ({ length: rowH, offset: rowH * index, index })}
-      refreshControl={refreshControl}
       showsVerticalScrollIndicator={false}
-      alwaysBounceVertical
+      scrollEnabled={false}
       removeClippedSubviews={false}
-      // Petit espace sous la grille → le contenu dépasse l'écran donc devient
-      // réellement défilable → le pull-to-refresh natif est fluide (comme la page
-      // jour / la liste des prestas), au lieu de « téléporter » sur un contenu pile
-      // à la hauteur de l'écran.
-      ListFooterComponent={<View style={{ height: 48 }} />}
       onLayout={(e) => {
         const h = e.nativeEvent.layout.height;
         if (h > 0 && Math.abs(h - listH) > 1) setListH(h);

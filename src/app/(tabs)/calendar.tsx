@@ -276,7 +276,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
           {isRefetching || allUsers.isRefetching ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : (
-            <RotateCw size={IconSize.md} color={colors.text2} />
+            <RotateCw size={IconSize.lg} color={colors.primary} />
           )}
         </TouchableOpacity>
       </View>

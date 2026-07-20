@@ -145,6 +145,10 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
   // Vue : grille mois en barres de séjour, grille mois en pastilles, ou liste agenda (Planning).
   const [viewMode, setViewMode] = usePersistedState<CalendarView>('calendar.viewMode', 'sejours');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // Hauteur dispo pour la grille, mesurée une fois : on la fige pour que le
+  // pull-to-refresh fasse GLISSER la grille en bloc (comme une liste) au lieu de
+  // la comprimer (l'ancien `flex:1` se réduisait quand le spinner apparaissait).
+  const [gridHeight, setGridHeight] = useState(0);
   const todayIso = isoLocal(new Date());
 
   // Planning (liste agenda) : tous les jours du mois qui ont des prestations,
@@ -477,6 +481,10 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
           style={{ flex: 1 }}
           contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
+          onLayout={(e) => {
+            const h = e.nativeEvent.layout.height;
+            if (h > 0 && Math.abs(h - gridHeight) > 1) setGridHeight(h);
+          }}
           refreshControl={
             <RefreshControl
               refreshing={isRefetching || allUsers.isRefetching}
@@ -486,25 +494,28 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
             />
           }
         >
-          {viewMode === 'sejours' ? (
-            <MonthSpanGridMobile
-              days={days}
-              spans={spans}
-              colors={colors}
-              todayIso={todayIso}
-              selectedDate={selectedDate}
-              onSelectDay={handleSelectDay}
-            />
-          ) : (
-            <MonthClassicGridMobile
-              days={days}
-              byDate={byDate}
-              colors={colors}
-              todayIso={todayIso}
-              selectedDate={selectedDate}
-              onSelectDay={handleSelectDay}
-            />
-          )}
+          {/* Hauteur figée une fois mesurée → glisse en bloc au pull-to-refresh. */}
+          <View style={gridHeight > 0 ? { height: gridHeight } : { flex: 1 }}>
+            {viewMode === 'sejours' ? (
+              <MonthSpanGridMobile
+                days={days}
+                spans={spans}
+                colors={colors}
+                todayIso={todayIso}
+                selectedDate={selectedDate}
+                onSelectDay={handleSelectDay}
+              />
+            ) : (
+              <MonthClassicGridMobile
+                days={days}
+                byDate={byDate}
+                colors={colors}
+                todayIso={todayIso}
+                selectedDate={selectedDate}
+                onSelectDay={handleSelectDay}
+              />
+            )}
+          </View>
         </ScrollView>
       )}
 

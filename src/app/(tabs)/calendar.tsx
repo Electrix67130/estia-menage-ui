@@ -1273,6 +1273,11 @@ function MonthSpanGridMobile({
       showsVerticalScrollIndicator={false}
       alwaysBounceVertical
       removeClippedSubviews={false}
+      // Petit espace sous la grille → le contenu dépasse l'écran donc devient
+      // réellement défilable → le pull-to-refresh natif est fluide (comme la page
+      // jour / la liste des prestas), au lieu de « téléporter » sur un contenu pile
+      // à la hauteur de l'écran.
+      ListFooterComponent={<View style={{ height: 48 }} />}
       onLayout={(e) => {
         const h = e.nativeEvent.layout.height;
         if (h > 0 && Math.abs(h - listH) > 1) setListH(h);
@@ -1360,6 +1365,11 @@ function MonthClassicGridMobile({
       showsVerticalScrollIndicator={false}
       alwaysBounceVertical
       removeClippedSubviews={false}
+      // Petit espace sous la grille → le contenu dépasse l'écran donc devient
+      // réellement défilable → le pull-to-refresh natif est fluide (comme la page
+      // jour / la liste des prestas), au lieu de « téléporter » sur un contenu pile
+      // à la hauteur de l'écran.
+      ListFooterComponent={<View style={{ height: 48 }} />}
       onLayout={(e) => {
         const h = e.nativeEvent.layout.height;
         if (h > 0 && Math.abs(h - listH) > 1) setListH(h);

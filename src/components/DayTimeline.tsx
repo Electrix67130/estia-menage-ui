@@ -205,9 +205,9 @@ export function DayTimeline({
         </View>
       ) : null}
 
-      {evs.length > 0 ? (
-        <View style={{ height: bodyH }}>
-          {hours.map((h) => (
+      {/* La grille horaire est toujours affichée, même sans prestation (jour vide). */}
+      <View style={{ height: bodyH }}>
+        {hours.map((h) => (
             <View key={h} style={[styles.tlHourRow, { top: (h - minH) * TL_HOUR_H }]}>
               <Text style={[styles.tlHourLabel, { color: colors.mutedText }]}>{`${String(h).padStart(2, '0')}:00`}</Text>
               <View style={[styles.tlHourLine, { backgroundColor: colors.border }]} />
@@ -241,8 +241,7 @@ export function DayTimeline({
               );
             })}
           </View>
-        </View>
-      ) : null}
+      </View>
     </View>
   );
 }

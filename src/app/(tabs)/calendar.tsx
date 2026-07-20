@@ -427,6 +427,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
             keyExtractor={(m) => m.id}
             stickySectionHeadersEnabled
             showsVerticalScrollIndicator={false}
+            alwaysBounceVertical
             contentContainerStyle={
               planningSections.length === 0
                 ? { flexGrow: 1, justifyContent: 'center' }
@@ -483,6 +484,9 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
           keyExtractor={() => 'grid'}
           renderItem={() => null}
           showsVerticalScrollIndicator={false}
+          // Le contenu remplit l'écran → sans bounce forcé, iOS ne permet pas
+          // l'overscroll et le pull-to-refresh « téléporte ». Forcé = glisse en douceur.
+          alwaysBounceVertical
           contentContainerStyle={{ flexGrow: 1 }}
           refreshControl={
             <RefreshControl

@@ -193,6 +193,7 @@ export default function DayScreen() {
             paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.md,
           }}
           showsVerticalScrollIndicator={false}
+          alwaysBounceVertical
           refreshControl={
             <RefreshControl
               refreshing={isRefetching}
@@ -202,11 +203,7 @@ export default function DayScreen() {
             />
           }
         >
-          {items.length === 0 ? (
-            <Text style={[styles.empty, { color: colors.mutedText }]}>Aucune prestation ce jour.</Text>
-          ) : (
-            <DayTimeline items={items} colors={colors} onPressItem={(id) => router.push(`/menage/${id}` as never)} />
-          )}
+          <DayTimeline items={items} colors={colors} onPressItem={(id) => router.push(`/menage/${id}` as never)} />
         </ScrollView>
       )}
     </SafeAreaView>

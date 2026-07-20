@@ -32,8 +32,6 @@ import { formatDateFr } from '@/lib/date-fr';
 import { AgendaRow, DayTimeline } from '@/components/DayTimeline';
 
 const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-/** Données vides stables pour la FlatList du calendrier (la grille est en ListEmptyComponent). */
-const EMPTY_LIST: never[] = [];
 
 const STATUS_COLOR: Record<MenageStatus, string> = {
   a_venir: '#3B82F6',
@@ -475,51 +473,44 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
         <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />
       ) : (
         // La grille occupe tout l'écran ; le détail du jour glisse depuis le bas
-        // (bottom sheet) au tap d'une case — pas de zone détail permanente.
-        // FlatList (et non ScrollView) → pull-to-refresh fluide comme la liste
-        // des prestas ; la grille remplit l'écran via ListEmptyComponent + flexGrow.
-        <FlatList
-          style={{ flex: 1 }}
-          data={EMPTY_LIST}
-          keyExtractor={() => 'grid'}
-          renderItem={() => null}
-          showsVerticalScrollIndicator={false}
-          // Le contenu remplit l'écran → sans bounce forcé, iOS ne permet pas
-          // l'overscroll et le pull-to-refresh « téléporte ». Forcé = glisse en douceur.
-          alwaysBounceVertical
-          contentContainerStyle={{ flexGrow: 1 }}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching || allUsers.isRefetching}
-              onRefresh={handleRefresh}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          }
-          ListEmptyComponent={
-            <View style={{ flex: 1 }}>
-              {viewMode === 'sejours' ? (
-                <MonthSpanGridMobile
-                  days={days}
-                  spans={spans}
-                  colors={colors}
-                  todayIso={todayIso}
-                  selectedDate={selectedDate}
-                  onSelectDay={handleSelectDay}
-                />
-              ) : (
-                <MonthClassicGridMobile
-                  days={days}
-                  byDate={byDate}
-                  colors={colors}
-                  todayIso={todayIso}
-                  selectedDate={selectedDate}
-                  onSelectDay={handleSelectDay}
-                />
-              )}
-            </View>
-          }
-        />
+        // au tap. Chaque grille est une FlatList dont les SEMAINES sont les items
+        // (vrais items → pull-to-refresh fluide comme la liste des prestas ;
+        // l'ancienne ListEmptyComponent démontait la grille = « téléportation »).
+        viewMode === 'sejours' ? (
+          <MonthSpanGridMobile
+            days={days}
+            spans={spans}
+            colors={colors}
+            todayIso={todayIso}
+            selectedDate={selectedDate}
+            onSelectDay={handleSelectDay}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching || allUsers.isRefetching}
+                onRefresh={handleRefresh}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+              />
+            }
+          />
+        ) : (
+          <MonthClassicGridMobile
+            days={days}
+            byDate={byDate}
+            colors={colors}
+            todayIso={todayIso}
+            selectedDate={selectedDate}
+            onSelectDay={handleSelectDay}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching || allUsers.isRefetching}
+                onRefresh={handleRefresh}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+              />
+            }
+          />
+        )
       )}
 
       <FilterPickerSheet
@@ -1065,6 +1056,7 @@ function MonthSpanGridMobile({
   todayIso,
   selectedDate,
   onSelectDay,
+  refreshControl,
 }: {
   days: { date: Date; inMonth: boolean }[];
   spans: Span[];
@@ -1072,9 +1064,14 @@ function MonthSpanGridMobile({
   todayIso: string;
   selectedDate: string | null;
   onSelectDay: (iso: string) => void;
+  refreshControl?: React.ReactElement<React.ComponentProps<typeof RefreshControl>>;
 }) {
+  const [listH, setListH] = useState(0);
   const weeks: { date: Date; inMonth: boolean }[][] = [];
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+  // Hauteur d'une semaine = hauteur dispo / nb de semaines → la grille remplit
+  // l'écran tout en étant une vraie liste (refresh natif fluide).
+  const rowH = listH > 0 ? listH / weeks.length : 84;
 
   // Occupation des demi-journées par jour : matin = check-out / départ de séjour ;
   // après-midi = check-in / arrivée de séjour ; jours intermédiaires = journée pleine.
@@ -1140,35 +1137,30 @@ function MonthSpanGridMobile({
     return { si, ei, lo: si, hi: si + 1 };
   };
 
-  return (
-    // Marge horizontale = en-tête des jours / vue classique → les barres ne
-    // touchent plus les bords de l'écran (fini l'effet « ça sort à gauche/droite »).
-    // flex:1 + semaines en flex:1 → la grille remplit la hauteur dispo (grandes cases).
-    <View style={{ paddingHorizontal: Spacing.sm, flex: 1 }}>
-      {weeks.map((week, wi) => {
-        const w0 = dayIndex(isoLocal(week[0].date));
-        const w6 = w0 + 6;
-        const inWeek = spans
-          .map((s) => ({ s, g: geom(s) }))
-          .filter(({ g }) => g.hi > w0 && g.lo < w6 + 1)
-          // Tri par position (lo puis hi) : le first-fit remet côte à côte un
-          // matin + un après-midi du même jour (turnover) sans les empiler.
-          .sort((a, b) => a.g.lo - b.g.lo || a.g.hi - b.g.hi);
-        const laneHi: number[] = [];
-        const laneOf = new Map<string, number>();
-        for (const { s, g } of inWeek) {
-          let lane = laneHi.findIndex((hi) => hi <= g.lo);
-          if (lane === -1) {
-            lane = laneHi.length;
-            laneHi.push(0);
-          }
-          laneHi[lane] = g.hi;
-          laneOf.set(s.key, lane);
-        }
-        const laneCount = Math.min(laneHi.length, MAX_LANES);
+  const renderWeek = ({ item: week }: { item: { date: Date; inMonth: boolean }[] }) => {
+    const w0 = dayIndex(isoLocal(week[0].date));
+    const w6 = w0 + 6;
+    const inWeek = spans
+      .map((s) => ({ s, g: geom(s) }))
+      .filter(({ g }) => g.hi > w0 && g.lo < w6 + 1)
+      // Tri par position (lo puis hi) : le first-fit remet côte à côte un
+      // matin + un après-midi du même jour (turnover) sans les empiler.
+      .sort((a, b) => a.g.lo - b.g.lo || a.g.hi - b.g.hi);
+    const laneHi: number[] = [];
+    const laneOf = new Map<string, number>();
+    for (const { s, g } of inWeek) {
+      let lane = laneHi.findIndex((hi) => hi <= g.lo);
+      if (lane === -1) {
+        lane = laneHi.length;
+        laneHi.push(0);
+      }
+      laneHi[lane] = g.hi;
+      laneOf.set(s.key, lane);
+    }
+    const laneCount = Math.min(laneHi.length, MAX_LANES);
 
-        return (
-          <View key={wi} style={{ flexDirection: 'row', flex: 1 }}>
+    return (
+          <View style={{ flexDirection: 'row', height: rowH }}>
             {week.map((cell, di) => {
               const dayIdx = w0 + di;
               const iso = isoLocal(cell.date);
@@ -1260,9 +1252,24 @@ function MonthSpanGridMobile({
               );
             })}
           </View>
-        );
-      })}
-    </View>
+    );
+  };
+
+  return (
+    <FlatList
+      style={{ flex: 1 }}
+      contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.sm }}
+      data={weeks}
+      keyExtractor={(_, i) => String(i)}
+      renderItem={renderWeek}
+      refreshControl={refreshControl}
+      showsVerticalScrollIndicator={false}
+      alwaysBounceVertical
+      onLayout={(e) => {
+        const h = e.nativeEvent.layout.height;
+        if (h > 0 && Math.abs(h - listH) > 1) setListH(h);
+      }}
+    />
   );
 }
 
@@ -1274,6 +1281,7 @@ function MonthClassicGridMobile({
   todayIso,
   selectedDate,
   onSelectDay,
+  refreshControl,
 }: {
   days: { date: Date; inMonth: boolean }[];
   byDate: Map<string, Menage[]>;
@@ -1281,53 +1289,68 @@ function MonthClassicGridMobile({
   todayIso: string;
   selectedDate: string | null;
   onSelectDay: (iso: string) => void;
+  refreshControl?: React.ReactElement<React.ComponentProps<typeof RefreshControl>>;
 }) {
+  const [listH, setListH] = useState(0);
   const weeks: { date: Date; inMonth: boolean }[][] = [];
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
-  return (
-    // flex:1 + semaines en flex:1 → les cases s'étirent pour remplir la hauteur.
-    <View style={{ flex: 1, paddingHorizontal: Spacing.sm }}>
-      {weeks.map((week, wi) => (
-        <View key={wi} style={{ flexDirection: 'row', flex: 1 }}>
-          {week.map(({ date, inMonth }) => {
-            const iso = isoLocal(date);
-            const items = byDate.get(iso) ?? [];
-            const isToday = iso === todayIso;
-            const isSelected = iso === selectedDate;
-            const dc = dayNumColors(colors, isToday, isSelected, inMonth);
-            return (
-              <TouchableOpacity
-                key={iso}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  paddingTop: 6,
-                  gap: 5,
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderColor: colors.border,
-                }}
-                onPress={() => onSelectDay(iso)}
-                activeOpacity={0.6}
-              >
-                <View style={[styles.dayCircle, { backgroundColor: dc.bg }]}>
-                  <Text style={{ color: dc.fg, fontSize: FontSize.md, fontWeight: dc.weight }}>
-                    {date.getDate()}
-                  </Text>
-                </View>
-                <View style={styles.dotsRow}>
-                  {items.slice(0, 3).map((m) => (
-                    <View
-                      key={m.id}
-                      style={[styles.dot, { backgroundColor: m.logement_color ?? STATUS_COLOR[m.status] }]}
-                    />
-                  ))}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      ))}
+  const rowH = listH > 0 ? listH / weeks.length : 84;
+  const renderWeek = ({ item: week }: { item: { date: Date; inMonth: boolean }[] }) => (
+    <View style={{ flexDirection: 'row', height: rowH }}>
+      {week.map(({ date, inMonth }) => {
+        const iso = isoLocal(date);
+        const items = byDate.get(iso) ?? [];
+        const isToday = iso === todayIso;
+        const isSelected = iso === selectedDate;
+        const dc = dayNumColors(colors, isToday, isSelected, inMonth);
+        return (
+          <TouchableOpacity
+            key={iso}
+            style={{
+              flex: 1,
+              alignItems: 'center',
+              paddingTop: 6,
+              gap: 5,
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderColor: colors.border,
+            }}
+            onPress={() => onSelectDay(iso)}
+            activeOpacity={0.6}
+          >
+            <View style={[styles.dayCircle, { backgroundColor: dc.bg }]}>
+              <Text style={{ color: dc.fg, fontSize: FontSize.md, fontWeight: dc.weight }}>
+                {date.getDate()}
+              </Text>
+            </View>
+            <View style={styles.dotsRow}>
+              {items.slice(0, 3).map((m) => (
+                <View
+                  key={m.id}
+                  style={[styles.dot, { backgroundColor: m.logement_color ?? STATUS_COLOR[m.status] }]}
+                />
+              ))}
+            </View>
+          </TouchableOpacity>
+        );
+      })}
     </View>
+  );
+
+  return (
+    <FlatList
+      style={{ flex: 1 }}
+      contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.sm }}
+      data={weeks}
+      keyExtractor={(_, i) => String(i)}
+      renderItem={renderWeek}
+      refreshControl={refreshControl}
+      showsVerticalScrollIndicator={false}
+      alwaysBounceVertical
+      onLayout={(e) => {
+        const h = e.nativeEvent.layout.height;
+        if (h > 0 && Math.abs(h - listH) > 1) setListH(h);
+      }}
+    />
   );
 }
 

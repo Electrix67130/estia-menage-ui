@@ -1067,8 +1067,13 @@ function MonthSpanGridMobile({
   refreshControl?: React.ReactElement<React.ComponentProps<typeof RefreshControl>>;
 }) {
   const [listH, setListH] = useState(0);
-  const weeks: { date: Date; inMonth: boolean }[][] = [];
-  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+  // Mémoïsé → référence stable : sinon la FlatList re-render tous ses items à
+  // chaque render (ex. bascule de `isRefetching`) → dédoublement pendant le refresh.
+  const weeks = useMemo(() => {
+    const out: { date: Date; inMonth: boolean }[][] = [];
+    for (let i = 0; i < days.length; i += 7) out.push(days.slice(i, i + 7));
+    return out;
+  }, [days]);
   // Hauteur d'une semaine = hauteur dispo / nb de semaines → la grille remplit
   // l'écran tout en étant une vraie liste (refresh natif fluide).
   const rowH = listH > 0 ? listH / weeks.length : 84;
@@ -1260,11 +1265,14 @@ function MonthSpanGridMobile({
       style={{ flex: 1 }}
       contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.sm }}
       data={weeks}
+      extraData={`${rowH}|${selectedDate}|${todayIso}`}
       keyExtractor={(_, i) => String(i)}
       renderItem={renderWeek}
+      getItemLayout={(_, index) => ({ length: rowH, offset: rowH * index, index })}
       refreshControl={refreshControl}
       showsVerticalScrollIndicator={false}
       alwaysBounceVertical
+      removeClippedSubviews={false}
       onLayout={(e) => {
         const h = e.nativeEvent.layout.height;
         if (h > 0 && Math.abs(h - listH) > 1) setListH(h);
@@ -1292,8 +1300,11 @@ function MonthClassicGridMobile({
   refreshControl?: React.ReactElement<React.ComponentProps<typeof RefreshControl>>;
 }) {
   const [listH, setListH] = useState(0);
-  const weeks: { date: Date; inMonth: boolean }[][] = [];
-  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+  const weeks = useMemo(() => {
+    const out: { date: Date; inMonth: boolean }[][] = [];
+    for (let i = 0; i < days.length; i += 7) out.push(days.slice(i, i + 7));
+    return out;
+  }, [days]);
   const rowH = listH > 0 ? listH / weeks.length : 84;
   const renderWeek = ({ item: week }: { item: { date: Date; inMonth: boolean }[] }) => (
     <View style={{ flexDirection: 'row', height: rowH }}>
@@ -1341,11 +1352,14 @@ function MonthClassicGridMobile({
       style={{ flex: 1 }}
       contentContainerStyle={{ flexGrow: 1, paddingHorizontal: Spacing.sm }}
       data={weeks}
+      extraData={`${rowH}|${selectedDate}|${todayIso}`}
       keyExtractor={(_, i) => String(i)}
       renderItem={renderWeek}
+      getItemLayout={(_, index) => ({ length: rowH, offset: rowH * index, index })}
       refreshControl={refreshControl}
       showsVerticalScrollIndicator={false}
       alwaysBounceVertical
+      removeClippedSubviews={false}
       onLayout={(e) => {
         const h = e.nativeEvent.layout.height;
         if (h > 0 && Math.abs(h - listH) > 1) setListH(h);

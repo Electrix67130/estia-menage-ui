@@ -1,5 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  RefreshControl,
+  Dimensions,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
@@ -13,6 +23,10 @@ import { DayTimeline } from '@/components/DayTimeline';
 
 const PRESTATAIRE_UNASSIGNED = '__unassigned__';
 const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+const SCREEN_W = Dimensions.get('window').width;
+// Bandeau semaine swipeable : on rend N semaines autour de la semaine de départ
+// (swipe horizontal = changer de semaine). STRIP_HALF de chaque côté.
+const STRIP_HALF = 52;
 
 function isoLocal(d: Date): string {
   const y = d.getFullYear();
@@ -21,17 +35,17 @@ function isoLocal(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-/** Semaine (lundi → dimanche) contenant la date donnée. */
-function weekOf(iso: string): Date[] {
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d);
+  x.setDate(d.getDate() + n);
+  return x;
+}
+
+/** Lundi de la semaine contenant la date donnée. */
+function mondayOf(iso: string): Date {
   const d = new Date(`${iso}T00:00:00`);
   const dow = (d.getDay() + 6) % 7; // lundi = 0
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - dow);
-  return Array.from({ length: 7 }, (_, i) => {
-    const x = new Date(monday);
-    x.setDate(monday.getDate() + i);
-    return x;
-  });
+  return addDays(d, -dow);
 }
 
 /** Titre de colonne façon Calendrier Apple : « jeu. — 2 juil. » */
@@ -53,7 +67,10 @@ export default function DayScreen() {
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const { date } = useLocalSearchParams<{ date: string }>();
-  const [activeDate, setActiveDate] = useState(() => (date ?? '').slice(0, 10) || isoLocal(new Date()));
+  // `baseIso` = date d'ouverture (figée) → sert d'ancre au bandeau semaine.
+  // `activeDate` = jour affiché (change au tap d'un jour).
+  const [baseIso] = useState(() => (date ?? '').slice(0, 10) || isoLocal(new Date()));
+  const [activeDate, setActiveDate] = useState(baseIso);
 
   const { data, isLoading, isRefetching, refetch } = useMenages({ from: activeDate, to: activeDate, limit: 200 });
 
@@ -78,7 +95,59 @@ export default function DayScreen() {
   }, [data, activeDate, prestataireFilter, typeFilter, logementFilter]);
 
   const todayIso = isoLocal(new Date());
-  const week = useMemo(() => weekOf(activeDate), [activeDate]);
+  // Lundis des semaines rendues dans le bandeau (autour de la semaine de départ).
+  const baseMonday = useMemo(() => mondayOf(baseIso), [baseIso]);
+  const weekMondays = useMemo(
+    () => Array.from({ length: STRIP_HALF * 2 + 1 }, (_, i) => addDays(baseMonday, (i - STRIP_HALF) * 7)),
+    [baseMonday],
+  );
+
+  const renderWeek = ({ item: monday }: { item: Date }) => {
+    const days = Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+    return (
+      <View style={{ width: SCREEN_W }}>
+        <View style={styles.weekStrip}>
+          {days.map((d, i) => {
+            const iso = isoLocal(d);
+            const isSelected = iso === activeDate;
+            const isToday = iso === todayIso;
+            const isWeekend = i >= 5;
+            const numColor = isSelected
+              ? '#fff'
+              : isToday
+                ? colors.primary
+                : isWeekend
+                  ? colors.mutedText
+                  : colors.text;
+            return (
+              <TouchableOpacity
+                key={iso}
+                style={styles.weekCell}
+                onPress={() => setActiveDate(iso)}
+                activeOpacity={0.6}
+                accessibilityRole="button"
+                accessibilityLabel={formatDateFr(iso, 'weekday')}
+                accessibilityState={{ selected: isSelected }}
+              >
+                <Text style={[styles.weekLetter, { color: colors.text2 }]}>{WEEKDAYS[i]}</Text>
+                <View style={[styles.weekPill, isSelected && { backgroundColor: colors.primary }]}>
+                  <Text
+                    style={{
+                      color: numColor,
+                      fontSize: FontSize.md,
+                      fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.regular,
+                    }}
+                  >
+                    {d.getDate()}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -94,40 +163,19 @@ export default function DayScreen() {
         <Text style={[styles.backLabel, { color: colors.primary }]}>{formatDateFr(activeDate, 'month')}</Text>
       </TouchableOpacity>
 
-      {/* Bandeau semaine navigable */}
-      <View style={styles.weekStrip}>
-        {week.map((d, i) => {
-          const iso = isoLocal(d);
-          const isSelected = iso === activeDate;
-          const isToday = iso === todayIso;
-          const isWeekend = i >= 5;
-          const numColor = isSelected
-            ? '#fff'
-            : isToday
-              ? colors.primary
-              : isWeekend
-                ? colors.mutedText
-                : colors.text;
-          return (
-            <TouchableOpacity
-              key={iso}
-              style={styles.weekCell}
-              onPress={() => setActiveDate(iso)}
-              activeOpacity={0.6}
-              accessibilityRole="button"
-              accessibilityLabel={formatDateFr(iso, 'weekday')}
-              accessibilityState={{ selected: isSelected }}
-            >
-              <Text style={[styles.weekLetter, { color: colors.text2 }]}>{WEEKDAYS[i]}</Text>
-              <View style={[styles.weekPill, isSelected && { backgroundColor: colors.primary }]}>
-                <Text style={{ color: numColor, fontSize: FontSize.md, fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.regular }}>
-                  {d.getDate()}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+      {/* Bandeau semaine swipeable : swipe horizontal = changer de semaine. */}
+      <FlatList
+        data={weekMondays}
+        renderItem={renderWeek}
+        keyExtractor={(m) => isoLocal(m)}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        initialScrollIndex={STRIP_HALF}
+        getItemLayout={(_, index) => ({ length: SCREEN_W, offset: SCREEN_W * index, index })}
+        style={styles.weekList}
+        extraData={activeDate}
+      />
 
       {/* Titre de colonne façon Apple */}
       <View style={[styles.colHeader, { borderBottomColor: colors.border }]}>
@@ -177,11 +225,13 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xs,
   },
   backLabel: { fontSize: FontSize.lg, fontWeight: FontWeight.medium, textTransform: 'capitalize' },
+  weekList: { flexGrow: 0 },
   weekStrip: {
     flexDirection: 'row',
     paddingHorizontal: Spacing.sm,
     paddingBottom: Spacing.sm,
   },
+
   weekCell: { flex: 1, alignItems: 'center', gap: 4 },
   weekLetter: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, textTransform: 'uppercase' },
   weekPill: {

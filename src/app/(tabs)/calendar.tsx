@@ -24,6 +24,7 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react-native';
 import { useMenages } from '@/api/hooks/useMenages';
@@ -975,6 +976,19 @@ function PullRefresh({
 }) {
   const pull = useSharedValue(0); // traction en cours (geste)
   const loading = useSharedValue(0); // 0→1 pendant le refetch
+  const armed = useSharedValue(false); // seuil franchi → tic haptique (une fois)
+
+  // Tic haptique léger (comme le pull-to-refresh natif). Gardé : sur un binaire
+  // sans le module natif (OTA actuelle), l'appel échoue en silence — s'activera
+  // au prochain build natif.
+  const lightHaptic = React.useCallback(() => {
+    try {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    } catch {
+      /* module natif absent (binaire OTA) → no-op */
+    }
+  }, []);
+
   React.useEffect(() => {
     // Retour piloté : quand le refetch se termine, `loading` revient à 0 en
     // douceur → la grille remonte sans téléportation.
@@ -991,9 +1005,17 @@ function PullRefresh({
       // Suit le doigt jusqu'au seuil, puis résistance (effet élastique).
       const t = Math.max(e.translationY, 0);
       pull.value = t <= PULL_THRESHOLD ? t : PULL_THRESHOLD + (t - PULL_THRESHOLD) * 0.3;
+      // Tic haptique une seule fois, au franchissement du seuil (comme le natif).
+      if (pull.value >= PULL_THRESHOLD && !armed.value) {
+        armed.value = true;
+        runOnJS(lightHaptic)();
+      } else if (pull.value < PULL_THRESHOLD && armed.value) {
+        armed.value = false;
+      }
     })
     .onEnd(() => {
       if (pull.value >= PULL_THRESHOLD) runOnJS(onRefresh)();
+      armed.value = false;
       // La traction se relâche toujours en douceur ; si un refetch démarre,
       // `loading` prend le relais pour garder la grille descendue.
       pull.value = withTiming(0, { duration: 420 });

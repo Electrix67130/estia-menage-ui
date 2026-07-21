@@ -16,6 +16,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
+  useDerivedValue,
   useAnimatedStyle,
   withTiming,
   runOnJS,
@@ -952,9 +953,13 @@ function groupByDate(menages: Menage[]): Map<string, Menage[]> {
 
 
 /**
- * Pull-to-refresh custom : au geste (tirer vers le bas), une roue apparaît en
- * overlay en haut de la zone, SANS déplacer le contenu (la grille reste fixe).
- * Au-delà d'un seuil, déclenche `onRefresh` ; la roue reste tant que `refreshing`.
+ * Pull-to-refresh custom. Le geste (tirer vers le bas) fait DESCENDRE la grille
+ * (comme le natif, ce qui était bien), une roue apparaît dans l'espace révélé en
+ * haut. Différence clé : la **remontée** est une animation `withTiming` qu'on
+ * contrôle → elle glisse toujours en douceur (le natif « téléportait » car son
+ * retour était interrompu par le re-render des données).
+ * `offset = max(traction, chargement)` : la grille reste descendue pendant le
+ * refetch puis remonte doucement à la fin.
  */
 const PULL_THRESHOLD = 64;
 function PullRefresh({
@@ -968,49 +973,55 @@ function PullRefresh({
   tint: string;
   children: React.ReactNode;
 }) {
-  const pull = useSharedValue(0);
+  const pull = useSharedValue(0); // traction en cours (geste)
+  const loading = useSharedValue(0); // 0→1 pendant le refetch
 
   React.useEffect(() => {
-    // Refetch démarré → on maintient la roue ; terminé → on la rétracte.
-    pull.value = withTiming(refreshing ? PULL_THRESHOLD : 0, { duration: 200 });
-  }, [refreshing, pull]);
+    // Retour piloté : quand le refetch se termine, `loading` revient à 0 en
+    // douceur → la grille remonte sans téléportation.
+    loading.value = withTiming(refreshing ? 1 : 0, { duration: 280 });
+  }, [refreshing, loading]);
+
+  // Décalage effectif de la grille = le plus grand des deux (traction ou chargement).
+  const offset = useDerivedValue(() => Math.max(pull.value, loading.value * PULL_THRESHOLD));
 
   const pan = Gesture.Pan()
     .activeOffsetY(14) // n'active qu'après un vrai glissement vers le bas
     .failOffsetY(-14) // laisse passer les taps / gestes vers le haut
     .onUpdate((e) => {
-      if (e.translationY > 0) pull.value = Math.min(e.translationY * 0.6, PULL_THRESHOLD + 24);
+      // Suit le doigt jusqu'au seuil, puis résistance (effet élastique).
+      const t = Math.max(e.translationY, 0);
+      pull.value = t <= PULL_THRESHOLD ? t : PULL_THRESHOLD + (t - PULL_THRESHOLD) * 0.3;
     })
     .onEnd(() => {
-      if (pull.value >= PULL_THRESHOLD) {
-        pull.value = withTiming(PULL_THRESHOLD, { duration: 120 });
-        runOnJS(onRefresh)();
-      } else {
-        pull.value = withTiming(0, { duration: 160 });
-      }
+      if (pull.value >= PULL_THRESHOLD) runOnJS(onRefresh)();
+      // La traction se relâche toujours en douceur ; si un refetch démarre,
+      // `loading` prend le relais pour garder la grille descendue.
+      pull.value = withTiming(0, { duration: 300 });
     });
 
+  const contentStyle = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }));
   const spinnerStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(pull.value, [0, PULL_THRESHOLD], [0, 1], Extrapolation.CLAMP),
+    opacity: interpolate(offset.value, [0, PULL_THRESHOLD], [0, 1], Extrapolation.CLAMP),
     transform: [
-      { translateY: interpolate(pull.value, [0, PULL_THRESHOLD], [-8, 12], Extrapolation.CLAMP) },
-      { scale: interpolate(pull.value, [0, PULL_THRESHOLD], [0.5, 1], Extrapolation.CLAMP) },
+      { translateY: interpolate(offset.value, [0, PULL_THRESHOLD], [-24, 8], Extrapolation.CLAMP) },
+      { scale: interpolate(offset.value, [0, PULL_THRESHOLD], [0.6, 1], Extrapolation.CLAMP) },
     ],
   }));
 
   return (
     <GestureDetector gesture={pan}>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, overflow: 'hidden' }}>
         <Animated.View
           pointerEvents="none"
           style={[
-            { position: 'absolute', top: 6, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
+            { position: 'absolute', top: 4, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
             spinnerStyle,
           ]}
         >
           <ActivityIndicator color={tint} />
         </Animated.View>
-        {children}
+        <Animated.View style={[{ flex: 1 }, contentStyle]}>{children}</Animated.View>
       </View>
     </GestureDetector>
   );

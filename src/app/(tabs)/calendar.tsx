@@ -12,6 +12,7 @@ import {
   FlatList,
   SectionList,
   RefreshControl,
+  Vibration,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -975,6 +976,8 @@ function PullRefresh({
 }) {
   const pull = useSharedValue(0); // traction en cours (geste)
   const loading = useSharedValue(0); // 0→1 pendant le refetch
+  const armed = useSharedValue(false); // seuil franchi → petite vibration (une fois)
+  const vibrate = React.useCallback(() => Vibration.vibrate(10), []);
 
   React.useEffect(() => {
     // Retour piloté : quand le refetch se termine, `loading` revient à 0 en
@@ -992,9 +995,18 @@ function PullRefresh({
       // Suit le doigt jusqu'au seuil, puis résistance (effet élastique).
       const t = Math.max(e.translationY, 0);
       pull.value = t <= PULL_THRESHOLD ? t : PULL_THRESHOLD + (t - PULL_THRESHOLD) * 0.3;
+      // Petite vibration au franchissement du seuil (une seule fois), comme le
+      // refresh natif des listes prestations/logements.
+      if (pull.value >= PULL_THRESHOLD && !armed.value) {
+        armed.value = true;
+        runOnJS(vibrate)();
+      } else if (pull.value < PULL_THRESHOLD && armed.value) {
+        armed.value = false;
+      }
     })
     .onEnd(() => {
       if (pull.value >= PULL_THRESHOLD) runOnJS(onRefresh)();
+      armed.value = false;
       // La traction se relâche toujours en douceur ; si un refetch démarre,
       // `loading` prend le relais pour garder la grille descendue.
       pull.value = withTiming(0, { duration: 420 });

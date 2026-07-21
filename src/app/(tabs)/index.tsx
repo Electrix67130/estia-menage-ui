@@ -46,22 +46,24 @@ function PrestataireMenagesScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader>
-        <View style={{ flex: 1 }}>
+        <View style={styles.headerRow}>
           <Text style={[styles.title, { color: colors.text }]}>{t('prestation.title')}</Text>
-          <Text style={{ color: colors.mutedText, fontSize: FontSize.xs, marginTop: 2 }}>
-            Indique si tu peux faire chaque prestation. Appui long = demander un changement.
-          </Text>
+          {/* Historique — ses prestations clôturées (validées/annulées). */}
+          <TouchableOpacity
+            style={[styles.reschedBtn, { backgroundColor: colors.itemBackground }]}
+            onPress={() => router.push('/historique' as never)}
+            accessibilityRole="button"
+            accessibilityLabel="Historique"
+          >
+            <History size={IconSize.md} color={colors.mutedText} />
+          </TouchableOpacity>
         </View>
-        {/* Historique — ses prestations clôturées (validées/annulées). */}
-        <TouchableOpacity
-          style={[styles.reschedBtn, { backgroundColor: colors.itemBackground }]}
-          onPress={() => router.push('/historique' as never)}
-          accessibilityRole="button"
-          accessibilityLabel="Historique"
-        >
-          <History size={IconSize.md} color={colors.mutedText} />
-        </TouchableOpacity>
       </AppHeader>
+      {/* Aide déplacée sous l'en-tête → l'en-tête garde le même format que les
+          autres pages (logo collé au titre). */}
+      <Text style={[styles.headerHint, { color: colors.mutedText }]}>
+        Indique si tu peux faire chaque prestation. Appui long = demander un changement.
+      </Text>
       <PrestaUpcomingList />
     </SafeAreaView>
   );
@@ -751,6 +753,7 @@ const styles = StyleSheet.create({
   // comme les autres pages (Logements, etc.).
   headerRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  headerHint: { fontSize: FontSize.xs, paddingHorizontal: Spacing.xxl, paddingBottom: Spacing.sm },
   viewToggle: {
     flexDirection: 'row',
     borderRadius: Radius.md,

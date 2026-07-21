@@ -979,7 +979,7 @@ function PullRefresh({
   React.useEffect(() => {
     // Retour piloté : quand le refetch se termine, `loading` revient à 0 en
     // douceur → la grille remonte sans téléportation.
-    loading.value = withTiming(refreshing ? 1 : 0, { duration: 280 });
+    loading.value = withTiming(refreshing ? 1 : 0, { duration: 480 });
   }, [refreshing, loading]);
 
   // Décalage effectif de la grille = le plus grand des deux (traction ou chargement).
@@ -997,7 +997,7 @@ function PullRefresh({
       if (pull.value >= PULL_THRESHOLD) runOnJS(onRefresh)();
       // La traction se relâche toujours en douceur ; si un refetch démarre,
       // `loading` prend le relais pour garder la grille descendue.
-      pull.value = withTiming(0, { duration: 300 });
+      pull.value = withTiming(0, { duration: 420 });
     });
 
   const contentStyle = useAnimatedStyle(() => ({ transform: [{ translateY: offset.value }] }));

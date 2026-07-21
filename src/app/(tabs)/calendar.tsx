@@ -14,7 +14,15 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  runOnJS,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react-native';
 import { useMenages } from '@/api/hooks/useMenages';
@@ -145,11 +153,6 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
   // Vue : grille mois en barres de séjour, grille mois en pastilles, ou liste agenda (Planning).
   const [viewMode, setViewMode] = usePersistedState<CalendarView>('calendar.viewMode', 'sejours');
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  // Hauteur dispo pour la grille, mesurée UNE fois (jamais recalculée pendant le
-  // refresh → la grille ne bouge pas). Le ScrollView a un contenu = gridH + débord
-  // → il est réellement défilable → le pull-to-refresh natif glisse (comme la page
-  // jour), au lieu de « téléporter » sur un contenu pile à la hauteur de l'écran.
-  const [gridH, setGridH] = useState(0);
   const todayIso = isoLocal(new Date());
 
   // Planning (liste agenda) : tous les jours du mois qui ont des prestations,
@@ -475,49 +478,34 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
       ) : isLoading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />
       ) : (
-        // Même montage que la page jour (qui marche) : ScrollView + RefreshControl,
-        // contenu = grille (hauteur figée, mesurée une fois) + petit débord → défilable
-        // → pull-to-refresh natif fluide, sans « téléportation ».
-        <View style={{ flex: 1 }} onLayout={(e) => {
-          const h = e.nativeEvent.layout.height;
-          if (h > 0 && gridH === 0) setGridH(h);
-        }}>
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={gridH > 0 ? { height: gridH + 56 } : { flexGrow: 1 }}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefetching || allUsers.isRefetching}
-                onRefresh={handleRefresh}
-                tintColor={colors.primary}
-                colors={[colors.primary]}
-              />
-            }
-          >
-            <View style={gridH > 0 ? { height: gridH } : { flex: 1 }}>
-              {viewMode === 'sejours' ? (
-                <MonthSpanGridMobile
-                  days={days}
-                  spans={spans}
-                  colors={colors}
-                  todayIso={todayIso}
-                  selectedDate={selectedDate}
-                  onSelectDay={handleSelectDay}
-                />
-              ) : (
-                <MonthClassicGridMobile
-                  days={days}
-                  byDate={byDate}
-                  colors={colors}
-                  todayIso={todayIso}
-                  selectedDate={selectedDate}
-                  onSelectDay={handleSelectDay}
-                />
-              )}
-            </View>
-          </ScrollView>
-        </View>
+        // Refresh custom : la roue apparaît en overlay en haut du calendrier au
+        // geste (tirer vers le bas), la GRILLE NE BOUGE PAS. Fini le glissement de
+        // tout le contenu du RefreshControl natif.
+        <PullRefresh
+          refreshing={isRefetching || allUsers.isRefetching}
+          onRefresh={handleRefresh}
+          tint={colors.primary}
+        >
+          {viewMode === 'sejours' ? (
+            <MonthSpanGridMobile
+              days={days}
+              spans={spans}
+              colors={colors}
+              todayIso={todayIso}
+              selectedDate={selectedDate}
+              onSelectDay={handleSelectDay}
+            />
+          ) : (
+            <MonthClassicGridMobile
+              days={days}
+              byDate={byDate}
+              colors={colors}
+              todayIso={todayIso}
+              selectedDate={selectedDate}
+              onSelectDay={handleSelectDay}
+            />
+          )}
+        </PullRefresh>
       )}
 
       <FilterPickerSheet
@@ -962,6 +950,71 @@ function groupByDate(menages: Menage[]): Map<string, Menage[]> {
   return map;
 }
 
+
+/**
+ * Pull-to-refresh custom : au geste (tirer vers le bas), une roue apparaît en
+ * overlay en haut de la zone, SANS déplacer le contenu (la grille reste fixe).
+ * Au-delà d'un seuil, déclenche `onRefresh` ; la roue reste tant que `refreshing`.
+ */
+const PULL_THRESHOLD = 64;
+function PullRefresh({
+  refreshing,
+  onRefresh,
+  tint,
+  children,
+}: {
+  refreshing: boolean;
+  onRefresh: () => void;
+  tint: string;
+  children: React.ReactNode;
+}) {
+  const pull = useSharedValue(0);
+
+  React.useEffect(() => {
+    // Refetch démarré → on maintient la roue ; terminé → on la rétracte.
+    pull.value = withTiming(refreshing ? PULL_THRESHOLD : 0, { duration: 200 });
+  }, [refreshing, pull]);
+
+  const pan = Gesture.Pan()
+    .activeOffsetY(14) // n'active qu'après un vrai glissement vers le bas
+    .failOffsetY(-14) // laisse passer les taps / gestes vers le haut
+    .onUpdate((e) => {
+      if (e.translationY > 0) pull.value = Math.min(e.translationY * 0.6, PULL_THRESHOLD + 24);
+    })
+    .onEnd(() => {
+      if (pull.value >= PULL_THRESHOLD) {
+        pull.value = withTiming(PULL_THRESHOLD, { duration: 120 });
+        runOnJS(onRefresh)();
+      } else {
+        pull.value = withTiming(0, { duration: 160 });
+      }
+    });
+
+  const spinnerStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(pull.value, [0, PULL_THRESHOLD], [0, 1], Extrapolation.CLAMP),
+    transform: [
+      { translateY: interpolate(pull.value, [0, PULL_THRESHOLD], [-8, 12], Extrapolation.CLAMP) },
+      { scale: interpolate(pull.value, [0, PULL_THRESHOLD], [0.5, 1], Extrapolation.CLAMP) },
+    ],
+  }));
+
+  return (
+    <GestureDetector gesture={pan}>
+      <View style={{ flex: 1 }}>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            { position: 'absolute', top: 6, left: 0, right: 0, alignItems: 'center', zIndex: 10 },
+            spinnerStyle,
+          ]}
+        >
+          <ActivityIndicator color={tint} />
+        </Animated.View>
+        {children}
+      </View>
+    </GestureDetector>
+  );
+}
 
 // ---------- Barres de séjour (grille mensuelle) ----------
 

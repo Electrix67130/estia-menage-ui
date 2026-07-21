@@ -402,59 +402,63 @@ function AdminMenagesScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader>
-        <Text style={[styles.title, { color: colors.text }]}>{t('prestation.title')}</Text>
-        {/* Historique — prestations clôturées (validées/annulées/retirées). */}
-        <TouchableOpacity
-          style={[styles.reschedBtn, { backgroundColor: colors.itemBackground }]}
-          onPress={() => router.push('/historique' as never)}
-          accessibilityRole="button"
-          accessibilityLabel="Historique"
-        >
-          <History size={IconSize.md} color={colors.mutedText} />
-        </TouchableOpacity>
-        {/* Demandes de changement — actif si pending > 0, muted sinon. */}
-        <TouchableOpacity
-          style={[
-            styles.reschedBtn,
-            {
-              backgroundColor:
-                pendingCount > 0 ? colors.statusEnCours + '20' : colors.itemBackground,
-            },
-          ]}
-          onPress={() => router.push('/reschedule-requests' as never)}
-          accessibilityRole="button"
-          accessibilityLabel={`Demandes de changement (${pendingCount})`}
-        >
-          <CalendarClock
-            size={IconSize.md}
-            color={pendingCount > 0 ? colors.statusEnCours : colors.mutedText}
-          />
-          {pendingCount > 0 ? (
-            <View style={[styles.reschedBadge, { backgroundColor: colors.statusEnCours }]}>
-              <Text style={styles.reschedBadgeText}>{pendingCount > 9 ? '9+' : pendingCount}</Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.title, { color: colors.text }]}>{t('prestation.title')}</Text>
+          <View style={styles.headerActions}>
+            {/* Historique — prestations clôturées (validées/annulées/retirées). */}
+            <TouchableOpacity
+              style={[styles.reschedBtn, { backgroundColor: colors.itemBackground }]}
+              onPress={() => router.push('/historique' as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Historique"
+            >
+              <History size={IconSize.md} color={colors.mutedText} />
+            </TouchableOpacity>
+            {/* Demandes de changement — actif si pending > 0, muted sinon. */}
+            <TouchableOpacity
+              style={[
+                styles.reschedBtn,
+                {
+                  backgroundColor:
+                    pendingCount > 0 ? colors.statusEnCours + '20' : colors.itemBackground,
+                },
+              ]}
+              onPress={() => router.push('/reschedule-requests' as never)}
+              accessibilityRole="button"
+              accessibilityLabel={`Demandes de changement (${pendingCount})`}
+            >
+              <CalendarClock
+                size={IconSize.md}
+                color={pendingCount > 0 ? colors.statusEnCours : colors.mutedText}
+              />
+              {pendingCount > 0 ? (
+                <View style={[styles.reschedBadge, { backgroundColor: colors.statusEnCours }]}>
+                  <Text style={styles.reschedBadgeText}>{pendingCount > 9 ? '9+' : pendingCount}</Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
+            {/* Toggle liste / carte */}
+            <View style={[styles.viewToggle, { backgroundColor: colors.itemBackground }]}>
+              <TouchableOpacity
+                style={[styles.toggleBtn, viewMode === 'list' && { backgroundColor: colors.primary }]}
+                onPress={() => setViewMode('list')}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: viewMode === 'list' }}
+                accessibilityLabel="Vue liste"
+              >
+                <List size={IconSize.md} color={viewMode === 'list' ? '#FFFFFF' : colors.text2} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleBtn, viewMode === 'map' && { backgroundColor: colors.primary }]}
+                onPress={() => setViewMode('map')}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: viewMode === 'map' }}
+                accessibilityLabel="Vue carte"
+              >
+                <MapIcon size={IconSize.md} color={viewMode === 'map' ? '#FFFFFF' : colors.text2} />
+              </TouchableOpacity>
             </View>
-          ) : null}
-        </TouchableOpacity>
-        {/* Toggle liste / carte */}
-        <View style={[styles.viewToggle, { backgroundColor: colors.itemBackground }]}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, viewMode === 'list' && { backgroundColor: colors.primary }]}
-            onPress={() => setViewMode('list')}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: viewMode === 'list' }}
-            accessibilityLabel="Vue liste"
-          >
-            <List size={IconSize.md} color={viewMode === 'list' ? '#FFFFFF' : colors.text2} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, viewMode === 'map' && { backgroundColor: colors.primary }]}
-            onPress={() => setViewMode('map')}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: viewMode === 'map' }}
-            accessibilityLabel="Vue carte"
-          >
-            <MapIcon size={IconSize.md} color={viewMode === 'map' ? '#FFFFFF' : colors.text2} />
-          </TouchableOpacity>
+          </View>
         </View>
       </AppHeader>
 
@@ -743,6 +747,10 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.sm,
   },
   title: { fontSize: FontSize.title, fontWeight: FontWeight.bold },
+  // Titre à gauche (collé au logo de l'AppHeader) + actions groupées à droite,
+  // comme les autres pages (Logements, etc.).
+  headerRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.md },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   viewToggle: {
     flexDirection: 'row',
     borderRadius: Radius.md,

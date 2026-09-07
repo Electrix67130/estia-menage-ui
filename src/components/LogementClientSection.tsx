@@ -15,7 +15,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
-import { useClients, useCreateClient, clientDisplayName } from '@/api/hooks/useClients';
+import { useClients, useClient, useCreateClient, clientDisplayName } from '@/api/hooks/useClients';
 import { useUpdateLogement } from '@/api/hooks/useLogements';
 import CreateClientModal from '@/components/CreateClientModal';
 import { useDialog } from '@/contexts/DialogContext';
@@ -36,7 +36,11 @@ const LogementClientSection: React.FC<Props> = ({ logementId, currentClientId, i
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
-  const clients = useClients();
+  // L'annuaire complet ne sert qu'au picker admin ; un non-admin ne charge que
+  // la fiche du client rattaché à CE logement (et seulement s'il a la
+  // permission `can_view_clients`, l'API filtrant le reste).
+  const clients = useClients({ enabled: isAdmin });
+  const singleClient = useClient(!isAdmin ? currentClientId ?? undefined : undefined);
   const createClient = useCreateClient();
   const update = useUpdateLogement();
   const [open, setOpen] = useState(false);
@@ -62,8 +66,9 @@ const LogementClientSection: React.FC<Props> = ({ logementId, currentClientId, i
 
   const current = useMemo(() => {
     if (!currentClientId) return null;
+    if (!isAdmin) return singleClient.data ?? null;
     return (clients.data?.data ?? []).find((c) => c.id === currentClientId) ?? null;
-  }, [clients.data, currentClientId]);
+  }, [clients.data, currentClientId, isAdmin, singleClient.data]);
 
   const [search, setSearch] = useState('');
 

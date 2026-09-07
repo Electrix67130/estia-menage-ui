@@ -24,7 +24,6 @@ import { useLogement, useDeleteLogement, useUpdateLogement, useUnarchiveLogement
 import { uploadFile } from '@/api/upload';
 import { optimizeImage } from '@/utils/optimizeImage';
 import { useLogementMembers } from '@/api/hooks/useLogementMembers';
-import SecretCodeField from '@/components/SecretCodeField';
 import { useAuth } from '@/contexts/AuthContext';
 import SheetHandle from '@/components/SheetHandle';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
@@ -35,6 +34,9 @@ import LogementMembersSection from '@/components/LogementMembersSection';
 import LogementInfoForm from '@/components/LogementInfoForm';
 import LogementClientSection from '@/components/LogementClientSection';
 import LogementExternalCalendarsSection from '@/components/LogementExternalCalendarsSection';
+import LogementEquipementsSection from '@/components/LogementEquipementsSection';
+import LogementCodesSection from '@/components/LogementCodesSection';
+import LogementOptionsSection from '@/components/LogementOptionsSection';
 import ImageView from 'react-native-image-viewing';
 import { useLogementPhotos } from '@/api/hooks/usePhotos';
 import { openMaps } from '@/lib/contact-links';
@@ -314,6 +316,10 @@ export default function LogementDetailScreen() {
           onEdit={(room) => setRoomModal({ mode: 'edit', room })}
         />
 
+        <LogementEquipementsSection logementId={logement.id} isAdmin={isAdmin} />
+
+        <LogementOptionsSection logementId={logement.id} isAdmin={isAdmin} />
+
         {isAdmin ? (
           <>
             <Text style={[styles.section, { color: colors.text2 }]}>CONSOMMABLES</Text>
@@ -321,12 +327,9 @@ export default function LogementDetailScreen() {
           </>
         ) : null}
 
-        {/* Code & notes : en lecture seule pour les non-admins (l'admin les édite dans le formulaire ci-dessus). */}
-        {!isAdmin && logement.key_safe_code && !!myMember ? (
-          <>
-            <Text style={[styles.section, { color: colors.text2 }]}>CODE BOÎTE À CLEF</Text>
-            <SecretCodeField value={logement.key_safe_code} onChangeText={() => {}} readonly />
-          </>
+        {/* Codes d'accès : édition admin, lecture pour les membres du logement. */}
+        {isAdmin || myMember ? (
+          <LogementCodesSection logementId={logement.id} isAdmin={isAdmin} />
         ) : null}
 
         {!isAdmin && logement.notes ? (

@@ -64,6 +64,10 @@ import {
 } from '@/api/hooks/useMenageResponses';
 import { useCreateRescheduleRequest } from '@/api/hooks/useReschedule';
 import { useLogement } from '@/api/hooks/useLogements';
+import { useLogementCodes } from '@/api/hooks/useLogementCodes';
+import MenageEquipementsSection from '@/components/MenageEquipementsSection';
+import MenageOptionsSection from '@/components/MenageOptionsSection';
+import LogementReferencePhotos from '@/components/LogementReferencePhotos';
 import { useMarkTabViewed, useUnreadCounts } from '@/api/hooks/useMenageViews';
 import {
   useMenageConsommables,
@@ -921,6 +925,15 @@ export default function MenageDetailScreen() {
               />
             ) : null}
             <BedsSection menage={menage} colors={colors} isAdmin={isAdmin} />
+            {/* Photos de référence du logement : le presta doit savoir à quoi
+                ça doit ressembler une fois le ménage fait. */}
+            <LogementReferencePhotos logementId={menage.logement_id} />
+            <MenageOptionsSection menageId={menage.id} logementId={menage.logement_id} isAdmin={isAdmin} />
+            <MenageEquipementsSection
+              menageId={menage.id}
+              logementId={menage.logement_id}
+              isAdmin={isAdmin}
+            />
           </ScrollView>
         )}
         {activeTab === 'check' && <MenageCheckList menageId={id!} readonly={menage.status === 'valide'} />}
@@ -1231,6 +1244,7 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
   const [nLitDouble, setNLitDouble] = useState(String(menage.n_lit_double ?? 0));
   const [nCanapeLit, setNCanapeLit] = useState(String(menage.n_canape_lit ?? 0));
   const [nLitAppoint, setNLitAppoint] = useState(String(menage.n_lit_appoint ?? 0));
+  const [nLitParapluie, setNLitParapluie] = useState(String(menage.n_lit_parapluie ?? 0));
   const [nTravelers, setNTravelers] = useState(menage.n_travelers != null ? String(menage.n_travelers) : '');
   const toTime = (iso: string | null) => (iso ? formatDateFr(iso, 'time') : '');
   const [arrivalTime, setArrivalTime] = useState(toTime(menage.arrived_at));
@@ -1252,6 +1266,7 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
     setNLitSimple(String(s.n_lit_simple));
     setNCanapeLit(String(s.n_canape_lit));
     setNLitAppoint(String(s.n_lit_appoint));
+    setNLitParapluie(String(s.n_lit_parapluie));
   };
 
   const invalid = (field: string) =>
@@ -1293,6 +1308,7 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
       n_lit_double: parseCountInput(nLitDouble),
       n_canape_lit: parseCountInput(nCanapeLit),
       n_lit_appoint: parseCountInput(nLitAppoint),
+      n_lit_parapluie: parseCountInput(nLitParapluie),
       n_travelers: nTravelers.trim() ? parseCountInput(nTravelers) : null,
       arrived_at: arrivalTime ? toIso(arrivalTime) : null,
       departed_at: departureTime ? toIso(departureTime) : null,
@@ -1423,6 +1439,14 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
             <AutoScrollInput style={inputStyle} value={nLitAppoint} onChangeText={setNLitAppoint} keyboardType="number-pad" />
           </LabeledField>
         </View>
+      </View>
+      <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+        <View style={{ flex: 1 }}>
+          <LabeledField label={tr('beds.crib')}>
+            <AutoScrollInput style={inputStyle} value={nLitParapluie} onChangeText={setNLitParapluie} keyboardType="number-pad" />
+          </LabeledField>
+        </View>
+        <View style={{ flex: 1 }} />
       </View>
 
       <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
@@ -1617,7 +1641,13 @@ function AccessInfoSection({
   logement: Logement | undefined;
   colors: typeof Colors.light;
 }) {
-  const code = logement?.key_safe_code;
+  // Codes d'accès du logement (boîte à clés, portail…). Lisibles par le presta
+  // affecté même s'il n'est pas membre du logement. `key_safe_code` (legacy,
+  // joint au ménage) sert de repli tant que la liste n'a pas répondu.
+  const codes = useLogementCodes(menage.logement_id);
+  const codeList = codes.data ?? [];
+  const legacyCode = logement?.key_safe_code ?? null;
+  const hasCodes = codeList.length > 0 || !!legacyCode;
   const nights = menage.stay_nights ?? null;
   const checkin = menage.next_checkin_at ? menage.next_checkin_at.slice(0, 10) : null;
   const sameDay = checkin !== null && checkin === menage.date_prevue.slice(0, 10);
@@ -1630,7 +1660,7 @@ function AccessInfoSection({
   const addressParts = [menage.logement_address ?? logement?.address, cityLine].filter(Boolean);
   const addressText = addressParts.join(' · ');
   const addressQuery = addressParts.join(', ');
-  if (!addressText && !code && !nights && !checkin) return null;
+  if (!addressText && !hasCodes && !nights && !checkin) return null;
   return (
     <View style={[styles.accessCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       {addressText ? (
@@ -1645,13 +1675,21 @@ function AccessInfoSection({
           <Text style={[styles.accessValue, { color: colors.primary, flex: 1 }]}>{addressText}</Text>
         </TouchableOpacity>
       ) : null}
-      {code ? (
-        <View style={styles.accessRow}>
-          <KeyRound size={IconSize.sm} color={colors.primary} />
-          <Text style={[styles.accessLabel, { color: colors.text2 }]}>Boîte à clés</Text>
-          <Text style={[styles.accessValue, { color: colors.text }]}>{code}</Text>
-        </View>
-      ) : null}
+      {codeList.length > 0
+        ? codeList.map((c) => (
+            <View key={c.id} style={styles.accessRow}>
+              <KeyRound size={IconSize.sm} color={colors.primary} />
+              <Text style={[styles.accessLabel, { color: colors.text2 }]}>{c.label}</Text>
+              <Text style={[styles.accessValue, { color: colors.text }]}>{c.code}</Text>
+            </View>
+          ))
+        : legacyCode ? (
+            <View style={styles.accessRow}>
+              <KeyRound size={IconSize.sm} color={colors.primary} />
+              <Text style={[styles.accessLabel, { color: colors.text2 }]}>Boîte à clés</Text>
+              <Text style={[styles.accessValue, { color: colors.text }]}>{legacyCode}</Text>
+            </View>
+          ) : null}
       {nights ? (
         <View style={styles.accessRow}>
           <Moon size={IconSize.sm} color={colors.text2} />
@@ -1806,7 +1844,7 @@ function DeclarationSection({
 /** Compo de lits suggérée pour N voyageurs : un double par paire, +1 simple si impair. */
 function suggestBeds(travelers: number) {
   const n = Math.max(0, travelers);
-  return { n_lit_double: Math.floor(n / 2), n_lit_simple: n % 2, n_canape_lit: 0, n_lit_appoint: 0 };
+  return { n_lit_double: Math.floor(n / 2), n_lit_simple: n % 2, n_canape_lit: 0, n_lit_appoint: 0, n_lit_parapluie: 0 };
 }
 
 function BedsSection({
@@ -1824,6 +1862,7 @@ function BedsSection({
     { field: 'n_lit_double', value: menage.n_lit_double ?? 0, label: t('beds.double') },
     { field: 'n_canape_lit', value: menage.n_canape_lit ?? 0, label: t('beds.sofa') },
     { field: 'n_lit_appoint', value: menage.n_lit_appoint ?? 0, label: t('beds.extra') },
+    { field: 'n_lit_parapluie', value: menage.n_lit_parapluie ?? 0, label: t('beds.crib') },
   ];
   const total = beds.reduce((s, b) => s + b.value, 0);
   if (!isAdmin && total === 0 && menage.n_travelers == null) return null;
@@ -1844,12 +1883,15 @@ function BedsSection({
         </Text>
       </View>
 
-      <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+      {/* 5 types de couchage : on laisse la ligne passer à la ligne plutôt que
+          d'écraser les tuiles sur un petit écran. */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
         {beds.map((b) => (
           <View
             key={b.field}
             style={{
-              flex: 1,
+              flexBasis: '30%',
+              flexGrow: 1,
               backgroundColor: colors.surface,
               borderColor: colors.border,
               borderWidth: 1,

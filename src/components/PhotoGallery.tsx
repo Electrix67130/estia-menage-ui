@@ -1,12 +1,13 @@
 import React, { useCallback, useState, useMemo } from 'react';
-import { View, Text, Image, TouchableOpacity, FlatList, StyleSheet, Dimensions, RefreshControl, Modal, ScrollView } from 'react-native';
+import { View, Text, Image, TouchableOpacity, FlatList, StyleSheet, Dimensions, RefreshControl, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import { Camera, ImagePlus, Trash2, Share2, X } from 'lucide-react-native';
 import ImageView from 'react-native-image-viewing';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { usePhotos, useLogementPhotos, useCreatePhoto, useDeletePhoto } from '@/api/hooks/usePhotos';
+import { usePhotos, useLogementPhotos, createPhotoRequest, useDeletePhoto } from '@/api/hooks/usePhotos';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMenageCheck } from '@/api/hooks/useMenageCheck';
 import { SECTION_ICONS } from '@/components/MenageCheckList';
 import { uploadFile } from '@/api/upload';
@@ -18,6 +19,12 @@ import { formatDateFr } from '@/lib/date-fr';
 import { useDialog } from '@/contexts/DialogContext';
 
 const COLUMN_COUNT = 3;
+/**
+ * Plafond de la sélection multiple dans la galerie. Le picker natif empêche
+ * d'en cocher plus — c'est visible pour l'utilisateur, jamais une troncature
+ * silencieuse. Garde-fou contre un envoi de plusieurs centaines de photos.
+ */
+const MAX_MULTI_SELECT = 30;
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const ITEM_GAP = Spacing.xs;
 const ITEM_SIZE = (SCREEN_WIDTH - Spacing.lg * 2 - ITEM_GAP * (COLUMN_COUNT - 1)) / COLUMN_COUNT;
@@ -68,8 +75,10 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
 
   const [roomPickerOpen, setRoomPickerOpen] = useState<null | 'camera' | 'gallery'>(null);
-  const createMutation = useCreatePhoto();
+  const qc = useQueryClient();
   const deleteMutation = useDeletePhoto();
+  /** Progression de l'envoi en cours (sélection multiple ou photo unique). */
+  const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<(Photo & { first_name: string; last_name: string }) | null>(null);
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
 
@@ -95,35 +104,72 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
         }
       }
 
+      // Caméra = une photo à la fois ; galerie = sélection multiple.
       const result = useCamera
         ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 1, allowsEditing: false })
-        : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, allowsEditing: false });
+        : await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            quality: 1,
+            allowsEditing: false,
+            allowsMultipleSelection: true,
+            selectionLimit: MAX_MULTI_SELECT,
+            orderedSelection: true,
+          });
 
-      if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        const optimized = await optimizeImage(asset.uri, asset.width, asset.height);
-        const fileName = `photo-${Date.now()}.jpg`;
-        const uploaded = await uploadFile(optimized.uri, fileName, optimized.mimeType);
-        await createMutation.mutateAsync({
-          menage_id: menageId,
-          // Rattache la photo à la pièce sélectionnée (section de checklist).
-          // « Toutes » (null) => photo non classée.
-          section_id: menageId ? (selectedSectionId ?? undefined) : undefined,
-          logement_id: menageId ? undefined : logementId,
-          logement_room_id: menageId
-            ? undefined
-            : (roomIdOverride ?? logementRoomId),
-          url: uploaded.url,
-          thumbnail_url: uploaded.thumbnail_url ?? undefined,
-          file_size: uploaded.file_size,
-          mime_type: uploaded.mime_type,
-          taken_at: new Date().toISOString(),
+      if (result.canceled || result.assets.length === 0) return;
+
+      const assets = result.assets;
+      setUploading({ done: 0, total: assets.length });
+      let failed = 0;
+
+      // Envoi séquentiel : `uploadFile` sérialise déjà les requêtes (rate-limit)
+      // et traiter une photo à la fois évite les pics mémoire sur une grosse
+      // sélection. Chaque photo est créée dès son upload → une erreur en cours
+      // de route ne fait pas perdre les précédentes.
+      for (let i = 0; i < assets.length; i++) {
+        const asset = assets[i];
+        try {
+          const optimized = await optimizeImage(asset.uri, asset.width, asset.height);
+          const fileName = `photo-${Date.now()}-${i}.jpg`;
+          const uploaded = await uploadFile(optimized.uri, fileName, optimized.mimeType);
+          await createPhotoRequest({
+            menage_id: menageId,
+            // Rattache la photo à la pièce sélectionnée (section de checklist).
+            // « Toutes » (null) => photo non classée.
+            section_id: menageId ? (selectedSectionId ?? undefined) : undefined,
+            logement_id: menageId ? undefined : logementId,
+            logement_room_id: menageId ? undefined : (roomIdOverride ?? logementRoomId),
+            url: uploaded.url,
+            thumbnail_url: uploaded.thumbnail_url ?? undefined,
+            file_size: uploaded.file_size,
+            mime_type: uploaded.mime_type,
+            taken_at: new Date().toISOString(),
+          });
+        } catch {
+          failed++;
+        }
+        setUploading({ done: i + 1, total: assets.length });
+      }
+
+      // Un seul refetch de la galerie, à la fin (au lieu d'un par photo).
+      if (menageId) await qc.invalidateQueries({ queryKey: ['photos', 'menage', menageId] });
+      if (logementId) await qc.invalidateQueries({ queryKey: ['photos', 'logement', logementId] });
+
+      if (failed > 0) {
+        void dialog.alert({
+          title: 'Envoi incomplet',
+          message:
+            failed === assets.length
+              ? 'Aucune photo n’a pu être envoyée. Vérifie ta connexion.'
+              : `${assets.length - failed} photo(s) envoyée(s), ${failed} en échec.`,
         });
       }
     } catch (err) {
       void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+    } finally {
+      setUploading(null);
     }
-  }, [menageId, logementId, logementRoomId, selectedSectionId, createMutation, dialog]);
+  }, [menageId, logementId, logementRoomId, selectedSectionId, qc, dialog]);
 
   /**
    * Entrée d'upload : en mode multi-rooms, on ouvre d'abord la modal "quelle
@@ -219,26 +265,45 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
     <View>
       {sectionChips}
       {!readonly && (
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-            onPress={() => handleAdd(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Prendre une photo"
-          >
-            <Camera size={IconSize.md} color="#FFFFFF" />
-            <Text style={styles.actionText}>Caméra</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-            onPress={() => handleAdd(false)}
-            accessibilityRole="button"
-            accessibilityLabel="Choisir une photo"
-          >
-            <ImagePlus size={IconSize.md} color="#FFFFFF" />
-            <Text style={styles.actionText}>Galerie</Text>
-          </TouchableOpacity>
-        </View>
+        <>
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: colors.primary, opacity: uploading ? 0.5 : 1 }]}
+              onPress={() => handleAdd(true)}
+              disabled={!!uploading}
+              accessibilityRole="button"
+              accessibilityLabel="Prendre une photo"
+            >
+              <Camera size={IconSize.md} color="#FFFFFF" />
+              <Text style={styles.actionText}>Caméra</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: colors.primary, opacity: uploading ? 0.5 : 1 }]}
+              onPress={() => handleAdd(false)}
+              disabled={!!uploading}
+              accessibilityRole="button"
+              accessibilityLabel="Choisir une ou plusieurs photos"
+            >
+              <ImagePlus size={IconSize.md} color="#FFFFFF" />
+              <Text style={styles.actionText}>Galerie</Text>
+            </TouchableOpacity>
+          </View>
+          {uploading ? (
+            <View
+              style={[
+                styles.uploadBanner,
+                { backgroundColor: colors.itemBackground, borderColor: colors.border },
+              ]}
+            >
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={{ color: colors.text2, fontSize: FontSize.sm, fontWeight: FontWeight.medium }}>
+                {uploading.total > 1
+                  ? `Envoi des photos ${uploading.done}/${uploading.total}…`
+                  : 'Envoi de la photo…'}
+              </Text>
+            </View>
+          ) : null}
+        </>
       )}
     </View>
   );
@@ -559,6 +624,15 @@ const styles = StyleSheet.create({
   group: { marginBottom: Spacing.lg },
   groupTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, marginBottom: Spacing.sm },
   actions: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.lg },
+  uploadBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.lg,
+  },
   actionBtn: {
     flex: 1,
     flexDirection: 'row',

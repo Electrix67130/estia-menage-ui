@@ -25,7 +25,7 @@ export default function ClientsScreen() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const [search, setSearch] = useState('');
-  const list = useClients();
+  const list = useClients({ enabled: isAdmin });
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

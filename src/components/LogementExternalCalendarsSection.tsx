@@ -89,9 +89,19 @@ const LogementExternalCalendarsSection: React.FC<Props> = ({ logementId }) => {
         });
         return;
       }
+      // `fetched_events` = événements lus dans le flux. L'afficher distingue
+      // « le lien ne renvoie rien » de « le flux est lu mais rien n'en sort ».
+      const lus = `${result.fetched_events} événement${result.fetched_events > 1 ? 's' : ''} lu${result.fetched_events > 1 ? 's' : ''}`;
+      const impact =
+        result.created_menages + result.updated_menages + result.cancelled_menages;
       void dialog.alert({
         title: 'Sync terminée',
-        message: `${result.created_menages} créé${result.created_menages > 1 ? 's' : ''}, ${result.updated_menages} mis à jour, ${result.cancelled_menages} annulé${result.cancelled_menages > 1 ? 's' : ''}.`,
+        message:
+          result.fetched_events === 0
+            ? 'Aucun événement dans le flux (calendrier vide ou lien invalide).'
+            : impact === 0
+              ? `${lus}, aucune prestation impactée (déjà à jour ou dates bloquées).`
+              : `${lus} · ${result.created_menages} créé${result.created_menages > 1 ? 's' : ''}, ${result.updated_menages} mis à jour, ${result.cancelled_menages} annulé${result.cancelled_menages > 1 ? 's' : ''}.`,
       });
     } catch (err) {
       void dialog.alert({

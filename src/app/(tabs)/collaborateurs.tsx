@@ -51,9 +51,13 @@ export default function CollaborateursScreen() {
   const createInvitation = useCreateInvitation();
   const cancelInvitation = useCancelInvitation();
   const resendInvitation = useResendInvitation();
-  const clientsQuery = useClients();
+  // Fichier client = admin only (l'API renvoie 403 aux autres).
+  const clientsQuery = useClients({ enabled: isAdmin });
 
-  const [tab, setTab] = usePersistedState<Tab>('team.tab', 'members');
+  const [persistedTab, setTab] = usePersistedState<Tab>('team.tab', 'members');
+  // L'onglet est mémorisé : un non-admin resté sur « Clients » retombe sur
+  // « Membres » plutôt que sur un écran vide.
+  const tab: Tab = !isAdmin && persistedTab === 'clients' ? 'members' : persistedTab;
   const [search, setSearch] = useState('');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -159,7 +163,7 @@ export default function CollaborateursScreen() {
         <View style={[styles.tabRow, { backgroundColor: colors.itemBackground }]}>
           {([
             { key: 'members', label: 'Membres' },
-            { key: 'clients', label: 'Clients' },
+            ...(isAdmin ? [{ key: 'clients' as Tab, label: 'Clients' }] : []),
           ] as { key: Tab; label: string }[]).map((t) => {
             const active = tab === t.key;
             return (

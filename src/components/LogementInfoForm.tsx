@@ -9,7 +9,6 @@ import { useLogement, useUpdateLogement } from '@/api/hooks/useLogements';
 import { useClients, clientDisplayName } from '@/api/hooks/useClients';
 import CityAutocomplete from '@/components/CityAutocomplete';
 import AutoScrollInput from '@/components/AutoScrollInput';
-import SecretCodeField from '@/components/SecretCodeField';
 import TimePickerField from '@/components/TimePickerField';
 import DurationPickerField from '@/components/DurationPickerField';
 import ColorPicker from '@/components/ColorPicker';
@@ -71,9 +70,9 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
   const [nLitDouble, setNLitDouble] = useState(0);
   const [nCanapeLit, setNCanapeLit] = useState(0);
   const [nLitAppoint, setNLitAppoint] = useState(0);
+  const [nLitParapluie, setNLitParapluie] = useState(0);
   const [surfaceM2, setSurfaceM2] = useState('');
   const [notes, setNotes] = useState('');
-  const [keySafeCode, setKeySafeCode] = useState('');
   const [defaultDurationMin, setDefaultDurationMin] = useState('');
   const [defaultClientPriceHt, setDefaultClientPriceHt] = useState('');
   const [defaultClientVatRate, setDefaultClientVatRate] = useState('');
@@ -106,9 +105,9 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
     setNLitDouble(logement.n_lit_double ?? 0);
     setNCanapeLit(logement.n_canape_lit ?? 0);
     setNLitAppoint(logement.n_lit_appoint ?? 0);
+    setNLitParapluie(logement.n_lit_parapluie ?? 0);
     setSurfaceM2(logement.surface_m2 !== null ? String(logement.surface_m2) : '');
     setNotes(logement.notes ?? '');
-    setKeySafeCode(logement.key_safe_code ?? '');
     const toStr = (v: number | string | null): string => (v === null || v === undefined ? '' : String(v));
     setDefaultDurationMin(toStr(logement.default_duration_min));
     setDefaultClientPriceHt(toStr(logement.default_client_price_ht));
@@ -129,7 +128,7 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
   // Auto-save (debounce 700ms) à chaque modification, une fois les champs initialisés.
   const stateKey = [
     name, clientId, address, city, postalCode, latitude, longitude,
-    nLitSimple, nLitDouble, nCanapeLit, nLitAppoint, surfaceM2, notes, keySafeCode,
+    nLitSimple, nLitDouble, nCanapeLit, nLitAppoint, nLitParapluie, surfaceM2, notes,
     defaultDurationMin, defaultClientPriceHt, defaultClientVatRate, defaultProviderPrice,
     defaultLaundryIncluded, defaultLaundryClientPriceHt, defaultLaundryProviderPrice,
     defaultHoraireDebut, defaultHoraireFin, color, hasPool, hasJacuzzi,
@@ -164,9 +163,9 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
             n_lit_double: nLitDouble,
             n_canape_lit: nCanapeLit,
             n_lit_appoint: nLitAppoint,
+            n_lit_parapluie: nLitParapluie,
             surface_m2: surface,
             notes: notes.trim() || undefined,
-            key_safe_code: keySafeCode.trim() || undefined,
             default_duration_min: defaultDurationMin.trim() ? parseInt(defaultDurationMin, 10) : undefined,
             default_client_price_ht: money(defaultClientPriceHt),
             default_client_vat_rate: money(defaultClientVatRate),
@@ -260,10 +259,6 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
         </LabeledField>
       </SectionCard>
 
-      <SectionCard title="Accès" subtitle="Code de la boîte à clef, visible des prestataires.">
-        <SecretCodeField value={keySafeCode} onChangeText={setKeySafeCode} placeholder="Ex : 1234" />
-      </SectionCard>
-
       <SectionCard title="Client (facturation)">
         <TouchableOpacity
           style={[
@@ -301,6 +296,7 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
         <RoomCounter label={tr('beds.double')} value={nLitDouble} onChange={setNLitDouble} />
         <RoomCounter label={tr('beds.sofa')} value={nCanapeLit} onChange={setNCanapeLit} />
         <RoomCounter label={tr('beds.extra')} value={nLitAppoint} onChange={setNLitAppoint} />
+        <RoomCounter label={tr('beds.crib')} value={nLitParapluie} onChange={setNLitParapluie} />
       </SectionCard>
 
       <SectionCard title="Valeurs par défaut (ménages)" subtitle="Pré-remplies à la création d'un ménage.">

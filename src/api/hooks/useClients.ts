@@ -52,10 +52,16 @@ interface PaginatedClients {
   meta: { total: number; page: number; limit: number; totalPages: number };
 }
 
-export function useClients() {
+/**
+ * Annuaire client de l'org. **Réservé aux admins côté API** (403 sinon) :
+ * ne l'appelle pas depuis un écran ouvert aux prestataires, ou passe
+ * `{ enabled: false }`.
+ */
+export function useClients({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['clients', 'list'],
     queryFn: () => apiFetch<PaginatedClients>(`/clients?limit=200`),
+    enabled,
     // 30s : assez pour qu'un aller-retour rapide reste instantané, assez court
     // pour refleter rapidement un nouveau client créé/invité.
     staleTime: 30_000,

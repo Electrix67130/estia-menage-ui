@@ -30,20 +30,14 @@ export function useLogementPhotos(logementId?: string, logementRoomId?: string) 
   });
 }
 
-export function useCreatePhoto() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: CreatePhotoInput) =>
-      apiFetch<Photo>('/photos', { method: 'POST', body }),
-    onSuccess: (_data, vars) => {
-      if (vars.menage_id) {
-        qc.invalidateQueries({ queryKey: ['photos', 'menage', vars.menage_id] });
-      }
-      if (vars.logement_id) {
-        qc.invalidateQueries({ queryKey: ['photos', 'logement', vars.logement_id] });
-      }
-    },
-  });
+/**
+ * Création d'une photo. Volontairement sans invalidation de cache : les envois
+ * se font par lot (sélection multiple dans la galerie), donc l'appelant crée les
+ * photos une par une puis invalide UNE seule fois — au lieu d'un refetch de la
+ * galerie par photo.
+ */
+export function createPhotoRequest(body: CreatePhotoInput): Promise<Photo> {
+  return apiFetch<Photo>('/photos', { method: 'POST', body });
 }
 
 export function useDeletePhoto() {

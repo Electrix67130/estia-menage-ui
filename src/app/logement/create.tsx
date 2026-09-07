@@ -102,6 +102,7 @@ export default function CreateLogementScreen() {
   const [nLitDouble, setNLitDouble] = useState(0);
   const [nCanapeLit, setNCanapeLit] = useState(0);
   const [nLitAppoint, setNLitAppoint] = useState(0);
+  const [nLitParapluie, setNLitParapluie] = useState(0);
   const [notes, setNotes] = useState('');
   const [keySafeCode, setKeySafeCode] = useState('');
   const [surfaceM2, setSurfaceM2] = useState('');
@@ -150,6 +151,7 @@ export default function CreateLogementScreen() {
         n_lit_double: nLitDouble,
         n_canape_lit: nCanapeLit,
         n_lit_appoint: nLitAppoint,
+        n_lit_parapluie: nLitParapluie,
         surface_m2: surfaceM2.trim() ? parseIntOrUndef(surfaceM2) : undefined,
         notes: notes.trim() || undefined,
         key_safe_code: keySafeCode.trim() || undefined,
@@ -306,6 +308,7 @@ export default function CreateLogementScreen() {
         <RoomCounter label={tr('beds.double')} value={nLitDouble} onChange={setNLitDouble} />
         <RoomCounter label={tr('beds.sofa')} value={nCanapeLit} onChange={setNCanapeLit} />
         <RoomCounter label={tr('beds.extra')} value={nLitAppoint} onChange={setNLitAppoint} />
+        <RoomCounter label={tr('beds.crib')} value={nLitParapluie} onChange={setNLitParapluie} />
 
         <Text style={[styles.section, { color: colors.text2 }]}>CODE BOÎTE À CLEF</Text>
         <SecretCodeField

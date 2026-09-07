@@ -223,6 +223,7 @@ export type TranslationKeys =
   | "beds.double"
   | "beds.sofa"
   | "beds.extra"
+  | "beds.crib"
   | "beds.hintLogement"
   | "beds.hintMenage"
   | "common.saving"
@@ -464,6 +465,7 @@ const fr: Dictionary = {
   "beds.double": "Lit double",
   "beds.sofa": "Canapé-lit",
   "beds.extra": "Lit d'appoint",
+  "beds.crib": "Lit parapluie",
   "beds.hintLogement": "Valeurs par défaut copiées sur chaque ménage (modifiables ensuite par ménage).",
   "beds.hintMenage": "Préremplie depuis le logement. Ajustez si nécessaire pour ce ménage spécifique.",
   "common.saving": "Enregistrement…",
@@ -704,6 +706,7 @@ const en: Dictionary = {
   "beds.double": "Double bed",
   "beds.sofa": "Sofa bed",
   "beds.extra": "Extra bed",
+  "beds.crib": "Travel cot",
   "beds.hintLogement": "Default values copied to each cleaning (editable per cleaning afterwards).",
   "beds.hintMenage": "Pre-filled from the property. Adjust if needed for this specific cleaning.",
   "common.saving": "Saving…",
@@ -944,6 +947,7 @@ const de: Dictionary = {
   "beds.double": "Doppelbett",
   "beds.sofa": "Schlafsofa",
   "beds.extra": "Zustellbett",
+  "beds.crib": "Reisebett",
   "beds.hintLogement": "Standardwerte werden für jede Reinigung übernommen (anschließend pro Reinigung bearbeitbar).",
   "beds.hintMenage": "Aus der Immobilie vorausgefüllt. Bei Bedarf für diese spezifische Reinigung anpassen.",
   "common.saving": "Speichern…",
@@ -1184,6 +1188,7 @@ const es: Dictionary = {
   "beds.double": "Cama doble",
   "beds.sofa": "Sofá cama",
   "beds.extra": "Cama supletoria",
+  "beds.crib": "Cuna de viaje",
   "beds.hintLogement": "Valores predeterminados copiados a cada limpieza (editables por limpieza después).",
   "beds.hintMenage": "Precargado desde la propiedad. Ajuste si es necesario para esta limpieza específica.",
   "common.saving": "Guardando…",
@@ -1424,6 +1429,7 @@ const it: Dictionary = {
   "beds.double": "Letto matrimoniale",
   "beds.sofa": "Divano letto",
   "beds.extra": "Letto aggiuntivo",
+  "beds.crib": "Lettino da viaggio",
   "beds.hintLogement": "Valori predefiniti copiati in ogni pulizia (modificabili per pulizia in seguito).",
   "beds.hintMenage": "Precompilato dalla proprietà. Modifica se necessario per questa pulizia specifica.",
   "common.saving": "Salvataggio…",
@@ -1664,6 +1670,7 @@ const pt: Dictionary = {
   "beds.double": "Cama de casal",
   "beds.sofa": "Sofá-cama",
   "beds.extra": "Cama extra",
+  "beds.crib": "Berço de viagem",
   "beds.hintLogement": "Valores predefinidos copiados em cada limpeza (editáveis por limpeza depois).",
   "beds.hintMenage": "Pré-preenchido a partir do imóvel. Ajuste se necessário para esta limpeza.",
   "common.saving": "A guardar…",
@@ -1904,6 +1911,7 @@ const tr: Dictionary = {
   "beds.double": "Çift kişilik yatak",
   "beds.sofa": "Yataklı koltuk",
   "beds.extra": "Ek yatak",
+  "beds.crib": "Seyahat beşiği",
   "beds.hintLogement": "Varsayılan değerler her temizliğe kopyalanır (her temizlik için sonradan düzenlenebilir).",
   "beds.hintMenage": "Mülkten önceden doldurulmuştur. Bu temizlik için gerekirse ayarlayın.",
   "common.saving": "Kaydediliyor…",
@@ -2144,6 +2152,7 @@ const pl: Dictionary = {
   "beds.double": "Łóżko podwójne",
   "beds.sofa": "Sofa rozkładana",
   "beds.extra": "Łóżko dostawne",
+  "beds.crib": "Łóżeczko turystyczne",
   "beds.hintLogement": "Wartości domyślne kopiowane do każdego sprzątania (potem edytowalne dla każdego).",
   "beds.hintMenage": "Wstępnie wypełnione z lokalu. Dostosuj w razie potrzeby dla tego sprzątania.",
   "common.saving": "Zapisywanie…",

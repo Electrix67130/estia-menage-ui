@@ -136,13 +136,16 @@ export default function LoginScreen() {
             </Link>
           </View>
         </ScrollView>
-        {/* Sous le formulaire : quelqu'un qui ne parle pas français doit pouvoir
-            changer de langue AVANT de se connecter, pas après. Hors du
-            ScrollView pour rester visible quand le clavier remonte le contenu. */}
-        <View style={styles.langBar}>
-          <LanguageSwitch />
-        </View>
       </KeyboardAvoidingView>
+      {/* Sous le formulaire : quelqu'un qui ne parle pas français doit pouvoir
+          changer de langue AVANT de se connecter, pas après.
+          En dehors du KeyboardAvoidingView, volontairement : à l'intérieur, il
+          était poussé vers le haut avec le contenu à l'ouverture du clavier et
+          venait se coller sous le champ actif. Il reste donc ancré en bas de
+          l'écran, simplement masqué par le clavier le temps de la saisie. */}
+      <View style={styles.langBar}>
+        <LanguageSwitch />
+      </View>
     </SafeAreaView>
   );
 }

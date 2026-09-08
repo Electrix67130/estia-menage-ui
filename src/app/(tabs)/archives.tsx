@@ -19,6 +19,7 @@ import { usePersistedState } from '@/hooks/usePersistedState';
 import AppHeader from '@/components/AppHeader';
 import MenageCard from '@/components/MenageCard';
 import { useMenages } from '@/api/hooks/useMenages';
+import { useAuth } from '@/contexts/AuthContext';
 import { menageLogementLabel } from '@/api/types';
 
 type StatusFilter = 'all' | 'valide' | 'annule';
@@ -41,6 +42,8 @@ function ymd(d: Date): string {
 }
 
 export default function ArchivesScreen() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
@@ -74,6 +77,11 @@ export default function ArchivesScreen() {
   const list = useMenages({
     closed: true,
     status: statusFilter === 'all' ? undefined : statusFilter,
+    // Un prestataire ne voit ici que les prestations qu'il a réellement faites
+    // (référent ou co-presta) — pas celles restées non assignées sur ses
+    // logements, que l'API lui montre par ailleurs pour qu'il puisse les
+    // prendre. L'admin garde la vue complète.
+    assigned: isAdmin ? undefined : 'me',
     from: period.from,
     to: period.to,
     limit: 200,

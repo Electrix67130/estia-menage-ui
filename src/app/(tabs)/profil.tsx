@@ -13,7 +13,7 @@ import {
   Switch} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
-import { LogOut, User, Sun, Moon, Smartphone, Save, Mail, Phone, Building2, Check, Globe, Lock, KeyRound, X, Camera, Plus, ArrowRightLeft, Bell, FileText, ChevronRight, ExternalLink, Wallet, Search, MapPin, Receipt, Archive } from 'lucide-react-native';
+import { LogOut, User, Sun, Moon, Smartphone, Save, Mail, Phone, Building2, Check, Globe, Lock, KeyRound, X, Camera, Plus, ArrowRightLeft, Bell, FileText, ChevronRight, ExternalLink, Wallet, Search, MapPin, Receipt, Archive, MessageSquare } from 'lucide-react-native';
 import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { DASHBOARD_CREATE_ORG_URL } from '@/constants/Urls';
@@ -569,6 +569,25 @@ export default function ProfilScreen() {
                   </TouchableOpacity>
                 </>
               )}
+
+              {/* Aide & signalements — ouvert à tous : c'est le canal pour
+                  remonter un bug ou proposer une amélioration. */}
+              <Text style={[styles.sectionTitle, { color: colors.text2 }]}>
+                {t('support.section')}
+              </Text>
+              <TouchableOpacity
+                style={[styles.settingsCard, styles.legalRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                onPress={() => router.push('/support' as never)}
+                accessibilityRole="button"
+                accessibilityLabel={t('support.title')}
+              >
+                <MessageSquare size={IconSize.md} color={colors.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.legalRowTitle, { color: colors.text }]}>{t('support.title')}</Text>
+                  <Text style={[styles.hint, { color: colors.mutedText }]}>{t('support.entryHint')}</Text>
+                </View>
+                <ChevronRight size={IconSize.sm} color={colors.mutedText} />
+              </TouchableOpacity>
 
               {/* Réglages */}
               <Text style={[styles.sectionTitle, { color: colors.text2 }]}>RÉGLAGES</Text>

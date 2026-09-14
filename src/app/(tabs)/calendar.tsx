@@ -24,7 +24,6 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Check, ChevronDown, ChevronLeft, ChevronRight, Search, X } from 'lucide-react-native';
 import { useMenages } from '@/api/hooks/useMenages';
@@ -33,6 +32,7 @@ import { useLogements } from '@/api/hooks/useLogements';
 import { Colors } from '@/constants/Colors';
 import { Spacing, FontSize, FontWeight, Radius, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { ticLeger } from '@/lib/haptics';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useAuth } from '@/contexts/AuthContext';
@@ -978,15 +978,11 @@ function PullRefresh({
   const loading = useSharedValue(0); // 0→1 pendant le refetch
   const armed = useSharedValue(false); // seuil franchi → tic haptique (une fois)
 
-  // Tic haptique léger (comme le pull-to-refresh natif). Gardé : sur un binaire
-  // sans le module natif (OTA actuelle), l'appel échoue en silence — s'activera
-  // au prochain build natif.
+  // Tic haptique léger (comme le pull-to-refresh natif). Le module natif est
+  // chargé paresseusement (cf. `@/lib/haptics`) : sur un binaire qui ne
+  // l'embarque pas, on s'en passe au lieu de planter l'écran.
   const lightHaptic = React.useCallback(() => {
-    try {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    } catch {
-      /* module natif absent (binaire OTA) → no-op */
-    }
+    ticLeger();
   }, []);
 
   React.useEffect(() => {

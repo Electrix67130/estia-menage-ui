@@ -20,3 +20,8 @@ coverage/
 
 expo-env.d.ts
 # @end expo-cli
+
+# Fiche App Store (eas metadata) : contient le contact d'examen — téléphone
+# personnel — et le mot de passe du compte de démonstration. Se régénère avec
+# `npx eas metadata:pull`.
+store.config.json

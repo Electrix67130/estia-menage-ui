@@ -25,3 +25,6 @@ expo-env.d.ts
 # personnel — et le mot de passe du compte de démonstration. Se régénère avec
 # `npx eas metadata:pull`.
 store.config.json
+
+# Captures d'écran redescendues par `eas metadata:pull` (se régénèrent)
+store/

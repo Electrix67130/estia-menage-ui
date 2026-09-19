@@ -20,7 +20,7 @@
       "resizeMode": "contain"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "fr.estiacleanconnect.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,

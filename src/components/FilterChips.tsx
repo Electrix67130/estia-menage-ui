@@ -6,7 +6,7 @@ import { Spacing, Radius, FontSize, FontWeight } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import type { MenageStatus } from '@/api/types';
 
-export type MenageFilter = MenageStatus | 'all' | 'to_validate';
+export type MenageFilter = MenageStatus | 'all' | 'to_validate' | 'past';
 
 interface Chip {
   key: MenageFilter;
@@ -23,13 +23,17 @@ export interface ExtraChip {
 
 // Validés/Annulés ne sont plus des filtres ici : les ménages clôturés vivent
 // dans les Archives. La liste = worklist active.
-// Ordre : Tous → À venir → En cours → À valider. « Terminés » retiré : doublon
-// de « À valider » (un ménage `termine` est par définition non validé).
+// Ordre : Tous → À venir → En cours → À valider → Passées. « Terminés » retiré :
+// doublon de « À valider » (un ménage `termine` est par définition non validé).
+// « Passées » = les non clôturées des 30 derniers jours (à valider / non
+// pointées) : elles ne traînent plus au fond de « Tous », qui ne montre que le
+// présent et le futur, mais restent à un tap.
 const CHIPS: Chip[] = [
   { key: 'all', label: 'Tous' },
   { key: 'a_venir', label: 'À venir' },
   { key: 'en_cours', label: 'En cours' },
   { key: 'to_validate', label: 'À valider' },
+  { key: 'past', label: 'Passées' },
 ];
 
 interface Props {
@@ -49,6 +53,7 @@ const FilterChips: React.FC<Props> = ({ selected, onSelect, extra }) => {
     if (key === 'termine') return colors.statusTermine;
     if (key === 'to_validate') return colors.statusTermine;
     if (key === 'valide') return colors.statusValide;
+    if (key === 'past') return colors.text2;
     return colors.primary;
   };
 

@@ -182,6 +182,15 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
     [router],
   );
 
+  // Tap sur une barre de séjour → détail de la prestation directement (parité
+  // dashboard), sans passer par la page du jour.
+  const handlePressSpan = React.useCallback(
+    (menageId: string) => {
+      router.push(`/menage/${menageId}` as never);
+    },
+    [router],
+  );
+
   // Planning = agenda plein écran (SectionList), un en-tête collant par jour.
   const planningSections = useMemo(
     () => planningDays.map(({ date, items }) => ({ title: date, data: items })),
@@ -492,6 +501,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
             <MonthSpanGridMobile
               days={days}
               spans={spans}
+              onPressSpan={handlePressSpan}
               colors={colors}
               todayIso={todayIso}
               selectedDate={selectedDate}
@@ -1060,6 +1070,12 @@ interface Span {
   hasCheckIn: boolean;
   /** 'stay' (séjour iCal) ou le type de la presta (géométrie demi-journée). */
   kind: 'stay' | 'menage' | 'check_in' | 'check_out';
+  /** Tap sur le jour d'arrivée → check-in (ou ménage) — même résolution que le dashboard. */
+  startId: string;
+  /** Tap sur le jour de départ → check-out (ou ménage). */
+  endId: string;
+  /** Tap au milieu du séjour → ménage. */
+  midId: string;
 }
 
 function addDays(d: Date, n: number): Date {
@@ -1109,6 +1125,9 @@ function buildSpans(menages: Menage[]): Span[] {
       needsAttention: rows.some((r) => !!r.needs_attention),
       hasCheckIn: !!checkIn,
       kind: 'stay',
+      startId: (checkIn ?? menage ?? anchor).id,
+      endId: (checkOut ?? menage ?? anchor).id,
+      midId: (menage ?? anchor).id,
     });
   }
 
@@ -1126,6 +1145,9 @@ function buildSpans(menages: Menage[]): Span[] {
       needsAttention: !!m.needs_attention,
       hasCheckIn: m.prestation_type === 'check_in',
       kind: m.prestation_type,
+      startId: m.id,
+      endId: m.id,
+      midId: m.id,
     });
   }
   return spans.sort((a, b) => a.startIso.localeCompare(b.startIso) || a.endIso.localeCompare(b.endIso));
@@ -1135,7 +1157,8 @@ function buildSpans(menages: Menage[]): Span[] {
  * Grille mensuelle : chaque séjour = une barre colorée s'étendant du check-in au
  * check-out. Demi-journées aux extrémités (turnover côte à côte) ; un ménage 1
  * jour se scinde aussi s'il partage sa date avec un check-in. Tap une case →
- * sélectionne le jour (le détail s'affiche dessous).
+ * page du jour ; tap sur une barre → détail de la prestation (jour d'arrivée →
+ * check-in, jour de départ → check-out, milieu → ménage), comme le dashboard.
  */
 function MonthSpanGridMobile({
   days,
@@ -1144,6 +1167,7 @@ function MonthSpanGridMobile({
   todayIso,
   selectedDate,
   onSelectDay,
+  onPressSpan,
 }: {
   days: { date: Date; inMonth: boolean }[];
   spans: Span[];
@@ -1151,6 +1175,7 @@ function MonthSpanGridMobile({
   todayIso: string;
   selectedDate: string | null;
   onSelectDay: (iso: string) => void;
+  onPressSpan: (menageId: string) => void;
 }) {
   const weeks: { date: Date; inMonth: boolean }[][] = [];
   for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
@@ -1299,9 +1324,16 @@ function MonthSpanGridMobile({
                             // Petit retrait aux extrémités réelles → espace entre 2 prestations.
                             const dispLo = segLo + (roundLeft ? SPAN_GAP : 0);
                             const dispHi = segHi - (roundRight ? SPAN_GAP : 0);
+                            // Résolution par jour touché (comme le dashboard) : arrivée →
+                            // check-in, départ → check-out, milieu → ménage.
+                            const targetId =
+                              dayIdx === g.si ? s.startId : dayIdx === g.ei ? s.endId : s.midId;
                             return (
-                              <View
+                              <Pressable
                                 key={s.key}
+                                onPress={() => onPressSpan(targetId)}
+                                // Barre de 5 px : zone de tap élargie pour rester atteignable au doigt.
+                                hitSlop={{ top: 6, bottom: 6, left: 2, right: 2 }}
                                 style={{
                                   position: 'absolute',
                                   top: 0,

@@ -40,6 +40,7 @@ import LogementOptionsSection from '@/components/LogementOptionsSection';
 import ImageView from 'react-native-image-viewing';
 import { useLogementPhotos } from '@/api/hooks/usePhotos';
 import { openMaps } from '@/lib/contact-links';
+import { formatQtyUnit } from '@/lib/unit-fr';
 import {
   useLogementRooms,
   useCreateRoom,
@@ -726,8 +727,8 @@ function ConsommablesSection({ logementId }: { logementId: string }) {
           c.qty === null
             ? { text: 'jamais relevé', color: colors.text2 }
             : c.needs_restock
-              ? { text: `${c.qty}${c.unit ? ` ${c.unit}` : ''} · à racheter`, color: colors.red }
-              : { text: `${c.qty}${c.unit ? ` ${c.unit}` : ''}`, color: colors.primary };
+              ? { text: `${formatQtyUnit(c.qty, c.unit)} · à racheter`, color: colors.red }
+              : { text: formatQtyUnit(c.qty, c.unit), color: colors.primary };
         return (
           <TouchableOpacity
             key={c.logement_consommable_id}
@@ -738,7 +739,7 @@ function ConsommablesSection({ logementId }: { logementId: string }) {
             <View style={{ flex: 1 }}>
               <Text style={{ color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.medium }}>{c.label}</Text>
               <Text style={{ color: colors.text2, fontSize: FontSize.sm }}>
-                Seuil : {c.seuil_alerte}{c.unit ? ` ${c.unit}` : ''}
+                Seuil : {formatQtyUnit(c.seuil_alerte, c.unit)}
               </Text>
             </View>
             <Text style={{ color: badge.color, fontSize: FontSize.sm, fontWeight: FontWeight.semibold }}>{badge.text}</Text>

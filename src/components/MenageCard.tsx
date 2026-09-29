@@ -15,9 +15,12 @@ interface Props {
   selectionMode?: boolean;
   selected?: boolean;
   unread?: number;
+  /** Carte atténuée (fond du thème, sans ombre) : prestations passées, à
+   *  distinguer d'un coup d'œil de la liste de travail. */
+  muted?: boolean;
 }
 
-const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, unread = 0 }) => {
+const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, unread = 0, muted = false }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
 
@@ -33,9 +36,10 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, u
     <TouchableOpacity
       style={[
         styles.card,
-        Shadow.sm,
+        muted ? null : Shadow.sm,
         {
-          backgroundColor: needsAttention && !selected ? colors.red + '12' : colors.surface,
+          backgroundColor:
+            needsAttention && !selected ? colors.red + '12' : muted ? colors.itemBackground : colors.surface,
           borderColor: selected ? colors.primary : colors.border,
           borderWidth: selected ? 2 : 1,
         },
@@ -100,7 +104,10 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, u
                   <Clock size={12} color={colors.statusEnCours} />
                 </View>
               ) : null}
-              <StatusBadge status={menage.status} />
+              {/* « Non pointé » tient lieu de statut : un « À venir » dont le jour
+                  est passé sans pointage n'a plus de sens — un seul badge, pas deux
+                  qui se contredisent côte à côte. */}
+              {needsAttention ? null : <StatusBadge status={menage.status} />}
             </View>
             {(() => {
               const typeColor = colors[prestationTypeColorKey(menage.prestation_type)];

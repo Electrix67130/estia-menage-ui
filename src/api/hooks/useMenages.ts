@@ -50,6 +50,9 @@ interface ListParams extends PaginationParams {
   assigned?: 'me';
   from?: string;
   to?: string;
+  /** Avec `closed: true` : inclut aussi les non clôturées dont la date est
+   *  antérieure (les « oubliées » de l'Historique). */
+  stale_before?: string;
 }
 
 export function useMenages(params?: ListParams) {
@@ -66,6 +69,7 @@ export function useMenages(params?: ListParams) {
   if (params?.assigned) query.set('assigned', params.assigned);
   if (params?.from) query.set('from', params.from);
   if (params?.to) query.set('to', params.to);
+  if (params?.stale_before) query.set('stale_before', params.stale_before);
   if (params?.orderBy) query.set('orderBy', params.orderBy);
   if (params?.order) query.set('order', params.order);
   const qs = query.toString();

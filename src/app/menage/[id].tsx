@@ -83,6 +83,7 @@ import MenageDiscussions from '@/components/MenageDiscussions';
 import MenageCheckList from '@/components/MenageCheckList';
 import { formatDateFr } from '@/lib/date-fr';
 import { openMaps } from '@/lib/contact-links';
+import { formatQtyUnit, unitForQty } from '@/lib/unit-fr';
 import { useDialog } from '@/contexts/DialogContext';
 import TimePickerField from '@/components/TimePickerField';
 import DurationPickerField from '@/components/DurationPickerField';
@@ -1571,8 +1572,7 @@ function ConsommablesReleveModal({
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: colors.text, fontWeight: FontWeight.semibold }}>{c.label}</Text>
                       <Text style={{ color: colors.text2, fontSize: FontSize.xs }}>
-                        Seuil : {c.seuil_alerte}
-                        {c.unit ? ` ${c.unit}` : ''}
+                        Seuil : {formatQtyUnit(c.seuil_alerte, c.unit)}
                       </Text>
                     </View>
                     <View style={styles.consoAlertSlot}>
@@ -1593,7 +1593,7 @@ function ConsommablesReleveModal({
                     />
                     {/* Colonne unité toujours réservée (même vide) pour aligner les inputs. */}
                     <Text style={[styles.consoUnit, { color: colors.text2 }]} numberOfLines={1}>
-                      {c.unit ?? ''}
+                      {c.unit ? unitForQty(Number.isNaN(n) ? 0 : n, c.unit) : ''}
                     </Text>
                   </View>
                 );

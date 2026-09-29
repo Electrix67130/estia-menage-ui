@@ -1,15 +1,15 @@
 import React, { useState, useCallback } from 'react';
 import { usePersistedState } from '@/hooks/usePersistedState';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, SectionList, TouchableOpacity, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { useDialog } from '@/contexts/DialogContext';
 import Animated, { LinearTransition, FadeInLeft, FadeOutLeft, FadeInDown, FadeOutUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Plus, Trash2, X, Check, List, MapIcon, CalendarClock, ChevronLeft, ChevronRight, SlidersHorizontal, History } from 'lucide-react-native';
+import { Plus, Trash2, X, Check, List, MapIcon, CalendarClock, ChevronLeft, ChevronRight, SlidersHorizontal, History, CheckCheck, Ban } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useMenages, menageHooks } from '@/api/hooks/useMenages';
+import { useMenages, menageHooks, useValidateReport } from '@/api/hooks/useMenages';
 import { useLogements } from '@/api/hooks/useLogements';
 import { useAllUsers } from '@/api/hooks/useLogementMembers';
 import { useMyRescheduleRequests } from '@/api/hooks/useReschedule';
@@ -25,8 +25,17 @@ import AppHeader from '@/components/AppHeader';
 import PrestaUpcomingList from '@/components/PrestaUpcomingList';
 import { menageLogementLabel, menageSourceLabel, prestationTypeLabel, type MenageStatus, type Menage, type PrestationType } from '@/api/types';
 import type { MenageFilter } from '@/components/FilterChips';
+import { formatDateFr } from '@/lib/date-fr';
+import { PAST_WINDOW_DAYS, ymdLocal, addDays } from '@/lib/prestations';
 
 type ViewMode = 'list' | 'map';
+
+interface MenageSection {
+  key: 'today' | 'upcoming' | 'past';
+  title: string;
+  subtitle?: string;
+  data: Menage[];
+}
 
 export default function MenagesScreen() {
   const { user } = useAuth();
@@ -100,8 +109,7 @@ function AdminMenagesScreen() {
 
   const period = React.useMemo<{ min: string | null; max: string | null; label: string }>(() => {
     if (periodFilter === 'all') return { min: null, max: null, label: '' };
-    const ymd = (d: Date) =>
-      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const ymd = ymdLocal;
     const now = new Date();
     if (periodFilter === 'week') {
       const dow = (now.getDay() + 6) % 7;
@@ -158,15 +166,28 @@ function AdminMenagesScreen() {
 
   // Filtre "À valider" = ménages terminés sans validation
   const isToValidate = statusFilter === 'to_validate';
+  // Filtre « Passées » = non clôturées des 30 derniers jours (à valider / non
+  // pointées). Elles ne traînent plus au fond de « Tous » ; plus ancien → Historique.
+  const isPast = statusFilter === 'past';
   const activeStatus: MenageStatus | undefined =
-    statusFilter === 'all' || statusFilter === 'to_validate' ? undefined : statusFilter;
+    statusFilter === 'all' || isToValidate || isPast ? undefined : statusFilter;
+  const todayYmd = ymdLocal(new Date());
 
   const menagesQuery = useMenages({
     status: isToValidate ? 'termine' : activeStatus,
     validated: isToValidate ? false : undefined,
     // Vue « Tous » = worklist active : on exclut les clôturés (validé/annulé),
-    // qui vivent dans les archives (cohérent avec le dashboard).
-    closed: statusFilter === 'all' ? false : undefined,
+    // qui vivent dans l'Historique (cohérent avec le dashboard).
+    closed: statusFilter === 'all' || isPast ? false : undefined,
+    // « Tous » sans période explicite = aujourd'hui + à venir uniquement : le
+    // passé a son chip. Une période choisie (semaine/mois/année) prime et peut
+    // remonter du passé, rangé alors dans une section « Passées » atténuée.
+    from: isPast
+      ? ymdLocal(addDays(new Date(), -PAST_WINDOW_DAYS))
+      : statusFilter === 'all' && periodFilter === 'all'
+        ? todayYmd
+        : undefined,
+    to: isPast ? ymdLocal(addDays(new Date(), -1)) : undefined,
     // Limite haute pour ne pas tronquer silencieusement la liste (le défaut
     // API de 20 coupait les ménages les plus anciens en tri décroissant).
     limit: 200,
@@ -182,8 +203,7 @@ function AdminMenagesScreen() {
   const data = React.useMemo(() => {
     const all = menagesQuery.data?.data ?? [];
     const q = searchQuery.trim().toLowerCase();
-    const todayDate = new Date();
-    const today = todayDate.toISOString().slice(0, 10);
+    const today = todayYmd;
     const periodMin = period.min;
     const periodMax = period.max;
     return all
@@ -223,8 +243,29 @@ function AdminMenagesScreen() {
         if (!aUp && !bUp) return bd.localeCompare(ad);
         return aUp ? -1 : 1;
       });
-  }, [menagesQuery.data, searchQuery, typeFilter, logementFilter, prestaFilter, creatorFilter, period.min, period.max]);
+  }, [menagesQuery.data, searchQuery, typeFilter, logementFilter, prestaFilter, creatorFilter, period.min, period.max, todayYmd]);
   const isLoading = menagesQuery.isLoading;
+
+  // Sections à en-tête collant : Aujourd'hui / À venir / Passées. Le tri
+  // ci-dessus (à venir croissant puis passé décroissant) est conservé à
+  // l'intérieur de chaque section.
+  const sections = React.useMemo<MenageSection[]>(() => {
+    if (isPast) return data.length ? [{ key: 'past', title: `${PAST_WINDOW_DAYS} derniers jours`, data }] : [];
+    const today: Menage[] = [];
+    const upcoming: Menage[] = [];
+    const past: Menage[] = [];
+    for (const m of data) {
+      const d = m.date_prevue.slice(0, 10);
+      if (d === todayYmd) today.push(m);
+      else if (d > todayYmd) upcoming.push(m);
+      else past.push(m);
+    }
+    const out: MenageSection[] = [];
+    if (today.length) out.push({ key: 'today', title: "Aujourd'hui", subtitle: formatDateFr(todayYmd, 'weekdayShort'), data: today });
+    if (upcoming.length) out.push({ key: 'upcoming', title: 'À venir', data: upcoming });
+    if (past.length) out.push({ key: 'past', title: 'Passées', data: past });
+    return out;
+  }, [data, isPast, todayYmd]);
 
   // Options pour les pickers.
   const typeOptions: FilterOption[] = React.useMemo(
@@ -284,6 +325,8 @@ function AdminMenagesScreen() {
   }, [menagesQuery.data, allUsers]);
 
   const deleteMutation = menageHooks.useRemove();
+  const updateMutation = menageHooks.useUpdate();
+  const validateMutation = useValidateReport();
 
   // Mode multi-selection (active sur long-press d'une carte ; admin uniquement).
   const [selectionMode, setSelectionMode] = useState(false);
@@ -323,6 +366,61 @@ function AdminMenagesScreen() {
     [isAdmin],
   );
 
+  // Sélection → objets (pour savoir ce qui est validable).
+  const selectedMenages = React.useMemo(() => data.filter((m) => selectedIds.has(m.id)), [data, selectedIds]);
+  const validableCount = selectedMenages.filter((m) => m.status === 'termine').length;
+  const bulkPending = deleteMutation.isPending || updateMutation.isPending || validateMutation.isPending;
+
+  // Valider en lot : seules les terminées (rapport rendu) sont validables — la
+  // validation engage la facturation, on ne valide jamais une prestation
+  // jamais pointée. Pas de clôture automatique : c'est un geste de l'admin.
+  const handleBulkValidate = useCallback(async () => {
+    const ids = selectedMenages.filter((m) => m.status === 'termine').map((m) => m.id);
+    const ignored = selectedMenages.length - ids.length;
+    if (ids.length === 0) {
+      void dialog.alert({
+        title: 'Rien à valider',
+        message: 'Seules les prestations terminées (rapport rendu) peuvent être validées.',
+      });
+      return;
+    }
+    const ok = await dialog.confirm({
+      title: `Valider ${ids.length} prestation${ids.length > 1 ? 's' : ''} ?`,
+      message:
+        `Elles passeront en « validée » au prix prévu et rejoindront l'Historique.` +
+        (ignored > 0 ? ` ${ignored} sélectionnée${ignored > 1 ? 's' : ''} non terminée${ignored > 1 ? 's' : ''} sera ignorée.` : ''),
+      confirmLabel: 'Valider',
+    });
+    if (!ok) return;
+    try {
+      await Promise.all(ids.map((id) => validateMutation.mutateAsync({ id })));
+      exitSelection();
+    } catch (err) {
+      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Validation partielle' });
+    }
+  }, [selectedMenages, validateMutation, exitSelection, dialog]);
+
+  // Annuler en lot : la prestation reste (Historique), les prestataires affectés
+  // sont prévenus par l'API (« Ménage annulé »).
+  const handleBulkCancel = useCallback(async () => {
+    const ids = selectedMenages.filter((m) => m.status !== 'annule').map((m) => m.id);
+    if (ids.length === 0) return;
+    const ok = await dialog.confirm({
+      title: `Annuler ${ids.length} prestation${ids.length > 1 ? 's' : ''} ?`,
+      message:
+        'Elles passeront en « annulée » et rejoindront l’Historique (retrouvables, pas supprimées). Les prestataires affectés seront prévenus.',
+      confirmLabel: 'Annuler les prestations',
+      destructive: true,
+    });
+    if (!ok) return;
+    try {
+      await Promise.all(ids.map((id) => updateMutation.mutateAsync({ id, body: { status: 'annule' } })));
+      exitSelection();
+    } catch (err) {
+      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Annulation partielle' });
+    }
+  }, [selectedMenages, updateMutation, exitSelection, dialog]);
+
   const handleBulkDelete = useCallback(async () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
@@ -346,7 +444,7 @@ function AdminMenagesScreen() {
   }, [selectedIds, deleteMutation, exitSelection, dialog]);
 
   const renderItem = useCallback(
-    ({ item }: { item: Menage }) => {
+    ({ item, section }: { item: Menage; section: MenageSection }) => {
       const isSelected = selectedIds.has(item.id);
       return (
         <Animated.View style={styles.selectableRow} layout={LinearTransition.duration(220)}>
@@ -377,6 +475,7 @@ function AdminMenagesScreen() {
               selectionMode={selectionMode}
               selected={isSelected}
               unread={unreadByMenage[item.id] ?? 0}
+              muted={section.key === 'past'}
             />
           </Animated.View>
         </Animated.View>
@@ -385,17 +484,63 @@ function AdminMenagesScreen() {
     [handleMenagePress, handleMenageLongPress, isAdmin, selectionMode, selectedIds, toggleSelection, colors, unreadByMenage],
   );
 
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: MenageSection }) => {
+      const accent = section.key === 'today';
+      return (
+        <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
+          <Text style={[styles.sectionTitle, { color: accent ? colors.primary : colors.text2 }]}>{section.title}</Text>
+          {section.subtitle ? (
+            <Text style={[styles.sectionSubtitle, { color: colors.text2 }]}>{section.subtitle}</Text>
+          ) : null}
+          <View
+            style={[
+              styles.sectionCount,
+              { backgroundColor: accent ? colors.primary : colors.lightItemBackground },
+            ]}
+          >
+            <Text style={[styles.sectionCountText, { color: accent ? '#FFFFFF' : colors.text2 }]}>
+              {section.data.length}
+            </Text>
+          </View>
+        </View>
+      );
+    },
+    [colors],
+  );
+
+  // Pied de liste du chip « Passées » : au-delà de la fenêtre, c'est l'Historique.
+  const renderFooter = useCallback(() => {
+    if (!isPast || isLoading) return null;
+    return (
+      <TouchableOpacity
+        style={styles.pastFooter}
+        onPress={() => router.push('/historique' as never)}
+        accessibilityRole="link"
+        accessibilityLabel="Voir les prestations plus anciennes dans l'Historique"
+      >
+        <Text style={[styles.pastFooterText, { color: colors.mutedText }]}>
+          Plus ancien que {PAST_WINDOW_DAYS} jours ?{' '}
+          <Text style={{ color: colors.primary, fontWeight: FontWeight.semibold }}>Voir l’Historique</Text>
+        </Text>
+      </TouchableOpacity>
+    );
+  }, [isPast, isLoading, router, colors]);
+
   const renderEmpty = () => {
     if (isLoading) return null;
+    const filtered = searchQuery || typeFilter || logementFilter || prestaFilter || creatorFilter;
     return (
       <View style={styles.emptyContainer}>
         <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-          {t('menage.empty')}
+          {isPast ? 'Rien en attente' : t('menage.empty')}
         </Text>
         <Text style={[styles.emptyHint, { color: colors.mutedText }]}>
-          {searchQuery || typeFilter || logementFilter || prestaFilter || creatorFilter
-            ? 'Aucune prestation pour ces filtres.'
-            : 'Appuyez sur + pour créer votre première prestation.'}
+          {isPast
+            ? `Aucune prestation passée à traiter sur les ${PAST_WINDOW_DAYS} derniers jours.`
+            : filtered
+              ? 'Aucune prestation pour ces filtres.'
+              : 'Appuyez sur + pour créer votre première prestation.'}
         </Text>
       </View>
     );
@@ -481,19 +626,47 @@ function AdminMenagesScreen() {
           >
             {selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}
           </Animated.Text>
+          {/* Actions groupées : Valider (terminées seulement) · Annuler · Supprimer.
+              Valider/Annuler vident la file des passées sans rien perdre (Historique). */}
           <TouchableOpacity
             style={[
-              styles.selectionDelete,
+              styles.selectionAction,
+              { backgroundColor: validableCount === 0 ? colors.itemBackground : colors.statusValide },
+            ]}
+            onPress={handleBulkValidate}
+            disabled={selectedIds.size === 0 || bulkPending}
+            accessibilityLabel={`Valider la sélection (${validableCount} terminée${validableCount > 1 ? 's' : ''})`}
+          >
+            <CheckCheck size={IconSize.sm} color={validableCount === 0 ? colors.mutedText : '#FFFFFF'} />
+            <Text style={[styles.selectionActionText, { color: validableCount === 0 ? colors.mutedText : '#FFFFFF' }]}>
+              Valider{validableCount > 0 ? ` ${validableCount}` : ''}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.selectionAction,
+              { backgroundColor: selectedIds.size === 0 ? colors.itemBackground : colors.statusEnCours },
+            ]}
+            onPress={handleBulkCancel}
+            disabled={selectedIds.size === 0 || bulkPending}
+            accessibilityLabel="Annuler la sélection"
+          >
+            <Ban size={IconSize.sm} color={selectedIds.size === 0 ? colors.mutedText : '#FFFFFF'} />
+            <Text style={[styles.selectionActionText, { color: selectedIds.size === 0 ? colors.mutedText : '#FFFFFF' }]}>
+              Annuler
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.selectionAction,
+              styles.selectionIconOnly,
               { backgroundColor: selectedIds.size === 0 ? colors.itemBackground : colors.red },
             ]}
             onPress={handleBulkDelete}
-            disabled={selectedIds.size === 0 || deleteMutation.isPending}
+            disabled={selectedIds.size === 0 || bulkPending}
             accessibilityLabel="Supprimer la sélection"
           >
             <Trash2 size={IconSize.sm} color={selectedIds.size === 0 ? colors.mutedText : '#FFFFFF'} />
-            <Text style={[styles.selectionDeleteText, { color: selectedIds.size === 0 ? colors.mutedText : '#FFFFFF' }]}>
-              Supprimer
-            </Text>
           </TouchableOpacity>
         </Animated.View>
       ) : (
@@ -689,14 +862,18 @@ function AdminMenagesScreen() {
       ) : viewMode === 'map' ? (
         <MenageMap onLogementPress={(id) => router.push(`/logement/${id}` as never)} />
       ) : (
-        <FlatList
+        <SectionList
           style={{ flex: 1 }}
-          data={data ?? []}
+          sections={sections}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
+          renderSectionHeader={renderSectionHeader}
+          stickySectionHeadersEnabled
           ListEmptyComponent={renderEmpty}
+          ListFooterComponent={renderFooter}
           contentContainerStyle={[styles.list, { flexGrow: 1 }]}
           ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
+          SectionSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -815,16 +992,38 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
   },
-  selectionCount: { fontSize: FontSize.base, fontWeight: FontWeight.semibold, flex: 1, textAlign: 'center' },
-  selectionDelete: {
+  selectionCount: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold, flex: 1, textAlign: 'center' },
+  selectionAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.sm,
     borderRadius: Radius.md,
   },
-  selectionDeleteText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
+  selectionIconOnly: { paddingHorizontal: Spacing.sm },
+  selectionActionText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: Spacing.sm,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.sm,
+  },
+  sectionTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.6 },
+  sectionSubtitle: { fontSize: FontSize.sm },
+  sectionCount: {
+    marginLeft: 'auto',
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionCountText: { fontSize: 11, fontWeight: FontWeight.bold },
+  pastFooter: { paddingVertical: Spacing.lg, alignItems: 'center' },
+  pastFooterText: { fontSize: FontSize.sm, textAlign: 'center' },
   selectableRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   externalCheckbox: {
     width: 24,

@@ -10,7 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Clock, Check, X, CheckCircle2, Play, CalendarCheck, AlertTriangle, ChevronLeft, ChevronRight, Bell } from 'lucide-react-native';
+import { Clock, Check, X, CheckCircle2, Play, CalendarCheck, AlertTriangle, ChevronLeft, ChevronRight, Bell, BadgeCheck, Ban } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -222,6 +222,9 @@ export default function PrestaUpcomingList() {
         const duration = item.duree_estimee_min ? formatDurationMin(item.duree_estimee_min) : null;
         const needsAttention = !!item.needs_attention;
         const unread = unreadByMenage[item.id] ?? 0;
+        // Clôturée (validée / annulée) : carte atténuée, sans relief — c'est du
+        // passé, elle ne doit pas ressembler à une prestation à faire.
+        const closed = item.status === 'valide' || item.status === 'annule';
         return (
           <TouchableOpacity
             activeOpacity={0.85}
@@ -235,9 +238,9 @@ export default function PrestaUpcomingList() {
             }}
             style={[
               styles.card,
-              Shadow.sm,
+              closed ? null : Shadow.sm,
               {
-                backgroundColor: needsAttention ? colors.red + '12' : colors.surface,
+                backgroundColor: needsAttention ? colors.red + '12' : closed ? colors.itemBackground : colors.surface,
                 borderColor: needsAttention ? colors.red + '55' : colors.border,
               },
               needsAttention ? { borderLeftColor: colors.red, borderLeftWidth: 3 } : null,
@@ -324,11 +327,13 @@ export default function PrestaUpcomingList() {
 
             {/* Les ménages affectés à d'autres sont filtrés côté API : ici on a
                 soit un ménage ouvert (vote éditable), soit un ménage où je suis
-                retenu (Présent figé), soit un ménage en cours / terminé.
-                - en cours / terminé → statut du workflow
+                retenu (Présent figé), soit un ménage en cours / terminé / clôturé.
+                - tout sauf « à venir » → bandeau de statut (en cours, terminé,
+                  validé, annulé) : jamais le pill « Présent », qui ferait passer
+                  une prestation finie pour une prestation future
                 - retenu (à venir) → pill vert "Présent" verrouillé
                 - personne d'affecté (à venir) → vote Présent/Absent éditable */}
-            {item.status === 'en_cours' || item.status === 'termine' ? (
+            {item.status !== 'a_venir' ? (
               <WorkflowStatus item={item} colors={colors} />
             ) : item.is_assigned ? (
               <LockedResponse present colors={colors} />
@@ -442,11 +447,19 @@ function WorkflowStatus({
   let color: string;
   let label: string;
   let Icon: typeof Check;
-  if (item.status === 'termine') {
+  const who = item.done_by_me
+    ? 'vous'
+    : [item.referent_first_name, item.referent_last_name].filter(Boolean).join(' ');
+  if (item.status === 'valide') {
+    color = colors.statusValide;
+    label = who ? `Validée · fait par ${who}` : 'Validée';
+    Icon = BadgeCheck;
+  } else if (item.status === 'annule') {
+    color = colors.mutedText;
+    label = 'Annulée';
+    Icon = Ban;
+  } else if (item.status === 'termine') {
     color = colors.statusTermine;
-    const who = item.done_by_me
-      ? 'vous'
-      : [item.referent_first_name, item.referent_last_name].filter(Boolean).join(' ');
     label = who ? `Terminé · fait par ${who}` : 'Terminé';
     Icon = CheckCircle2;
   } else if (item.status === 'en_cours') {

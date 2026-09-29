@@ -225,6 +225,9 @@ export default function PrestaUpcomingList() {
         // Clôturée (validée / annulée) : carte atténuée, sans relief — c'est du
         // passé, elle ne doit pas ressembler à une prestation à faire.
         const closed = item.status === 'valide' || item.status === 'annule';
+        // Jour passé : plus rien à voter ni à confirmer — un « Présent » sur une
+        // prestation d'hier la ferait passer pour une prestation à faire.
+        const pastDay = item.date_prevue.slice(0, 10) < ymd(new Date());
         return (
           <TouchableOpacity
             activeOpacity={0.85}
@@ -232,7 +235,7 @@ export default function PrestaUpcomingList() {
             // Appui long sur une prestation à venir → demande de changement
             // (la modale s'ouvre pré-remplie sur le détail).
             onLongPress={() => {
-              if (item.status === 'a_venir') {
+              if (item.status === 'a_venir' && !pastDay) {
                 router.push(`/menage/${item.id}?reschedule=1` as never);
               }
             }}
@@ -333,8 +336,8 @@ export default function PrestaUpcomingList() {
                   une prestation finie pour une prestation future
                 - retenu (à venir) → pill vert "Présent" verrouillé
                 - personne d'affecté (à venir) → vote Présent/Absent éditable */}
-            {item.status !== 'a_venir' ? (
-              <WorkflowStatus item={item} colors={colors} />
+            {item.status !== 'a_venir' || pastDay ? (
+              <WorkflowStatus item={item} colors={colors} pastDay={pastDay} />
             ) : item.is_assigned ? (
               <LockedResponse present colors={colors} />
             ) : (
@@ -440,9 +443,12 @@ function ResponseButton({
 function WorkflowStatus({
   item,
   colors,
+  pastDay = false,
 }: {
   item: MyUpcomingMenage;
   colors: typeof Colors.light;
+  /** Jour passé : une « à venir » non pointée est en retard, pas à faire. */
+  pastDay?: boolean;
 }) {
   let color: string;
   let label: string;
@@ -466,6 +472,14 @@ function WorkflowStatus({
     color = colors.statusEnCours;
     label = 'En cours';
     Icon = Play;
+  } else if (pastDay && item.is_assigned) {
+    color = colors.red;
+    label = 'Non pointée — pointe ton arrivée depuis la fiche';
+    Icon = AlertTriangle;
+  } else if (pastDay) {
+    color = colors.mutedText;
+    label = 'Passée · personne ne l’a prise';
+    Icon = Ban;
   } else {
     // a_venir mais affecté
     color = colors.primary;

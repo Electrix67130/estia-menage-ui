@@ -89,7 +89,7 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, u
               ) : null}
               {needsAttention ? (
                 <View
-                  style={[styles.lateBadge, { backgroundColor: colors.red + '20' }]}
+                  style={[styles.lateBadge, { backgroundColor: colors.red + '20', borderColor: colors.red }]}
                   accessibilityLabel="Jour passé sans pointage"
                 >
                   <AlertTriangle size={11} color={colors.red} />
@@ -193,19 +193,20 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
+  // Même géométrie que StatusBadge (il en tient lieu) : padding, gap, liseré,
+  // corps de texte — au lieu d'une pastille tassée en capitales de 9 px.
   lateBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
     borderRadius: Radius.pill,
+    borderWidth: 1,
   },
   lateBadgeText: {
-    fontSize: 9,
-    fontWeight: FontWeight.bold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontSize: FontSize.xs,
+    fontWeight: FontWeight.semibold,
   },
   reschedulePill: {
     width: 22,

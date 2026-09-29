@@ -1,16 +1,18 @@
 import React, { useMemo, useState } from 'react';
-import { usePersistedState } from '@/hooks/usePersistedState';
 import {
   View,
   Text,
-  FlatList,
+  SectionList,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Clock, Check, X, CheckCircle2, Play, CalendarCheck, AlertTriangle, ChevronLeft, ChevronRight, Bell, BadgeCheck, Ban } from 'lucide-react-native';
+import { Clock, Check, X, CheckCircle2, Play, CalendarCheck, AlertTriangle, Bell, BadgeCheck, Ban } from 'lucide-react-native';
+import SegmentedTabs from '@/components/prestations/SegmentedTabs';
+import HistoriqueList from '@/components/HistoriqueList';
+import { groupByDay, type DaySection } from '@/lib/prestations';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -40,170 +42,103 @@ export default function PrestaUpcomingList() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
-  const [periodFilter, setPeriodFilter] = usePersistedState<'week' | 'month' | 'year' | 'all' | 'past'>(
-    'presta.filter.period',
-    'all',
-  );
-  // Décalage de période (0 = courante, -1 = précédente, +1 = suivante).
-  const [periodOffset, setPeriodOffset] = useState(0);
-
-  // Bornes + libellé + mode de la période sélectionnée (date locale).
-  // mode 'history' dès que la période est entièrement passée → on récupère les
-  // ménages termine/valide ; sinon 'upcoming' (à venir). "Passés"/"Tout" : pas
-  // de bornes, on garde les fenêtres par défaut de l'API.
-  const period = useMemo<{
-    from: string | null;
-    to: string | null;
-    mode: 'upcoming' | 'history';
-    label: string;
-  }>(() => {
-    const now = new Date();
-    const todayYmd = ymd(now);
-    if (periodFilter === 'week') {
-      const dow = (now.getDay() + 6) % 7;
-      const monday = new Date(now);
-      monday.setDate(now.getDate() - dow + periodOffset * 7);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      const to = ymd(sunday);
-      const f = (d: Date) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-      return { from: ymd(monday), to, mode: to < todayYmd ? 'history' : 'upcoming', label: `${f(monday)} – ${f(sunday)}` };
-    }
-    if (periodFilter === 'month') {
-      const first = new Date(now.getFullYear(), now.getMonth() + periodOffset, 1);
-      const last = new Date(now.getFullYear(), now.getMonth() + periodOffset + 1, 0);
-      const to = ymd(last);
-      return {
-        from: ymd(first),
-        to,
-        mode: to < todayYmd ? 'history' : 'upcoming',
-        label: first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-      };
-    }
-    if (periodFilter === 'year') {
-      const y = now.getFullYear() + periodOffset;
-      const to = `${y}-12-31`;
-      return { from: `${y}-01-01`, to, mode: to < todayYmd ? 'history' : 'upcoming', label: String(y) };
-    }
-    if (periodFilter === 'past') return { from: null, to: null, mode: 'history', label: '' };
-    return { from: null, to: null, mode: 'upcoming', label: '' };
-  }, [periodFilter, periodOffset]);
-
-  const list = useMyUpcomingMenages({
-    from: period.from ?? undefined,
-    to: period.to ?? undefined,
-    mode: period.mode,
-  });
+  // Une question par vue : Planning (mes prestations par jour), À traiter (ce
+  // qui attend une action de ma part), Historique (ce que j'ai fait).
+  const [view, setView] = useState<'planning' | 'todo' | 'history'>('planning');
+  const todayYmd = ymd(new Date());
+  // Mode « upcoming » de l'API : d'aujourd'hui à +90 j, plus les « à venir » en
+  // retard (jour passé sans pointage). Le passé clôturé vit dans l'Historique.
+  const list = useMyUpcomingMenages({ mode: 'upcoming' });
   const respond = useRespondToMenageOptimistic();
   // Non-lus par ménage → pastille sur la carte concernée (commentaires/photos…).
   const unreadByMenage = useUnreadSummary().data?.by_menage ?? {};
 
-  // Filtre période (sécurité : le mode upcoming ajoute les ménages en retard
-  // hors fenêtre) + tri. "Passés" : tri descendant. Autres : ascendant.
-  const items = useMemo(() => {
-    const filtered = (list.data ?? []).filter((m) => {
-      const d = m.date_prevue.slice(0, 10);
-      if (period.from && d < period.from) return false;
-      if (period.to && d > period.to) return false;
-      return true;
-    });
-    const desc = periodFilter === 'past';
-    return filtered
-      .slice()
-      .sort((a, b) => {
-        const ad = a.date_prevue.slice(0, 10);
-        const bd = b.date_prevue.slice(0, 10);
-        return desc ? bd.localeCompare(ad) : ad.localeCompare(bd);
-      });
-  }, [list.data, period, periodFilter]);
+  type Section = DaySection<MyUpcomingMenage> & { color?: string };
+  const sections = useMemo<Section[]>(() => {
+    const all = list.data ?? [];
+    if (view === 'planning') return groupByDay(all, todayYmd);
+    // À traiter : à répondre (vote ouvert, pas encore de réponse) + non pointées
+    // (affecté, jour passé sans pointage).
+    const toAnswer = all.filter(
+      (m) => m.status === 'a_venir' && !m.assigned_to_someone && !m.my_response && m.date_prevue.slice(0, 10) >= todayYmd,
+    );
+    const late = all.filter((m) => m.status === 'a_venir' && m.is_assigned && m.date_prevue.slice(0, 10) < todayYmd);
+    const out: Section[] = [];
+    if (toAnswer.length)
+      out.push({ key: 'answer', title: 'À répondre', isToday: false, color: colors.primary, data: toAnswer.slice().sort((a, b) => a.date_prevue.localeCompare(b.date_prevue)) });
+    if (late.length)
+      out.push({ key: 'late', title: late.length > 1 ? 'Non pointées' : 'Non pointée', isToday: false, color: colors.red, data: late.slice().sort((a, b) => b.date_prevue.localeCompare(a.date_prevue)) });
+    return out;
+  }, [list.data, view, todayYmd, colors]);
+  const todoCount = useMemo(() => {
+    const all = list.data ?? [];
+    return (
+      all.filter((m) => m.status === 'a_venir' && !m.assigned_to_someone && !m.my_response && m.date_prevue.slice(0, 10) >= todayYmd).length +
+      all.filter((m) => m.status === 'a_venir' && m.is_assigned && m.date_prevue.slice(0, 10) < todayYmd).length
+    );
+  }, [list.data, todayYmd]);
 
   const handleRespond = (menageId: string, status: MenageResponseStatus) => {
     respond.mutate({ menageId, status });
   };
 
+  const segmented = (
+    <View style={styles.segmentedWrap}>
+      <SegmentedTabs
+        segments={[
+          { key: 'planning', label: 'Planning' },
+          { key: 'todo', label: 'À traiter', badge: todoCount },
+          { key: 'history', label: 'Historique' },
+        ]}
+        value={view}
+        onChange={setView}
+      />
+      {view === 'planning' ? (
+        <Text style={[styles.hint, { color: colors.mutedText }]}>
+          Indique si tu peux faire chaque prestation. Appui long = demander un changement.
+        </Text>
+      ) : null}
+    </View>
+  );
+
+  if (view === 'history') {
+    return (
+      <View style={{ flex: 1 }}>
+        {segmented}
+        <HistoriqueList />
+      </View>
+    );
+  }
+
   if (list.isLoading) {
     return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={colors.primary} />
+      <View style={{ flex: 1 }}>
+        {segmented}
+        <View style={styles.loading}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
       </View>
     );
   }
 
   return (
-    <FlatList
-      data={items}
+    <View style={{ flex: 1 }}>
+    {segmented}
+    <SectionList
+      sections={sections}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.listContent}
-      ListHeaderComponent={
-        <View>
-          <View style={[styles.periodToggle, { backgroundColor: colors.itemBackground }]}>
-            {([
-              { key: 'week' as const, label: 'Semaine' },
-              { key: 'month' as const, label: 'Mois' },
-              { key: 'year' as const, label: 'Année' },
-              { key: 'all' as const, label: 'Tout' },
-              { key: 'past' as const, label: 'Passés' },
-            ]).map((p) => {
-              const active = periodFilter === p.key;
-              return (
-                <TouchableOpacity
-                  key={p.key}
-                  style={[
-                    styles.periodTab,
-                    { backgroundColor: active ? colors.surface : 'transparent' },
-                  ]}
-                  onPress={() => {
-                    setPeriodFilter(p.key);
-                    setPeriodOffset(0);
-                  }}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                >
-                  <Text
-                    style={[
-                      styles.periodTabText,
-                      {
-                        color: active ? colors.text : colors.mutedText,
-                        fontWeight: active ? FontWeight.semibold : FontWeight.medium,
-                      },
-                    ]}
-                  >
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+      stickySectionHeadersEnabled
+      renderSectionHeader={({ section }) => (
+        <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
+          <Text style={[styles.sectionTitle, { color: section.color ?? (section.isToday ? colors.primary : colors.text2) }]}>{section.title}</Text>
+          {section.subtitle ? <Text style={[styles.sectionSubtitle, { color: colors.text2 }]}>{section.subtitle}</Text> : null}
+          <View style={{ flex: 1 }} />
+          <View style={[styles.sectionCount, { backgroundColor: section.isToday ? colors.primary : (section.color ?? colors.mutedText) + '20' }]}>
+            <Text style={[styles.sectionCountText, { color: section.isToday ? '#FFFFFF' : section.color ?? colors.text2 }]}>{section.data.length}</Text>
           </View>
-          {periodFilter === 'week' || periodFilter === 'month' || periodFilter === 'year' ? (
-            <View style={styles.periodNav}>
-              <TouchableOpacity
-                onPress={() => setPeriodOffset((o) => o - 1)}
-                style={styles.periodNavBtn}
-                accessibilityLabel="Période précédente"
-              >
-                <ChevronLeft size={IconSize.md} color={colors.text} />
-              </TouchableOpacity>
-              <Text style={[styles.periodNavLabel, { color: colors.text }]} numberOfLines={1}>
-                {period.label}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setPeriodOffset((o) => o + 1)}
-                style={styles.periodNavBtn}
-                accessibilityLabel="Période suivante"
-              >
-                <ChevronRight size={IconSize.md} color={colors.text} />
-              </TouchableOpacity>
-              {periodOffset !== 0 ? (
-                <TouchableOpacity onPress={() => setPeriodOffset(0)} style={styles.periodNavToday}>
-                  <Text style={[styles.periodNavTodayLabel, { color: colors.primary }]}>
-                    Aujourd&apos;hui
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          ) : null}
         </View>
-      }
+      )}
       ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
       refreshControl={
         <RefreshControl
@@ -366,19 +301,14 @@ export default function PrestaUpcomingList() {
       ListEmptyComponent={
         <View style={styles.empty}>
           <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-            {periodFilter === 'week'
-              ? 'Aucun ménage sur cette semaine.'
-              : periodFilter === 'month'
-                ? 'Aucun ménage sur ce mois.'
-                : periodFilter === 'year'
-                  ? 'Aucun ménage sur cette année.'
-                  : periodFilter === 'past'
-                    ? 'Aucun ménage déjà effectué.'
-                    : 'Aucun ménage à venir sur les logements où tu es prestataire.'}
+            {view === 'todo'
+              ? 'Tout est à jour : rien à répondre, rien en retard.'
+              : 'Aucune prestation à venir sur les logements où tu es prestataire.'}
           </Text>
         </View>
       }
     />
+    </View>
   );
 }
 
@@ -498,34 +428,14 @@ function WorkflowStatus({
 
 const styles = StyleSheet.create({
   loading: { padding: Spacing.xl, alignItems: 'center' },
-  listContent: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxxl },
-  periodToggle: {
-    flexDirection: 'row',
-    padding: 4,
-    borderRadius: Radius.pill,
-    gap: 2,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  periodTab: { flex: 1, alignItems: 'center', paddingVertical: Spacing.xs, borderRadius: Radius.pill },
-  periodTabText: { fontSize: FontSize.sm },
-  periodNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  periodNavBtn: { padding: Spacing.xs },
-  periodNavLabel: {
-    fontSize: FontSize.md,
-    fontWeight: FontWeight.semibold,
-    textAlign: 'center',
-    minWidth: 150,
-    textTransform: 'capitalize',
-  },
-  periodNavToday: { paddingHorizontal: Spacing.sm, paddingVertical: 2 },
-  periodNavTodayLabel: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
+  listContent: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxxl, flexGrow: 1 },
+  segmentedWrap: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.xs, paddingBottom: Spacing.sm, gap: Spacing.xs },
+  hint: { fontSize: FontSize.xs },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingTop: Spacing.sm, paddingBottom: 2 },
+  sectionTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.6 },
+  sectionSubtitle: { fontSize: FontSize.sm },
+  sectionCount: { minWidth: 20, height: 20, paddingHorizontal: 6, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  sectionCountText: { fontSize: 11, fontWeight: FontWeight.bold },
   card: {
     marginTop: Spacing.sm,
     paddingVertical: Spacing.sm,

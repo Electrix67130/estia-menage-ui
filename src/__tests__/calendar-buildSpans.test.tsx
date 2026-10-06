@@ -1,5 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { buildSpans } from './calendar';
+// Hors de src/app : expo-router prend tout fichier de ce dossier pour une route
+// et embarquerait Testing Library dans le bundle de production.
+import { buildSpans } from '@/app/(tabs)/calendar';
 import { makeMenage } from '@/test-utils/render';
 
 // L'écran importe des hooks/API ; seule la fonction pure `buildSpans` est testée ici.

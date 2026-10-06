@@ -37,11 +37,19 @@ import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Menage, MenageStatus, PrestationType } from '@/api/types';
-import { menagePrestataireLabel, menageLogementLabel, prestationTypeLabel } from '@/api/types';
+import { menagePrestataireLabel, menageLogementLabel } from '@/api/types';
 import { formatDateFr } from '@/lib/date-fr';
 import { AgendaRow, DayTimeline } from '@/components/DayTimeline';
+import { useTranslation } from '@/contexts/I18nContext';
+import { INTL_LOCALES, getIntlLocale } from '@/i18n/runtime';
+import type { Locale, TranslationKeys } from '@/i18n/translations';
 
-const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+/** Initiales des jours (lundi en premier) dans la langue donnée, via `Intl`. */
+function weekdayInitials(locale: Locale): string[] {
+  const fmt = new Intl.DateTimeFormat(INTL_LOCALES[locale], { weekday: 'narrow' });
+  // 2024-01-01 est un lundi.
+  return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2024, 0, 1 + i)).toUpperCase());
+}
 
 const STATUS_COLOR: Record<MenageStatus, string> = {
   a_venir: '#3B82F6',
@@ -58,10 +66,10 @@ const TYPE_ALL = '';
 
 /** Vues du calendrier : mois en barres de séjour, mois en pastilles, ou liste agenda. */
 type CalendarView = 'sejours' | 'pastilles' | 'planning';
-const VIEW_SEGMENTS: { id: CalendarView; label: string }[] = [
-  { id: 'sejours', label: 'Séjours' },
-  { id: 'pastilles', label: 'Prestations' },
-  { id: 'planning', label: 'Planning' },
+const VIEW_SEGMENTS: { id: CalendarView; labelKey: TranslationKeys }[] = [
+  { id: 'sejours', labelKey: 'calendar.view.sejours' },
+  { id: 'pastilles', labelKey: 'calendar.view.prestations' },
+  { id: 'planning', labelKey: 'calendar.view.planning' },
 ];
 
 interface CalendarScreenProps {
@@ -77,6 +85,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t, locale } = useTranslation();
   const { user } = useAuth();
   // Le filtre prestataire ne sert qu'à l'admin (pour voir les dispos / ménages
   // d'un presta donné). Un prestataire ne voit que ses propres ménages, donc
@@ -112,11 +121,11 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
 
   const typeOptions = useMemo(
     () =>
-      (['menage', 'check_in', 'check_out'] as PrestationType[]).map((t) => ({
-        id: t,
-        label: prestationTypeLabel(t),
+      (['menage', 'check_in', 'check_out'] as PrestationType[]).map((type) => ({
+        id: type,
+        label: t(`prestationType.${type}` as TranslationKeys),
       })),
-    [],
+    [t],
   );
 
   const prestataireOptions = useMemo(
@@ -130,8 +139,8 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
     const list = (allLogements.data?.data ?? [])
       .filter((l) => !l.archived_at)
       .map((l) => ({ id: l.id, label: l.name }));
-    return list.sort((a, b) => a.label.localeCompare(b.label, 'fr'));
-  }, [allLogements.data]);
+    return list.sort((a, b) => a.label.localeCompare(b.label, locale));
+  }, [allLogements.data, locale]);
 
   const filteredMenages = useMemo(
     () =>
@@ -204,34 +213,36 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
 
   const prestataireFilterLabel =
     prestataireFilter === PRESTATAIRE_ALL
-      ? 'Tous'
+      ? t('common.all')
       : prestataireFilter === PRESTATAIRE_UNASSIGNED
-        ? 'Non assigné'
-        : prestataireOptions.find((p) => p.id === prestataireFilter)?.label ?? 'Tous';
+        ? t('common.unassigned')
+        : prestataireOptions.find((p) => p.id === prestataireFilter)?.label ?? t('common.all');
 
   const logementFilterLabel =
     logementFilter === LOGEMENT_ALL
-      ? 'Tous'
-      : logementOptions.find((l) => l.id === logementFilter)?.label ?? 'Tous';
+      ? t('common.all')
+      : logementOptions.find((l) => l.id === logementFilter)?.label ?? t('common.all');
 
   const typeFilterLabel =
     typeFilter === TYPE_ALL
-      ? 'Type'
-      : typeOptions.find((o) => o.id === typeFilter)?.label ?? 'Type';
+      ? t('calendar.filter.type')
+      : typeOptions.find((o) => o.id === typeFilter)?.label ?? t('calendar.filter.type');
 
   const prestatairePickerOptions = useMemo(
     () => [
-      { id: PRESTATAIRE_ALL, label: 'Tous les prestataires' },
-      { id: PRESTATAIRE_UNASSIGNED, label: 'Non assigné' },
+      { id: PRESTATAIRE_ALL, label: t('calendar.filter.allPrestataires') },
+      { id: PRESTATAIRE_UNASSIGNED, label: t('common.unassigned') },
       ...prestataireOptions,
     ],
-    [prestataireOptions],
+    [prestataireOptions, t],
   );
 
   const logementPickerOptions = useMemo(
-    () => [{ id: LOGEMENT_ALL, label: 'Tous les logements' }, ...logementOptions],
-    [logementOptions],
+    () => [{ id: LOGEMENT_ALL, label: t('calendar.filter.allLogements') }, ...logementOptions],
+    [logementOptions, t],
   );
+
+  const weekdays = useMemo(() => weekdayInitials(locale), [locale]);
 
   const Wrapper: React.ComponentType<{ children: React.ReactNode }> = embedded
     ? ({ children }) => (
@@ -252,11 +263,11 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
             style={styles.backBtn}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityRole="button"
-            accessibilityLabel="Retour"
+            accessibilityLabel={t('common.back')}
           >
             <ArrowLeft size={IconSize.md} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>Calendrier</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t('calendar.title')}</Text>
         </View>
       ) : null}
 
@@ -266,7 +277,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
           hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
           style={styles.monthNavBtn}
           accessibilityRole="button"
-          accessibilityLabel="Mois précédent"
+          accessibilityLabel={t('calendar.prevMonth')}
         >
           <ChevronLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
@@ -276,7 +287,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
           hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
           style={styles.monthNavBtn}
           accessibilityRole="button"
-          accessibilityLabel="Mois suivant"
+          accessibilityLabel={t('calendar.nextMonth')}
         >
           <ChevronRight size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
@@ -292,7 +303,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
               onPress={() => setViewMode(seg.id)}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
-              accessibilityLabel={`Vue ${seg.label}`}
+              accessibilityLabel={t('calendar.viewA11y', { view: t(seg.labelKey) })}
             >
               <Text
                 style={[
@@ -300,7 +311,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
                   { color: active ? colors.text : colors.text2, fontWeight: active ? FontWeight.semibold : FontWeight.medium },
                 ]}
               >
-                {seg.label}
+                {t(seg.labelKey)}
               </Text>
             </TouchableOpacity>
           );
@@ -323,7 +334,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
           ]}
           onPress={() => setTypeSheetOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel="Filtrer par type"
+          accessibilityLabel={t('calendar.filter.byType')}
         >
           <Text
             style={[
@@ -352,7 +363,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
             ]}
             onPress={() => setPrestataireSheetOpen(true)}
             accessibilityRole="button"
-            accessibilityLabel="Filtrer par prestataire"
+            accessibilityLabel={t('calendar.filter.byPrestataire')}
           >
             <Text
               style={[
@@ -364,7 +375,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
               ]}
               numberOfLines={1}
             >
-              {prestataireFilter !== PRESTATAIRE_ALL ? prestataireFilterLabel : 'Prestataire'}
+              {prestataireFilter !== PRESTATAIRE_ALL ? prestataireFilterLabel : t('menage.fields.prestataire')}
             </Text>
             <ChevronDown
               size={12}
@@ -384,7 +395,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
           ]}
           onPress={() => setLogementSheetOpen(true)}
           accessibilityRole="button"
-          accessibilityLabel="Filtrer par logement"
+          accessibilityLabel={t('calendar.filter.byLogement')}
         >
           <Text
             style={[
@@ -393,7 +404,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
             ]}
             numberOfLines={1}
           >
-            {logementFilter !== LOGEMENT_ALL ? logementFilterLabel : 'Logement'}
+            {logementFilter !== LOGEMENT_ALL ? logementFilterLabel : t('calendar.filter.logement')}
           </Text>
           <ChevronDown
             size={12}
@@ -413,7 +424,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
               setTypeFilter(TYPE_ALL);
             }}
             accessibilityRole="button"
-            accessibilityLabel="Réinitialiser les filtres"
+            accessibilityLabel={t('calendar.filter.reset')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <X size={12} color={colors.text2} />
@@ -423,7 +434,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
 
       {viewMode !== 'planning' ? (
         <View style={styles.weekdayRow}>
-          {WEEKDAYS.map((d, i) => (
+          {weekdays.map((d, i) => (
             <Text key={i} style={[styles.weekdayLabel, { color: colors.text2 }]}>
               {d}
             </Text>
@@ -481,7 +492,7 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
             )}
             ListEmptyComponent={
               <Text style={[styles.empty, { color: colors.mutedText, textAlign: 'center' }]}>
-                Aucune prestation ce mois-ci.
+                {t('calendar.emptyMonth')}
               </Text>
             }
           />
@@ -522,8 +533,8 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
 
       <FilterPickerSheet
         visible={showPrestataireFilter && prestataireSheetOpen}
-        title="Filtrer par prestataire"
-        searchPlaceholder="Rechercher un prestataire…"
+        title={t('calendar.filter.byPrestataire')}
+        searchPlaceholder={t('calendar.filter.searchPrestataire')}
         options={prestatairePickerOptions}
         selectedId={prestataireFilter}
         onSelect={(id) => {
@@ -534,8 +545,8 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
       />
       <FilterPickerSheet
         visible={logementSheetOpen}
-        title="Filtrer par logement"
-        searchPlaceholder="Rechercher un logement…"
+        title={t('calendar.filter.byLogement')}
+        searchPlaceholder={t('calendar.filter.searchLogement')}
         options={logementPickerOptions}
         selectedId={logementFilter}
         onSelect={(id) => {
@@ -546,8 +557,8 @@ export default function CalendarScreen({ embedded = false }: CalendarScreenProps
       />
       <FilterPickerSheet
         visible={typeSheetOpen}
-        title="Filtrer par type"
-        options={[{ id: TYPE_ALL, label: 'Tous les types' }, ...typeOptions]}
+        title={t('calendar.filter.byType')}
+        options={[{ id: TYPE_ALL, label: t('calendar.filter.allTypes') }, ...typeOptions]}
         selectedId={typeFilter}
         onSelect={(id) => {
           setTypeFilter(id);
@@ -586,6 +597,7 @@ function FilterPickerSheet({
 }: FilterPickerSheetProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const animatedModalStyle = useKeyboardAwareModalStyle({ visible });
   const insets = useSafeAreaInsets();
@@ -644,7 +656,7 @@ function FilterPickerSheet({
               <View style={{ height: 1, backgroundColor: colors.border }} />
             )}
             ListEmptyComponent={
-              <Text style={[sheetStyles.empty, { color: colors.mutedText }]}>Aucun résultat.</Text>
+              <Text style={[sheetStyles.empty, { color: colors.mutedText }]}>{t('calendar.filter.noResult')}</Text>
             }
             renderItem={({ item }) => {
               const isSelected = item.id === selectedId;
@@ -935,7 +947,7 @@ function buildPrestataireOptions(
   }
   return Array.from(map.entries())
     .map(([id, label]) => ({ id, label }))
-    .sort((a, b) => a.label.localeCompare(b.label, 'fr'));
+    .sort((a, b) => a.label.localeCompare(b.label, getIntlLocale()));
 }
 
 function buildLogementOptions(menages: Menage[]): { id: string; label: string }[] {
@@ -947,7 +959,7 @@ function buildLogementOptions(menages: Menage[]): { id: string; label: string }[
   }
   return Array.from(map.entries())
     .map(([id, label]) => ({ id, label }))
-    .sort((a, b) => a.label.localeCompare(b.label, 'fr'));
+    .sort((a, b) => a.label.localeCompare(b.label, getIntlLocale()));
 }
 
 function groupByDate(menages: Menage[]): Map<string, Menage[]> {
@@ -1092,7 +1104,7 @@ function dayIndex(iso: string): number {
  * Regroupe ménage / check-in / check-out d'une même réservation (external_event_uid)
  * en un séjour ; les ménages manuels (sans uid) deviennent des événements 1 jour.
  */
-function buildSpans(menages: Menage[]): Span[] {
+export function buildSpans(menages: Menage[]): Span[] {
   const groups = new Map<string, Menage[]>();
   const singles: Menage[] = [];
   for (const m of menages) {

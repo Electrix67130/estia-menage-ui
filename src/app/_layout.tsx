@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { QueryClient } from '@tanstack/react-query';
@@ -74,6 +75,9 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // Au tap sur une notification → ouvrir le ménage concerné.
   useEffect(() => {
+    // Pas de notifications push sur le web (expo-notifications lève sinon
+    // « not available on web » au montage) — le rendu web sert aux vérifications.
+    if (Platform.OS === 'web') return;
     const goToMenage = (response: Notifications.NotificationResponse | null) => {
       const menageId = response?.notification.request.content.data?.menage_id;
       if (typeof menageId === 'string') {

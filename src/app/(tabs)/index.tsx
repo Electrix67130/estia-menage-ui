@@ -729,7 +729,7 @@ function AdminMenagesScreen() {
               ].map((s) => (
                 <View key={s.key} style={styles.summaryCell}>
                   <Text style={[styles.summaryNum, { color: s.n > 0 ? s.color : colors.mutedText }]}>{s.n}</Text>
-                  <Text style={[styles.summaryLabel, { color: colors.text2 }]} numberOfLines={1}>
+                  <Text style={[styles.summaryLabel, { color: colors.text2 }]} numberOfLines={2}>
                     {s.label}
                   </Text>
                 </View>
@@ -830,7 +830,8 @@ const styles = StyleSheet.create({
   },
   summaryCell: { flex: 1, gap: 1 },
   summaryNum: { fontSize: FontSize.xl, fontWeight: FontWeight.bold, fontVariant: ['tabular-nums'] },
-  summaryLabel: { fontSize: 11 },
+  // Deux lignes : « nicht zugewiesen », « nieprzypisanych »… ne tiennent pas sur une seule dans un quart d'écran.
+  summaryLabel: { fontSize: 11, lineHeight: 13 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingTop: Spacing.sm, paddingBottom: Spacing.sm },
   sectionTitle: { fontSize: FontSize.sm, fontWeight: FontWeight.bold, textTransform: 'uppercase', letterSpacing: 0.6 },
   sectionSubtitle: { fontSize: FontSize.sm },

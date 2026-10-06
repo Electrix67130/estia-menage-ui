@@ -9,6 +9,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useLogements, useArchivedLogements, useUnarchiveLogement } from '@/api/hooks/useLogements';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
 import AppHeader from '@/components/AppHeader';
 import type { Logement } from '@/api/types';
 
@@ -18,6 +19,7 @@ export default function LogementsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { confirm } = useDialog();
+  const { t } = useTranslation();
   const isAdmin = user?.role === 'admin';
   const [showArchived, setShowArchived] = useState(false);
   const { data, isLoading, isRefetching, refetch } = useLogements();
@@ -44,9 +46,9 @@ export default function LogementsScreen() {
 
   const handleUnarchive = async (item: Logement) => {
     const ok = await confirm({
-      title: 'Restaurer ce logement ?',
-      message: `« ${item.name} » et les prestations/consommables archivés avec lui seront réactivés.`,
-      confirmLabel: 'Restaurer',
+      title: t('logementsList.restoreTitle'),
+      message: t('logementsList.restoreBody', { name: item.name }),
+      confirmLabel: t('logement.restore'),
     });
     if (ok) await unarchive.mutateAsync(item.id);
   };
@@ -137,7 +139,7 @@ export default function LogementsScreen() {
       {item.archived_at ? (
         <View style={styles.archivedCol}>
           <View style={[styles.archivedBadge, { backgroundColor: colors.itemBackground }]}>
-            <Text style={[styles.archivedBadgeText, { color: colors.text2 }]}>Archivé</Text>
+            <Text style={[styles.archivedBadgeText, { color: colors.text2 }]}>{t('logementsList.archived')}</Text>
           </View>
           {isAdmin ? (
             <TouchableOpacity
@@ -147,7 +149,7 @@ export default function LogementsScreen() {
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <RotateCcw size={13} color={colors.primary} />
-              <Text style={[styles.restoreText, { color: colors.primary }]}>Restaurer</Text>
+              <Text style={[styles.restoreText, { color: colors.primary }]}>{t('logement.restore')}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -159,7 +161,7 @@ export default function LogementsScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader>
         <View style={styles.headerRow}>
-          <Text style={[styles.title, { color: colors.text }]}>Logements</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t('logementsList.title')}</Text>
           {isAdmin ? (
             <View style={{ flexDirection: 'row', gap: Spacing.xs }}>
               <TouchableOpacity
@@ -171,20 +173,20 @@ export default function LogementsScreen() {
                   },
                 ]}
                 onPress={() => setShowArchived((v) => !v)}
-                accessibilityLabel="Afficher les logements archivés"
+                accessibilityLabel={t('logementsList.showArchivedA11y')}
                 accessibilityRole="button"
               >
                 <Archive size={IconSize.sm} color={showArchived ? colors.primary : colors.text2} />
-                <Text style={[styles.headerBtnText, { color: showArchived ? colors.primary : colors.text }]}>Archivés</Text>
+                <Text style={[styles.headerBtnText, { color: showArchived ? colors.primary : colors.text }]}>{t('logementsList.archivedBtn')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.headerBtn, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}
                 onPress={() => router.push('/checklist-template' as never)}
-                accessibilityLabel="Modèles de checklist"
+                accessibilityLabel={t('logementsList.templatesA11y')}
                 accessibilityRole="button"
               >
                 <ListChecks size={IconSize.sm} color={colors.primary} />
-                <Text style={[styles.headerBtnText, { color: colors.text }]}>Modèles</Text>
+                <Text style={[styles.headerBtnText, { color: colors.text }]}>{t('logementsList.templatesBtn')}</Text>
               </TouchableOpacity>
             </View>
           ) : null}
@@ -204,9 +206,7 @@ export default function LogementsScreen() {
           ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
           ListEmptyComponent={
             <Text style={{ color: colors.mutedText, textAlign: 'center', marginTop: Spacing.xl }}>
-              {isAdmin
-                ? 'Aucun logement. Appuyez sur + pour en créer un.'
-                : 'Vous n’avez aucun logement assigné pour le moment. Un administrateur vous en attribuera prochainement.'}
+              {isAdmin ? t('logementsList.emptyAdmin') : t('logementsList.emptyPresta')}
             </Text>
           }
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={colors.primary} />}
@@ -217,7 +217,7 @@ export default function LogementsScreen() {
         <TouchableOpacity
           style={[styles.fab, { backgroundColor: colors.primary }, Shadow.lg]}
           onPress={() => router.push('/logement/create')}
-          accessibilityLabel="Créer un logement"
+          accessibilityLabel={t('logementsList.createA11y')}
         >
           <Plus size={IconSize.xl} color="#FFFFFF" />
         </TouchableOpacity>

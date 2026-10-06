@@ -11,7 +11,9 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreateMenage } from '@/api/hooks/useMenages';
 import { useLogements } from '@/api/hooks/useLogements';
-import { prestationTypeLabel, prestationTypeColorKey, type PrestationType } from '@/api/types';
+import { prestationTypeColorKey, type PrestationType } from '@/api/types';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 import KeyboardAwareScroll from '@/components/KeyboardAwareScroll';
 import AutoScrollInput from '@/components/AutoScrollInput';
 import DatePickerField from '@/components/DatePickerField';
@@ -25,6 +27,7 @@ export default function CreateMenageScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ logement_id?: string; type?: string }>();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const isAdmin = user?.role === 'admin';
   const createMutation = useCreateMenage();
   const { data: logements } = useLogements();
@@ -83,22 +86,22 @@ export default function CreateMenageScreen() {
   const handleSubmit = async () => {
     setError('');
     if (!logementId || !datePrevue.trim()) {
-      setError('Logement et date prévue requis.');
+      setError(t('menageCreate.logementAndDateRequired'));
       return;
     }
     const cPrice = parseMoney(clientPriceHt);
-    if (cPrice === 'invalid') { setError('Prix client HT invalide'); return; }
+    if (cPrice === 'invalid') { setError(t('menageCreate.clientPriceInvalid')); return; }
     const cVat = parseMoney(clientVatRate);
-    if (cVat === 'invalid') { setError('TVA invalide'); return; }
+    if (cVat === 'invalid') { setError(t('menageCreate.vatInvalid')); return; }
     const pPrice = parseMoney(providerPrice);
-    if (pPrice === 'invalid') { setError('Prix prestataire invalide'); return; }
+    if (pPrice === 'invalid') { setError(t('menageCreate.providerPriceInvalid')); return; }
     const lCPrice = parseMoney(laundryClientPriceHt);
-    if (lCPrice === 'invalid') { setError('Prix linge client invalide'); return; }
+    if (lCPrice === 'invalid') { setError(t('menageCreate.laundryClientInvalid')); return; }
     const lPPrice = parseMoney(laundryProviderPrice);
-    if (lPPrice === 'invalid') { setError('Prix linge prestataire invalide'); return; }
+    if (lPPrice === 'invalid') { setError(t('menageCreate.laundryProviderInvalid')); return; }
     const duree = dureeEstimee.trim() ? parseInt(dureeEstimee, 10) : undefined;
     if (dureeEstimee.trim() && (duree === undefined || Number.isNaN(duree) || duree < 0)) {
-      setError('Durée invalide'); return;
+      setError(t('menageCreate.durationInvalid')); return;
     }
 
     try {
@@ -119,7 +122,7 @@ export default function CreateMenageScreen() {
       });
       router.replace(`/menage/${menage.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la création.');
+      setError(err instanceof Error ? err.message : t('menageCreate.createError'));
     }
   };
 
@@ -130,41 +133,41 @@ export default function CreateMenageScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('common.back')}
         >
           <ArrowLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Nouvelle prestation</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('menageCreate.title')}</Text>
         <View style={{ width: IconSize.lg }} />
       </View>
 
       <KeyboardAwareScroll contentContainerStyle={styles.body}>
-        <Text style={[styles.section, { color: colors.text2 }]}>TYPE DE PRESTATION</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('menageCreate.sectionType')}</Text>
         <View style={styles.typeRow}>
-          {(['menage', 'check_in', 'check_out'] as PrestationType[]).map((t) => {
-            const active = prestationType === t;
-            const c = colors[prestationTypeColorKey(t)];
+          {(['menage', 'check_in', 'check_out'] as PrestationType[]).map((type) => {
+            const active = prestationType === type;
+            const c = colors[prestationTypeColorKey(type)];
             return (
               <TouchableOpacity
-                key={t}
+                key={type}
                 style={[
                   styles.typeChip,
                   { borderColor: active ? c : colors.border, backgroundColor: active ? c + '20' : colors.surface },
                 ]}
-                onPress={() => setPrestationType(t)}
+                onPress={() => setPrestationType(type)}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
               >
                 <Text style={{ color: active ? c : colors.text2, fontWeight: FontWeight.semibold, fontSize: FontSize.sm }}>
-                  {prestationTypeLabel(t)}
+                  {t(`prestationType.${type}` as TranslationKeys)}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        <Text style={[styles.section, { color: colors.text2 }]}>LOGEMENT</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('menageCreate.sectionLogement')}</Text>
         <TouchableOpacity
           style={[
             styles.optionRow,
@@ -189,23 +192,23 @@ export default function CreateMenageScreen() {
             }}
           >
             {logementId
-              ? (logements?.data ?? []).find((l) => l.id === logementId)?.name ?? 'Logement sélectionné'
-              : 'Choisir un logement…'}
+              ? (logements?.data ?? []).find((l) => l.id === logementId)?.name ?? t('menageCreate.logementSelected')
+              : t('menageCreate.chooseLogement')}
           </Text>
           <ChevronRight size={IconSize.sm} color={colors.text2} />
         </TouchableOpacity>
 
-        <Text style={[styles.section, { color: colors.text2 }]}>PLANIFICATION</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('menageCreate.sectionPlanning')}</Text>
         <DatePickerField
-          label="Date prévue"
+          label={t('menage.fields.datePrevue')}
           value={datePrevue}
           onChange={setDatePrevue}
-          placeholder="Choisir une date"
+          placeholder={t('picker.chooseDate')}
         />
         {isCheck ? (
           // Check-in / check-out : une seule heure (pas de tranche ni de durée).
           <TimePickerField
-            label="Heure"
+            label={t('menageCreate.hour')}
             value={horairePrevu}
             onChange={setHorairePrevu}
             placeholder="--:--"
@@ -215,7 +218,7 @@ export default function CreateMenageScreen() {
             <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
               <View style={{ flex: 1 }}>
                 <TimePickerField
-                  label="Tranche début"
+                  label={t('menageCreate.slotStart')}
                   value={horairePrevu}
                   onChange={setHorairePrevu}
                   placeholder="--:--"
@@ -223,7 +226,7 @@ export default function CreateMenageScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <TimePickerField
-                  label="Tranche fin"
+                  label={t('menageCreate.slotEnd')}
                   value={horaireFinPrevu}
                   onChange={setHoraireFinPrevu}
                   placeholder="--:--"
@@ -231,7 +234,7 @@ export default function CreateMenageScreen() {
               </View>
             </View>
             <DurationPickerField
-              label="Durée estimée"
+              label={t('menage.fields.dureeEstimee')}
               value={dureeEstimee}
               onChange={setDureeEstimee}
             />
@@ -240,25 +243,23 @@ export default function CreateMenageScreen() {
 
         {isAdmin ? (
           <>
-            <Text style={[styles.section, { color: colors.text2 }]}>TARIFICATION</Text>
-            <Text style={[styles.hint, { color: colors.mutedText }]}>
-              Le prestataire ne verra que son propre montant.
-            </Text>
+            <Text style={[styles.section, { color: colors.text2 }]}>{t('menageCreate.sectionPricing')}</Text>
+            <Text style={[styles.hint, { color: colors.mutedText }]}>{t('menageCreate.pricingHint')}</Text>
             <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
               <View style={{ flex: 2 }}>
-                <LabeledField label="Prix client HT (€)">
+                <LabeledField label={t('menage.fields.clientPriceHt')}>
                   <AutoScrollInput
                     style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                     value={clientPriceHt}
                     onChangeText={setClientPriceHt}
-                    placeholder="ex. 80"
+                    placeholder={t('menageCreate.example', { value: 80 })}
                     placeholderTextColor={colors.placeholder}
                     keyboardType="decimal-pad"
                   />
                 </LabeledField>
               </View>
               <View style={{ flex: 1 }}>
-                <LabeledField label="TVA (%)">
+                <LabeledField label={t('menage.fields.clientVatRate')}>
                   <AutoScrollInput
                     style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                     value={clientVatRate}
@@ -270,12 +271,12 @@ export default function CreateMenageScreen() {
                 </LabeledField>
               </View>
             </View>
-            <LabeledField label="Prix prestataire (€)">
+            <LabeledField label={t('menage.fields.providerPrice')}>
               <AutoScrollInput
                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={providerPrice}
                 onChangeText={setProviderPrice}
-                placeholder="ex. 50"
+                placeholder={t('menageCreate.example', { value: 50 })}
                 placeholderTextColor={colors.placeholder}
                 keyboardType="decimal-pad"
               />
@@ -283,9 +284,9 @@ export default function CreateMenageScreen() {
 
             {!isCheck ? (
               <>
-                <Text style={[styles.section, { color: colors.text2 }]}>LINGE</Text>
+                <Text style={[styles.section, { color: colors.text2 }]}>{t('menageCreate.sectionLaundry')}</Text>
                 <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Text style={{ color: colors.text, fontSize: FontSize.md }}>Gestion du linge incluse</Text>
+                  <Text style={{ color: colors.text, fontSize: FontSize.md }}>{t('menage.fields.laundryIncluded')}</Text>
                   <Switch
                     value={laundryIncluded}
                     onValueChange={setLaundryIncluded}
@@ -295,24 +296,24 @@ export default function CreateMenageScreen() {
                 {laundryIncluded ? (
                   <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
                     <View style={{ flex: 1 }}>
-                      <LabeledField label="Linge — client HT (€)">
+                      <LabeledField label={t('menage.fields.laundryClientHt')}>
                         <AutoScrollInput
                           style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                           value={laundryClientPriceHt}
                           onChangeText={setLaundryClientPriceHt}
-                          placeholder="ex. 15"
+                          placeholder={t('menageCreate.example', { value: 15 })}
                           placeholderTextColor={colors.placeholder}
                           keyboardType="decimal-pad"
                         />
                       </LabeledField>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <LabeledField label="Linge — prestataire (€)">
+                      <LabeledField label={t('menage.fields.laundryProvider')}>
                         <AutoScrollInput
                           style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                           value={laundryProviderPrice}
                           onChangeText={setLaundryProviderPrice}
-                          placeholder="ex. 10"
+                          placeholder={t('menageCreate.example', { value: 10 })}
                           placeholderTextColor={colors.placeholder}
                           keyboardType="decimal-pad"
                         />
@@ -325,7 +326,7 @@ export default function CreateMenageScreen() {
           </>
         ) : null}
 
-        <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('menageCreate.sectionNotes')}</Text>
         <AutoScrollInput
           style={[
             styles.input,
@@ -333,7 +334,7 @@ export default function CreateMenageScreen() {
           ]}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Consignes particulières, accès, codes…"
+          placeholder={t('menage.fields.notesPlaceholder')}
           placeholderTextColor={colors.placeholder}
           multiline
         />
@@ -347,7 +348,7 @@ export default function CreateMenageScreen() {
         >
           <Save size={IconSize.md} color="#FFFFFF" />
           <Text style={styles.submitText}>
-            {createMutation.isPending ? 'Création…' : 'Créer la prestation'}
+            {createMutation.isPending ? t('menageCreate.creating') : t('menageCreate.submit')}
           </Text>
         </TouchableOpacity>
       </KeyboardAwareScroll>
@@ -393,6 +394,7 @@ function LogementPickerModal({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const animatedModalStyle = useKeyboardAwareModalStyle({ visible });
 
@@ -419,7 +421,7 @@ function LogementPickerModal({
             <View style={[pickerStyles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <View style={pickerStyles.header}>
-            <Text style={[pickerStyles.title, { color: colors.text }]}>Choisir un logement</Text>
+            <Text style={[pickerStyles.title, { color: colors.text }]}>{t('menageCreate.pickerTitle')}</Text>
           </View>
 
           <View
@@ -431,7 +433,7 @@ function LogementPickerModal({
             <Search size={16} color={colors.placeholder} />
             <TextInput
               style={[pickerStyles.searchInput, { color: colors.text }]}
-              placeholder="Rechercher un logement…"
+              placeholder={t('menageCreate.searchLogement')}
               placeholderTextColor={colors.placeholder}
               value={search}
               onChangeText={setSearch}
@@ -449,7 +451,7 @@ function LogementPickerModal({
             ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.border }} />}
             ListEmptyComponent={
               <Text style={[pickerStyles.empty, { color: colors.mutedText }]}>
-                {search ? 'Aucun résultat.' : 'Aucun logement.'}
+                {search ? t('menageCreate.noResults') : t('menageCreate.noLogement')}
               </Text>
             }
             renderItem={({ item }) => {

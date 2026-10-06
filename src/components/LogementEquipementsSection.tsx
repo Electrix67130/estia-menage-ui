@@ -18,6 +18,8 @@ import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/const
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 import { useLogementRooms } from '@/api/hooks/useLogementRooms';
 import {
   useLogementEquipements,
@@ -44,21 +46,25 @@ interface Props {
   isAdmin: boolean;
 }
 
-/** Familles d'équipements — miroir de l'enum côté API. */
-const CATEGORIES: { value: EquipementCategory; label: string }[] = [
-  { value: 'cuisine', label: 'Cuisine' },
-  { value: 'electromenager', label: 'Électroménager' },
-  { value: 'confort', label: 'Confort' },
-  { value: 'exterieur', label: 'Extérieur' },
-  { value: 'loisirs', label: 'Loisirs' },
-  { value: 'bebe', label: 'Bébé' },
-  { value: 'securite', label: 'Sécurité' },
-  { value: 'autre', label: 'Autre' },
+/** Familles d'équipements — miroir de l'enum côté API (libellés via `equipements.family.<code>`). */
+const CATEGORIES: EquipementCategory[] = [
+  'cuisine',
+  'electromenager',
+  'confort',
+  'exterieur',
+  'loisirs',
+  'bebe',
+  'securite',
+  'autre',
 ];
+
+const familyKey = (category: EquipementCategory): TranslationKeys =>
+  `equipements.family.${category}` as TranslationKeys;
 
 const LogementEquipementsSection: React.FC<Props> = ({ logementId, isAdmin }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const list = useLogementEquipements(logementId);
   const [editing, setEditing] = useState<{ item: LogementEquipement | null } | null>(null);
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -67,9 +73,10 @@ const LogementEquipementsSection: React.FC<Props> = ({ logementId, isAdmin }) =>
   const total = items.reduce((sum, e) => sum + e.quantity, 0);
 
   // Groupé par famille, dans l'ordre du catalogue (« Autre » en dernier).
-  const groups = CATEGORIES.map((cat) => ({
-    ...cat,
-    items: items.filter((e) => (e.category ?? 'autre') === cat.value),
+  const groups = CATEGORIES.map((value) => ({
+    value,
+    label: t(familyKey(value)),
+    items: items.filter((e) => (e.category ?? 'autre') === value),
   })).filter((g) => g.items.length > 0);
 
   return (
@@ -77,10 +84,11 @@ const LogementEquipementsSection: React.FC<Props> = ({ logementId, isAdmin }) =>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.title, { color: colors.text2 }]}>
-            ÉQUIPEMENTS{total > 0 ? ` · ${total}` : ''}
+            {t('equipements.sectionTitle')}
+            {total > 0 ? ` · ${total}` : ''}
           </Text>
           <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-            Ce que le prestataire trouvera sur place.
+            {t('equipements.sectionSubtitle')}
           </Text>
         </View>
         {isAdmin ? (
@@ -89,7 +97,7 @@ const LogementEquipementsSection: React.FC<Props> = ({ logementId, isAdmin }) =>
             onPress={() => setCatalogOpen(true)}
           >
             <Boxes size={IconSize.sm} color="#FFFFFF" />
-            <Text style={styles.addBtnText}>Catalogue</Text>
+            <Text style={styles.addBtnText}>{t('equipements.catalog')}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -101,8 +109,8 @@ const LogementEquipementsSection: React.FC<Props> = ({ logementId, isAdmin }) =>
       ) : groups.length === 0 ? (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={{ color: colors.mutedText, textAlign: 'center' }}>
-            Aucun équipement renseigné.
-            {isAdmin ? ' Ouvre le catalogue pour en ajouter plusieurs d’un coup.' : ''}
+            {t('equipements.empty')}
+            {isAdmin ? ` ${t('equipements.emptyAdminHint')}` : ''}
           </Text>
         </View>
       ) : (
@@ -159,7 +167,7 @@ const LogementEquipementsSection: React.FC<Props> = ({ logementId, isAdmin }) =>
         >
           <Plus size={IconSize.sm} color={colors.primary} />
           <Text style={{ color: colors.primary, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
-            Ajouter un équipement
+            {t('equipements.addOne')}
           </Text>
         </TouchableOpacity>
       ) : null}
@@ -197,6 +205,7 @@ function EquipementEditModal({
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
+  const { t } = useTranslation();
   const rooms = useLogementRooms(logementId);
   const create = useCreateEquipement(logementId);
   const update = useUpdateEquipement(logementId);
@@ -213,12 +222,12 @@ function EquipementEditModal({
 
   const handleSave = async () => {
     if (!label.trim()) {
-      void dialog.alert({ title: 'Nom requis', message: 'Donne un nom à l’équipement.' });
+      void dialog.alert({ title: t('equipements.nameRequiredTitle'), message: t('equipements.nameRequiredBody') });
       return;
     }
     const qty = parseInt(quantity, 10);
     if (Number.isNaN(qty) || qty < 1) {
-      void dialog.alert({ title: 'Quantité invalide', message: 'La quantité doit être au moins 1.' });
+      void dialog.alert({ title: t('equipements.qtyInvalidTitle'), message: t('equipements.qtyInvalidBody') });
       return;
     }
     const body = {
@@ -234,8 +243,8 @@ function EquipementEditModal({
       onClose();
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Enregistrement impossible',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.saveFailed'),
       });
     }
   };
@@ -243,9 +252,9 @@ function EquipementEditModal({
   const handleDelete = async () => {
     if (!item) return;
     const ok = await dialog.confirm({
-      title: 'Supprimer l’équipement ?',
-      message: `« ${item.label} » sera retiré de l’inventaire.`,
-      confirmLabel: 'Supprimer',
+      title: t('equipements.deleteConfirmTitle'),
+      message: t('equipements.deleteConfirmBody', { label: item.label }),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -254,8 +263,8 @@ function EquipementEditModal({
       onClose();
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Suppression impossible',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.deleteFailed'),
       });
     }
   };
@@ -276,11 +285,11 @@ function EquipementEditModal({
             <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <Text style={[sheetStyles.title, { color: colors.text }]}>
-            {item ? 'Modifier l’équipement' : 'Nouvel équipement'}
+            {item ? t('equipements.editTitle') : t('equipements.newTitle')}
           </Text>
 
           <ScrollView keyboardShouldPersistTaps="handled">
-            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>NOM</Text>
+            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('equipements.fieldName')}</Text>
             <TextInput
               style={[
                 sheetStyles.input,
@@ -288,17 +297,17 @@ function EquipementEditModal({
               ]}
               value={label}
               onChangeText={setLabel}
-              placeholder="Ex : Appareil à raclette"
+              placeholder={t('equipements.namePlaceholder')}
               placeholderTextColor={colors.placeholder}
             />
 
-            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>FAMILLE</Text>
+            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('equipements.fieldFamily')}</Text>
             <View style={sheetStyles.chipRow}>
               {CATEGORIES.map((c) => {
-                const active = category === c.value;
+                const active = category === c;
                 return (
                   <TouchableOpacity
-                    key={c.value}
+                    key={c}
                     style={[
                       sheetStyles.chip,
                       {
@@ -306,7 +315,7 @@ function EquipementEditModal({
                         borderColor: active ? colors.primary : colors.border,
                       },
                     ]}
-                    onPress={() => setCategory(c.value)}
+                    onPress={() => setCategory(c)}
                   >
                     <Text
                       style={{
@@ -315,14 +324,14 @@ function EquipementEditModal({
                         fontWeight: FontWeight.medium,
                       }}
                     >
-                      {c.label}
+                      {t(familyKey(c))}
                     </Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
 
-            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>QUANTITÉ</Text>
+            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('equipements.fieldQuantity')}</Text>
             <TextInput
               style={[
                 sheetStyles.input,
@@ -337,7 +346,7 @@ function EquipementEditModal({
 
             {(rooms.data ?? []).length > 0 ? (
               <>
-                <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>PIÈCE (OPTIONNEL)</Text>
+                <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('equipements.fieldRoom')}</Text>
                 <View style={sheetStyles.chipRow}>
                   <TouchableOpacity
                     style={[
@@ -355,7 +364,7 @@ function EquipementEditModal({
                         fontSize: FontSize.sm,
                       }}
                     >
-                      Aucune
+                      {t('common.noneF')}
                     </Text>
                   </TouchableOpacity>
                   {(rooms.data ?? []).map((r) => {
@@ -384,7 +393,7 @@ function EquipementEditModal({
               </>
             ) : null}
 
-            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>NOTES (OPTIONNEL)</Text>
+            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('equipements.fieldNotes')}</Text>
             <TextInput
               style={[
                 sheetStyles.input,
@@ -392,7 +401,7 @@ function EquipementEditModal({
               ]}
               value={notes}
               onChangeText={setNotes}
-              placeholder="Ex : dans le placard du haut"
+              placeholder={t('equipements.notesPlaceholder')}
               placeholderTextColor={colors.placeholder}
             />
           </ScrollView>
@@ -405,7 +414,7 @@ function EquipementEditModal({
             {saving ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={sheetStyles.submitText}>Enregistrer</Text>
+              <Text style={sheetStyles.submitText}>{t('common.save')}</Text>
             )}
           </TouchableOpacity>
 
@@ -417,7 +426,7 @@ function EquipementEditModal({
             >
               <Trash2 size={IconSize.sm} color={colors.red} />
               <Text style={{ color: colors.red, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
-                Supprimer
+                {t('common.delete')}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -444,6 +453,7 @@ function EquipementCatalogModal({
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
+  const { t } = useTranslation();
   const catalog = useEquipementCatalog();
   const bulkCreate = useBulkCreateEquipements(logementId);
   const [selected, setSelected] = useState<Record<string, EquipementCategory>>({});
@@ -469,8 +479,8 @@ function EquipementCatalogModal({
       onClose();
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Ajout impossible',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('equipements.addFailed'),
       });
     }
   };
@@ -489,9 +499,9 @@ function EquipementCatalogModal({
           <View style={sheetStyles.handle}>
             <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
           </View>
-          <Text style={[sheetStyles.title, { color: colors.text }]}>Catalogue d’équipements</Text>
+          <Text style={[sheetStyles.title, { color: colors.text }]}>{t('equipements.catalogTitle')}</Text>
           <Text style={[sheetStyles.hint, { color: colors.mutedText }]}>
-            Coche ce qui est présent dans le logement.
+            {t('equipements.catalogHint')}
           </Text>
 
           {catalog.isLoading ? (
@@ -561,7 +571,8 @@ function EquipementCatalogModal({
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text style={sheetStyles.submitText}>
-                Ajouter{selectedLabels.length > 0 ? ` (${selectedLabels.length})` : ''}
+                {t('common.add')}
+                {selectedLabels.length > 0 ? ` (${selectedLabels.length})` : ''}
               </Text>
             )}
           </TouchableOpacity>

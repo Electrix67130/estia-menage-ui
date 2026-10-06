@@ -1,4 +1,5 @@
 import { Linking, Platform } from 'react-native';
+import { translate } from '@/i18n/runtime';
 
 /**
  * Erreur typée pour les échecs d'ouverture d'app native (tel:, mailto:, maps:).
@@ -21,7 +22,7 @@ export async function openPhone(phone: string | null | undefined): Promise<void>
   if (!phone) return;
   const cleaned = phone.replace(/[\s.()\-]/g, '');
   const url = `tel:${cleaned}`;
-  await safeOpen(url, "Impossible de lancer l'appel");
+  await safeOpen(url, translate('contactLinks.callFailed'));
 }
 
 /**
@@ -31,7 +32,7 @@ export async function openEmail(email: string | null | undefined, subject?: stri
   if (!email) return;
   const qs = subject ? `?subject=${encodeURIComponent(subject)}` : '';
   const url = `mailto:${email}${qs}`;
-  await safeOpen(url, "Impossible d'ouvrir l'email");
+  await safeOpen(url, translate('contactLinks.emailFailed'));
 }
 
 /**
@@ -49,7 +50,7 @@ export async function openMaps(address: string | null | undefined): Promise<void
   try {
     await Linking.openURL(canNative ? native : fallback);
   } catch {
-    throw new ContactLinkError("Impossible de lancer l'itinéraire");
+    throw new ContactLinkError(translate('contactLinks.routeFailed'));
   }
 }
 

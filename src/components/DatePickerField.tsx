@@ -5,6 +5,9 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { formatDateFr } from '@/lib/date-fr';
+import { useTranslation } from '@/contexts/I18nContext';
+import { getIntlLocale } from '@/i18n/runtime';
+import { useWeekdayShortLabels, monthYearLabel } from './calendarLabels';
 
 interface Props {
   label: string;
@@ -13,14 +16,12 @@ interface Props {
   placeholder?: string;
 }
 
-const MONTHS = [
-  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
-];
-
-const DatePickerField: React.FC<Props> = ({ label, value, onChange, placeholder = 'Sélectionner une date' }) => {
+const DatePickerField: React.FC<Props> = ({ label, value, onChange, placeholder }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t, locale } = useTranslation();
+  const weekdays = useWeekdayShortLabels(locale);
+  const effectivePlaceholder = placeholder ?? t('picker.selectDate');
   const [showPicker, setShowPicker] = useState(false);
 
   const today = new Date();
@@ -86,7 +87,7 @@ const DatePickerField: React.FC<Props> = ({ label, value, onChange, placeholder 
         accessibilityLabel={label}
       >
         <Text style={[styles.fieldText, { color: value ? colors.text : colors.placeholder }]}>
-          {value ? formatDisplay(value) : placeholder}
+          {value ? formatDisplay(value) : effectivePlaceholder}
         </Text>
         <Calendar size={IconSize.md} color={colors.mutedText} />
       </TouchableOpacity>
@@ -97,20 +98,20 @@ const DatePickerField: React.FC<Props> = ({ label, value, onChange, placeholder 
           <View style={[styles.modal, { backgroundColor: colors.surface }, Shadow.lg]}>
             {/* Header */}
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={prevMonth} accessibilityRole="button" accessibilityLabel="Mois précédent">
+              <TouchableOpacity onPress={prevMonth} accessibilityRole="button" accessibilityLabel={t('picker.prevMonth')}>
                 <Text style={[styles.navBtn, { color: colors.primary }]}>{'<'}</Text>
               </TouchableOpacity>
               <Text style={[styles.monthYear, { color: colors.text }]}>
-                {MONTHS[viewMonth]} {viewYear}
+                {monthYearLabel(viewYear, viewMonth)}
               </Text>
-              <TouchableOpacity onPress={nextMonth} accessibilityRole="button" accessibilityLabel="Mois suivant">
+              <TouchableOpacity onPress={nextMonth} accessibilityRole="button" accessibilityLabel={t('picker.nextMonth')}>
                 <Text style={[styles.navBtn, { color: colors.primary }]}>{'>'}</Text>
               </TouchableOpacity>
             </View>
 
             {/* Day names */}
             <View style={styles.weekRow}>
-              {['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'].map((d) => (
+              {weekdays.map((d) => (
                 <Text key={d} style={[styles.weekDay, { color: colors.mutedText }]}>{d}</Text>
               ))}
             </View>
@@ -126,7 +127,13 @@ const DatePickerField: React.FC<Props> = ({ label, value, onChange, placeholder 
                     onPress={() => item.current && handleSelectDay(item.day)}
                     disabled={!item.current}
                     accessibilityRole="button"
-                    accessibilityLabel={item.current ? `${item.day} ${MONTHS[viewMonth]}` : undefined}
+                    accessibilityLabel={
+                      item.current
+                        ? new Intl.DateTimeFormat(getIntlLocale(), { day: 'numeric', month: 'long' }).format(
+                            new Date(viewYear, viewMonth, item.day),
+                          )
+                        : undefined
+                    }
                   >
                     <View
                       style={[

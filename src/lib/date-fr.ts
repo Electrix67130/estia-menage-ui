@@ -1,5 +1,9 @@
+import { getIntlLocale, translate } from '@/i18n/runtime';
+
 /**
- * Format de date français centralisé (mobile). Identique à la version dashboard.
+ * Format de date centralisé (mobile). Identique à la version dashboard.
+ * Les helpers gardent leur nom historique (`…Fr`) mais suivent la **langue
+ * courante de l'app** (`@/i18n/runtime`) : les exemples ci-dessous sont en français.
  *
  * Variants :
  * - `short`        : 15/05/2026
@@ -53,7 +57,7 @@ export function formatDateFr(
   if (!value) return '';
   const d = typeof value === 'string' ? new Date(value) : value;
   if (Number.isNaN(d.getTime())) return '';
-  return new Intl.DateTimeFormat('fr-FR', FORMATTERS[variant]).format(d);
+  return new Intl.DateTimeFormat(getIntlLocale(), FORMATTERS[variant]).format(d);
 }
 
 /**
@@ -75,9 +79,28 @@ export function formatCurrencyFr(
   if (amount === null || amount === undefined || amount === '') return '—';
   const n = typeof amount === 'string' ? parseFloat(amount) : amount;
   if (Number.isNaN(n)) return '—';
-  return new Intl.NumberFormat('fr-FR', {
+  return new Intl.NumberFormat(getIntlLocale(), {
     style: 'currency',
     currency,
     minimumFractionDigits: 2,
   }).format(n);
+}
+
+/**
+ * Date relative courte (langue courante), pour un horodatage récent :
+ *   « à l'instant » / « il y a 5 min » / « il y a 2 h » / « il y a 3 j »,
+ * puis la date (« 15 mai ») au-delà d'une semaine. Chaîne vide si invalide.
+ */
+export function formatRelativeFr(value: string | Date | null | undefined, now: Date = new Date()): string {
+  if (!value) return '';
+  const d = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return '';
+  const diffMin = Math.round((now.getTime() - d.getTime()) / 60_000);
+  if (diffMin < 1) return translate('relative.justNow');
+  if (diffMin < 60) return translate('relative.minutesAgo', { count: diffMin });
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return translate('relative.hoursAgo', { count: diffH });
+  const diffD = Math.floor(diffH / 24);
+  if (diffD < 7) return translate('relative.daysAgo', { count: diffD });
+  return formatDateFr(d, 'dayShort');
 }

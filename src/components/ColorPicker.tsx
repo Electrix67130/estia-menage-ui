@@ -20,6 +20,7 @@ import { Check, ChevronDown, X } from 'lucide-react-native';
 import { Spacing, FontSize, FontWeight, Radius, IconSize, Shadow } from '@/constants/Layout';
 import { Colors } from '@/constants/Colors';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTranslation } from '@/contexts/I18nContext';
 
 const PALETTE = [
   '#EF4444', '#F97316', '#F59E0B', '#EAB308', '#84CC16',
@@ -82,9 +83,11 @@ interface Props {
   onChange: (color: string | null) => void;
 }
 
-const ColorPicker: React.FC<Props> = ({ label = 'Couleur', value, onChange }) => {
+const ColorPicker: React.FC<Props> = ({ label, value, onChange }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
+  const effectiveLabel = label ?? t('colorPicker.label');
   const id = useId().replace(/[^a-zA-Z0-9]/g, '');
   const hueGradId = `hueG_${id}`;
   const darkGradId = `darkG_${id}`;
@@ -185,7 +188,7 @@ const ColorPicker: React.FC<Props> = ({ label = 'Couleur', value, onChange }) =>
 
   return (
     <View style={styles.wrap}>
-      {label ? <Text style={[styles.label, { color: colors.text2 }]}>{label}</Text> : null}
+      {effectiveLabel ? <Text style={[styles.label, { color: colors.text2 }]}>{effectiveLabel}</Text> : null}
 
       <TouchableOpacity
         style={[styles.trigger, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -202,7 +205,7 @@ const ColorPicker: React.FC<Props> = ({ label = 'Couleur', value, onChange }) =>
           ]}
         />
         <Text style={[styles.triggerHex, { color: colors.text }]}>
-          {value ?? 'Aucune couleur'}
+          {value ?? t('colorPicker.none')}
         </Text>
         <ChevronDown size={14} color={colors.text2} />
       </TouchableOpacity>
@@ -214,7 +217,7 @@ const ColorPicker: React.FC<Props> = ({ label = 'Couleur', value, onChange }) =>
             style={[styles.popover, { backgroundColor: colors.surface }, Shadow.lg]}
           >
             <View style={styles.popoverHeader}>
-              <Text style={[styles.popoverTitle, { color: colors.text }]}>Choisir une couleur</Text>
+              <Text style={[styles.popoverTitle, { color: colors.text }]}>{t('colorPicker.title')}</Text>
             </View>
 
             {/* Zone Saturation × Valeur */}
@@ -322,7 +325,7 @@ const ColorPicker: React.FC<Props> = ({ label = 'Couleur', value, onChange }) =>
                   }}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 >
-                  <Text style={[styles.clearText, { color: colors.text2 }]}>Effacer</Text>
+                  <Text style={[styles.clearText, { color: colors.text2 }]}>{t('colorPicker.clear')}</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -358,7 +361,7 @@ const ColorPicker: React.FC<Props> = ({ label = 'Couleur', value, onChange }) =>
               style={[styles.doneBtn, { backgroundColor: colors.primary }]}
               onPress={() => setOpen(false)}
             >
-              <Text style={styles.doneText}>OK</Text>
+              <Text style={styles.doneText}>{t('common.ok')}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

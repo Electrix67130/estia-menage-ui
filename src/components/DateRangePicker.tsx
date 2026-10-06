@@ -5,17 +5,14 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { formatDateFr } from '@/lib/date-fr';
+import { useTranslation } from '@/contexts/I18nContext';
+import { useWeekdayShortLabels, monthYearLabel } from './calendarLabels';
 
 interface Props {
   startDate: string;
   endDate: string;
   onChange: (start: string, end: string) => void;
 }
-
-const MONTHS = [
-  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
-];
 
 const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
 const getFirstDay = (y: number, m: number) => { const d = new Date(y, m, 1).getDay(); return d === 0 ? 6 : d - 1; };
@@ -25,6 +22,8 @@ const toDateStr = (y: number, m: number, d: number) =>
 const DateRangePicker: React.FC<Props> = ({ startDate, endDate, onChange }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t, locale } = useTranslation();
+  const weekdays = useWeekdayShortLabels(locale);
 
   const [showPicker, setShowPicker] = useState(false);
   const [step, setStep] = useState<'start' | 'end'>('start');
@@ -104,17 +103,17 @@ const DateRangePicker: React.FC<Props> = ({ startDate, endDate, onChange }) => {
 
   return (
     <View>
-      <Text style={[styles.label, { color: colors.text }]}>Dates du menage</Text>
+      <Text style={[styles.label, { color: colors.text }]}>{t('menage.dates')}</Text>
       <TouchableOpacity
         style={[styles.field, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}
         onPress={handleOpen}
         accessibilityRole="button"
-        accessibilityLabel="Sélectionner les dates"
+        accessibilityLabel={t('picker.selectDates')}
       >
         <Text style={[styles.fieldText, { color: startDate || endDate ? colors.text : colors.placeholder }]}>
           {startDate || endDate
             ? `${formatDisplay(startDate)} → ${formatDisplay(endDate)}`
-            : 'Sélectionner début et fin'}
+            : t('picker.selectStartEnd')}
         </Text>
         <Calendar size={IconSize.md} color={colors.mutedText} />
       </TouchableOpacity>
@@ -127,25 +126,25 @@ const DateRangePicker: React.FC<Props> = ({ startDate, endDate, onChange }) => {
           >
             {/* Step indicator */}
             <Text style={[styles.stepText, { color: colors.primary }]}>
-              {step === 'start' ? 'Sélectionnez la date de début' : 'Sélectionnez la date de fin'}
+              {step === 'start' ? t('picker.selectStart') : t('picker.selectEnd')}
             </Text>
 
             {/* Month nav */}
             <View style={styles.monthNav}>
-              <TouchableOpacity onPress={prevMonth} accessibilityLabel="Mois précédent">
+              <TouchableOpacity onPress={prevMonth} accessibilityLabel={t('picker.prevMonth')}>
                 <Text style={[styles.navBtn, { color: colors.primary }]}>{'‹'}</Text>
               </TouchableOpacity>
               <Text style={[styles.monthYear, { color: colors.text }]}>
-                {MONTHS[viewMonth]} {viewYear}
+                {monthYearLabel(viewYear, viewMonth)}
               </Text>
-              <TouchableOpacity onPress={nextMonth} accessibilityLabel="Mois suivant">
+              <TouchableOpacity onPress={nextMonth} accessibilityLabel={t('picker.nextMonth')}>
                 <Text style={[styles.navBtn, { color: colors.primary }]}>{'›'}</Text>
               </TouchableOpacity>
             </View>
 
             {/* Week days */}
             <View style={styles.weekRow}>
-              {['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'].map((d) => (
+              {weekdays.map((d) => (
                 <Text key={d} style={[styles.weekDay, { color: colors.mutedText }]}>{d}</Text>
               ))}
             </View>
@@ -197,17 +196,17 @@ const DateRangePicker: React.FC<Props> = ({ startDate, endDate, onChange }) => {
             {tempStart && (
               <View style={[styles.rangeDisplay, { borderTopColor: colors.border }]}>
                 <View style={styles.rangeItem}>
-                  <Text style={[styles.rangeLabel, { color: colors.mutedText }]}>Début</Text>
+                  <Text style={[styles.rangeLabel, { color: colors.mutedText }]}>{t('menage.startDate')}</Text>
                   <Text style={[styles.rangeValue, { color: colors.text }]}>{formatDisplay(tempStart)}</Text>
                 </View>
                 {tempEnd ? (
                   <View style={styles.rangeItem}>
-                    <Text style={[styles.rangeLabel, { color: colors.mutedText }]}>Fin</Text>
+                    <Text style={[styles.rangeLabel, { color: colors.mutedText }]}>{t('menage.endDate')}</Text>
                     <Text style={[styles.rangeValue, { color: colors.text }]}>{formatDisplay(tempEnd)}</Text>
                   </View>
                 ) : (
                   <View style={styles.rangeItem}>
-                    <Text style={[styles.rangeLabel, { color: colors.primary }]}>→ choisir la fin</Text>
+                    <Text style={[styles.rangeLabel, { color: colors.primary }]}>{t('picker.chooseEnd')}</Text>
                   </View>
                 )}
               </View>

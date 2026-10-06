@@ -2,6 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { optimizeImage } from '@/utils/optimizeImage';
 import { uploadFile } from '@/api/upload';
+import { translate } from '@/i18n/runtime';
 
 export interface GeoPhotoResult {
   /** URI locale de la photo (pas encore uploadée) — voir `uploadGeoPhoto`. */
@@ -31,14 +32,11 @@ export class GeoPhotoError extends Error {
 export async function captureGeoPhoto(): Promise<GeoPhotoResult> {
   const camPerm = await ImagePicker.requestCameraPermissionsAsync();
   if (!camPerm.granted) {
-    throw new GeoPhotoError('camera-denied', 'Autorise la caméra dans les réglages pour pointer.');
+    throw new GeoPhotoError('camera-denied', translate('geo.cameraDenied'));
   }
   const locPerm = await Location.requestForegroundPermissionsAsync();
   if (!locPerm.granted) {
-    throw new GeoPhotoError(
-      'location-denied',
-      'Autorise la localisation : la position est requise pour prouver ta présence.',
-    );
+    throw new GeoPhotoError('location-denied', translate('geo.locationDenied'));
   }
 
   const result = await ImagePicker.launchCameraAsync({
@@ -47,7 +45,7 @@ export async function captureGeoPhoto(): Promise<GeoPhotoResult> {
     allowsEditing: false,
   });
   if (result.canceled || !result.assets[0]) {
-    throw new GeoPhotoError('cancelled', 'Photo annulée.');
+    throw new GeoPhotoError('cancelled', translate('geo.cancelled'));
   }
 
   // GPS au moment de la prise. High accuracy pour un point fiable.
@@ -57,7 +55,7 @@ export async function captureGeoPhoto(): Promise<GeoPhotoResult> {
       accuracy: Location.Accuracy.High,
     });
   } catch {
-    throw new GeoPhotoError('location-failed', 'Impossible de récupérer la position GPS. Réessaie en extérieur.');
+    throw new GeoPhotoError('location-failed', translate('geo.locationFailed'));
   }
 
   const asset = result.assets[0];

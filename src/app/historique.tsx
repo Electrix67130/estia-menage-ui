@@ -7,12 +7,14 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import HistoriqueList from '@/components/HistoriqueList';
+import { useTranslation } from '@/contexts/I18nContext';
 
 /** Écran Historique en pleine page (route `/historique`). La liste elle-même est
  *  partagée avec la vue « Historique » de l'onglet Prestations. */
 export default function HistoriqueScreen() {
   const colors = Colors[useColorScheme()];
   const router = useRouter();
+  const { t } = useTranslation();
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
@@ -20,11 +22,11 @@ export default function HistoriqueScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('common.back')}
         >
           <ArrowLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Historique</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('historique.title')}</Text>
         <View style={{ width: IconSize.lg }} />
       </View>
       <HistoriqueList />

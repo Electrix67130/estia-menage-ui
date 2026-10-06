@@ -18,12 +18,18 @@ import { apiFetch, ApiError } from '@/api/client';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: 'Administrateur',
-  prestataire: 'Prestataire',
-  client: 'Client',
+const ROLE_KEYS: Record<string, TranslationKeys> = {
+  admin: 'common.admin',
+  prestataire: 'collab.role.prestataire',
+  client: 'collab.role.client',
 };
+
+/** Jetons insérés dans la phrase traduite pour retrouver où mettre les parties en gras. */
+const ORG_TOKEN = '{{org}}';
+const ROLE_TOKEN = '{{role}}';
 
 export default function InviteScreen() {
   const colorScheme = useColorScheme();
@@ -31,6 +37,7 @@ export default function InviteScreen() {
   const router = useRouter();
   const { token } = useLocalSearchParams<{ token: string }>();
   const { register } = useAuth();
+  const { t } = useTranslation();
 
   const [invitation, setInvitation] = useState<{ email: string; role: string; organization_name: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +56,7 @@ export default function InviteScreen() {
   // Fetch invitation info on mount
   useEffect(() => {
     if (!token) {
-      setInvitationError('Lien d\'invitation invalide.');
+      setInvitationError(t('invite.invalidLink'));
       setLoading(false);
       return;
     }
@@ -65,22 +72,24 @@ export default function InviteScreen() {
       })
       .catch((err) => {
         if (err instanceof ApiError && err.statusCode === 400) {
-          setInvitationError('Cette invitation a expiré.');
+          setInvitationError(t('invite.expired'));
         } else {
-          setInvitationError('Invitation introuvable ou déjà utilisée.');
+          setInvitationError(t('invite.notFound'));
         }
       })
       .finally(() => setLoading(false));
+    // `t` volontairement hors dépendances : la langue au moment du chargement suffit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const handleSubmit = async () => {
     if (!invitation || !token) return;
     if (!firstName.trim() || !lastName.trim() || !password.trim() || !phone.trim()) {
-      setFormError('Veuillez remplir les champs obligatoires.');
+      setFormError(t('invite.fillRequired'));
       return;
     }
     if (password.length < 12 || !/\p{L}/u.test(password) || !/[0-9]/.test(password)) {
-      setFormError('Le mot de passe doit faire au moins 12 caractères et contenir une lettre et un chiffre.');
+      setFormError(t('auth.passwordRules'));
       return;
     }
 
@@ -101,7 +110,7 @@ export default function InviteScreen() {
       if (err instanceof ApiError) {
         setFormError(String(err.details));
       } else {
-        setFormError('Erreur lors de l\'inscription.');
+        setFormError(t('invite.registerError'));
       }
     } finally {
       setSubmitting(false);
@@ -122,11 +131,11 @@ export default function InviteScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.centered}>
-          <Text style={[styles.errorTitle, { color: colors.red }]}>Invitation invalide</Text>
+          <Text style={[styles.errorTitle, { color: colors.red }]}>{t('invite.invalidTitle')}</Text>
           <Text style={[styles.errorText, { color: colors.text2 }]}>{invitationError}</Text>
           <Link href="/(auth)/login" asChild>
             <TouchableOpacity style={[styles.backBtn, { backgroundColor: colors.primary }]}>
-              <Text style={styles.backBtnText}>Aller à la connexion</Text>
+              <Text style={styles.backBtnText}>{t('invite.goToLogin')}</Text>
             </TouchableOpacity>
           </Link>
         </View>
@@ -142,80 +151,90 @@ export default function InviteScreen() {
             <View style={[styles.iconCircle, { backgroundColor: colors.primary + '15' }]}>
               <MailCheck size={IconSize.xxl} color={colors.primary} />
             </View>
-            <Text style={[styles.title, { color: colors.text }]}>Invitation à rejoindre Buildr</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{t('invite.title')}</Text>
             <Text style={[styles.subtitle, { color: colors.text2 }]}>
-              <Text style={{ fontWeight: FontWeight.bold, color: colors.primary }}>
-                {invitation.organization_name}
-              </Text> vous invite en tant que <Text style={{ fontWeight: FontWeight.bold, color: colors.primary }}>
-                {ROLE_LABELS[invitation.role] || invitation.role}
-              </Text>
+              {t('invite.subtitle', { org: ORG_TOKEN, role: ROLE_TOKEN })
+                .split(/(\{\{org\}\}|\{\{role\}\})/)
+                .map((part, i) => {
+                  if (part === ORG_TOKEN || part === ROLE_TOKEN) {
+                    const roleKey = ROLE_KEYS[invitation.role];
+                    const label =
+                      part === ORG_TOKEN ? invitation.organization_name : roleKey ? t(roleKey) : invitation.role;
+                    return (
+                      <Text key={i} style={{ fontWeight: FontWeight.bold, color: colors.primary }}>
+                        {label}
+                      </Text>
+                    );
+                  }
+                  return part ? <Text key={i}>{part}</Text> : null;
+                })}
             </Text>
           </View>
 
           <View style={styles.form}>
-            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{t('auth.email')}</Text>
             <TextInput
               style={[styles.inputDisabled, { backgroundColor: colors.itemBackground, color: colors.text2, borderColor: colors.border }]}
               value={invitation.email}
               editable={false}
-              accessibilityLabel="Email"
+              accessibilityLabel={t('auth.email')}
             />
 
             <View style={styles.row}>
               <View style={styles.halfField}>
-                <Text style={[styles.label, { color: colors.text }]}>Prénom *</Text>
+                <Text style={[styles.label, { color: colors.text }]}>{t('auth.firstName')} *</Text>
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
                   value={firstName}
                   onChangeText={setFirstName}
-                  accessibilityLabel="Prénom"
+                  accessibilityLabel={t('auth.firstName')}
                 />
               </View>
               <View style={styles.halfField}>
-                <Text style={[styles.label, { color: colors.text }]}>Nom *</Text>
+                <Text style={[styles.label, { color: colors.text }]}>{t('auth.lastName')} *</Text>
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
                   value={lastName}
                   onChangeText={setLastName}
-                  accessibilityLabel="Nom"
+                  accessibilityLabel={t('auth.lastName')}
                 />
               </View>
             </View>
 
-            <Text style={[styles.label, { color: colors.text }]}>Mot de passe *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{t('auth.password')} *</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
-              placeholder="12 caractères, dont une lettre et un chiffre"
+              placeholder={t('auth.passwordPlaceholder')}
               placeholderTextColor={colors.placeholder}
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              accessibilityLabel="Mot de passe"
+              accessibilityLabel={t('auth.password')}
             />
 
-            <Text style={[styles.label, { color: colors.text }]}>Téléphone *</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{t('auth.phone')} *</Text>
             <TextInput
               style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
-              accessibilityLabel="Téléphone"
+              accessibilityLabel={t('auth.phone')}
             />
 
             <Text style={[styles.label, { color: colors.text }]}>
-              Entreprise {isClient ? '' : '(définie par l\'invitant)'}
+              {isClient ? t('auth.company') : t('invite.companyByInviter')}
             </Text>
             <TextInput
               style={[
                 isClient ? styles.input : styles.inputDisabled,
                 { backgroundColor: colors.itemBackground, color: isClient ? colors.text : colors.text2, borderColor: colors.border },
               ]}
-              placeholder={isClient ? 'Votre entreprise (ex: EIFFAGE)' : ''}
+              placeholder={isClient ? t('invite.companyPlaceholder') : ''}
               placeholderTextColor={colors.placeholder}
               value={companyName}
               onChangeText={setCompanyName}
               editable={isClient}
-              accessibilityLabel="Entreprise"
+              accessibilityLabel={t('auth.company')}
             />
 
             {formError ? <Text style={[styles.error, { color: colors.red }]}>{formError}</Text> : null}
@@ -225,12 +244,12 @@ export default function InviteScreen() {
               onPress={handleSubmit}
               disabled={submitting}
               accessibilityRole="button"
-              accessibilityLabel="Accepter l'invitation"
+              accessibilityLabel={t('invite.accept')}
             >
               {submitting ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.buttonText}>Accepter l'invitation</Text>
+                <Text style={styles.buttonText}>{t('invite.accept')}</Text>
               )}
             </TouchableOpacity>
           </View>

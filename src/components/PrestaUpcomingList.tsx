@@ -23,7 +23,9 @@ import {
   type MenageResponseStatus,
 } from '@/api/hooks/useMenageResponses';
 import { useUnreadSummary } from '@/api/hooks/useMenageViews';
-import { prestationTypeLabel, prestationTypeColorKey } from '@/api/types';
+import { prestationTypeColorKey } from '@/api/types';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 import { formatDateFr, formatDurationMin } from '@/lib/date-fr';
 
 /** Date locale au format YYYY-MM-DD (sans décalage UTC). */
@@ -42,6 +44,7 @@ export default function PrestaUpcomingList() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
+  const { t, tp, locale } = useTranslation();
   // Une question par vue : Planning (mes prestations par jour), À traiter (ce
   // qui attend une action de ma part), Historique (ce que j'ai fait).
   const [view, setView] = useState<'planning' | 'todo' | 'history'>('planning');
@@ -65,11 +68,14 @@ export default function PrestaUpcomingList() {
     const late = all.filter((m) => m.status === 'a_venir' && m.is_assigned && m.date_prevue.slice(0, 10) < todayYmd);
     const out: Section[] = [];
     if (toAnswer.length)
-      out.push({ key: 'answer', title: 'À répondre', isToday: false, color: colors.primary, data: toAnswer.slice().sort((a, b) => a.date_prevue.localeCompare(b.date_prevue)) });
+      out.push({ key: 'answer', title: t('prestations.toAnswer'), isToday: false, color: colors.primary, data: toAnswer.slice().sort((a, b) => a.date_prevue.localeCompare(b.date_prevue)) });
     if (late.length)
-      out.push({ key: 'late', title: late.length > 1 ? 'Non pointées' : 'Non pointée', isToday: false, color: colors.red, data: late.slice().sort((a, b) => b.date_prevue.localeCompare(a.date_prevue)) });
+      out.push({ key: 'late', title: tp('todo.late', late.length), isToday: false, color: colors.red, data: late.slice().sort((a, b) => b.date_prevue.localeCompare(a.date_prevue)) });
     return out;
-  }, [list.data, view, todayYmd, colors]);
+    // `groupByDay` lit la langue courante hors React : `locale` en dépendance pour
+    // recalculer les titres (Aujourd'hui / Demain / jour) au changement de langue.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list.data, view, todayYmd, colors, t, tp, locale]);
   const todoCount = useMemo(() => {
     const all = list.data ?? [];
     return (
@@ -86,16 +92,16 @@ export default function PrestaUpcomingList() {
     <View style={styles.segmentedWrap}>
       <SegmentedTabs
         segments={[
-          { key: 'planning', label: 'Planning' },
-          { key: 'todo', label: 'À traiter', badge: todoCount },
-          { key: 'history', label: 'Historique' },
+          { key: 'planning', label: t('prestations.segPlanning') },
+          { key: 'todo', label: t('prestations.segTodo'), badge: todoCount },
+          { key: 'history', label: t('historique.title') },
         ]}
         value={view}
         onChange={setView}
       />
       {view === 'planning' ? (
         <Text style={[styles.hint, { color: colors.mutedText }]}>
-          Indique si tu peux faire chaque prestation. Appui long = demander un changement.
+          {t('prestations.prestaHint')}
         </Text>
       ) : null}
     </View>
@@ -211,7 +217,7 @@ export default function PrestaUpcomingList() {
                   >
                     {item.logement_name ||
                       [item.logement_address, item.logement_city].filter(Boolean).join(' ') ||
-                      'Logement'}
+                      t('prestations.logementFallback')}
                   </Text>
                 </View>
                 <View style={styles.metaRow}>
@@ -220,10 +226,10 @@ export default function PrestaUpcomingList() {
                     return (
                       <View
                         style={[styles.typeBadge, { backgroundColor: typeColor + '20' }]}
-                        accessibilityLabel={prestationTypeLabel(item.prestation_type)}
+                        accessibilityLabel={t(`prestationType.${item.prestation_type ?? 'menage'}` as TranslationKeys)}
                       >
                         <Text style={[styles.typeBadgeText, { color: typeColor }]}>
-                          {prestationTypeLabel(item.prestation_type)}
+                          {t(`prestationType.${item.prestation_type ?? 'menage'}` as TranslationKeys)}
                         </Text>
                       </View>
                     );
@@ -231,7 +237,7 @@ export default function PrestaUpcomingList() {
                   {unread > 0 ? (
                     <View
                       style={[styles.unreadBadge, { backgroundColor: colors.red }]}
-                      accessibilityLabel={`${unread} élément(s) non lu(s)`}
+                      accessibilityLabel={tp('menageCard.unread', unread)}
                     >
                       <Bell size={11} color="#FFFFFF" />
                       <Text style={styles.unreadBadgeText}>{unread > 99 ? '99+' : unread}</Text>
@@ -240,10 +246,10 @@ export default function PrestaUpcomingList() {
                   {needsAttention ? (
                     <View
                       style={[styles.lateBadge, { backgroundColor: colors.red + '20' }]}
-                      accessibilityLabel="Jour passé sans pointage"
+                      accessibilityLabel={t('menageCard.lateA11y')}
                     >
                       <AlertTriangle size={12} color={colors.red} />
-                      <Text style={[styles.lateBadgeText, { color: colors.red }]}>Non pointé</Text>
+                      <Text style={[styles.lateBadgeText, { color: colors.red }]}>{t('menage.statusNotClockedIn')}</Text>
                     </View>
                   ) : null}
                   {duration ? (
@@ -301,9 +307,7 @@ export default function PrestaUpcomingList() {
       ListEmptyComponent={
         <View style={styles.empty}>
           <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-            {view === 'todo'
-              ? 'Tout est à jour : rien à répondre, rien en retard.'
-              : 'Aucune prestation à venir sur les logements où tu es prestataire.'}
+            {view === 'todo' ? t('prestations.todoEmptyPresta') : t('prestations.planningEmptyPresta')}
           </Text>
         </View>
       }
@@ -317,13 +321,14 @@ export default function PrestaUpcomingList() {
  * pill plein largeur : vert "Présent" si retenu, rouge "Absent" sinon.
  */
 function LockedResponse({ present, colors }: { present: boolean; colors: typeof Colors.light }) {
+  const { t } = useTranslation();
   const accent = present ? colors.green : colors.red;
   const Icon = present ? Check : X;
   return (
     <View style={[styles.responseBtn, { backgroundColor: accent, borderColor: accent }]}>
       <Icon size={IconSize.sm} color="#FFFFFF" />
       <Text style={[styles.responseBtnText, { color: '#FFFFFF' }]}>
-        {present ? 'Présent' : 'Absent'}
+        {present ? t('prestations.present') : t('prestations.absent')}
       </Text>
     </View>
   );
@@ -340,10 +345,11 @@ function ResponseButton({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const isPresent = status === 'present';
   const accent = isPresent ? colors.green : colors.red;
   const Icon = isPresent ? Check : X;
-  const label = isPresent ? 'Présent' : 'Absent';
+  const label = isPresent ? t('prestations.present') : t('prestations.absent');
   return (
     <TouchableOpacity
       style={[
@@ -380,40 +386,41 @@ function WorkflowStatus({
   /** Jour passé : une « à venir » non pointée est en retard, pas à faire. */
   pastDay?: boolean;
 }) {
+  const { t } = useTranslation();
   let color: string;
   let label: string;
   let Icon: typeof Check;
   const who = item.done_by_me
-    ? 'vous'
+    ? t('prestations.you')
     : [item.referent_first_name, item.referent_last_name].filter(Boolean).join(' ');
   if (item.status === 'valide') {
     color = colors.statusValide;
-    label = who ? `Validée · fait par ${who}` : 'Validée';
+    label = who ? t('prestations.validatedBy', { who }) : t('prestations.validatedF');
     Icon = BadgeCheck;
   } else if (item.status === 'annule') {
     color = colors.mutedText;
-    label = 'Annulée';
+    label = t('prestations.cancelledF');
     Icon = Ban;
   } else if (item.status === 'termine') {
     color = colors.statusTermine;
-    label = who ? `Terminé · fait par ${who}` : 'Terminé';
+    label = who ? t('prestations.doneBy', { who }) : t('menage.statusCompleted');
     Icon = CheckCircle2;
   } else if (item.status === 'en_cours') {
     color = colors.statusEnCours;
-    label = 'En cours';
+    label = t('menage.statusInProgress');
     Icon = Play;
   } else if (pastDay && item.is_assigned) {
     color = colors.red;
-    label = 'Non pointée — pointe ton arrivée depuis la fiche';
+    label = t('prestations.lateClockIn');
     Icon = AlertTriangle;
   } else if (pastDay) {
     color = colors.mutedText;
-    label = 'Passée · personne ne l’a prise';
+    label = t('prestations.pastNobody');
     Icon = Ban;
   } else {
     // a_venir mais affecté
     color = colors.primary;
-    label = "Tu es affecté — pense à pointer ton arrivée";
+    label = t('prestations.assignedReminder');
     Icon = CalendarCheck;
   }
   return (

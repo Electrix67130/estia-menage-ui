@@ -5,7 +5,9 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import StatusBadge from './StatusBadge';
-import { menageLogementLabel, menageSourceLabel, prestationTypeLabel, prestationTypeColorKey, type Menage } from '@/api/types';
+import { menageLogementLabel, menageSourceLabel, prestationTypeColorKey, type Menage } from '@/api/types';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 import { formatDateFr, formatDurationMin } from '@/lib/date-fr';
 
 interface Props {
@@ -23,6 +25,7 @@ interface Props {
 const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, unread = 0, muted = false }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t, tp } = useTranslation();
 
   const day = menage.date_prevue.slice(8, 10);
   const dayShort = formatDateFr(menage.date_prevue.slice(0, 10), 'dayShort'); // "5 juin"
@@ -31,6 +34,7 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, u
   const time = menage.horaire_prevu ? menage.horaire_prevu.slice(0, 5) : null;
   const duration = menage.duree_estimee_min ? formatDurationMin(menage.duree_estimee_min) : null;
   const needsAttention = !!menage.needs_attention;
+  const typeLabel = t(`prestationType.${menage.prestation_type ?? 'menage'}` as TranslationKeys);
 
   return (
     <TouchableOpacity
@@ -81,7 +85,7 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, u
               {unread > 0 ? (
                 <View
                   style={[styles.unreadBadge, { backgroundColor: colors.red }]}
-                  accessibilityLabel={`${unread} élément(s) non lu(s)`}
+                  accessibilityLabel={tp('menageCard.unread', unread)}
                 >
                   <Bell size={10} color="#FFFFFF" />
                   <Text style={styles.unreadBadgeText}>{unread > 99 ? '99+' : unread}</Text>
@@ -90,16 +94,16 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, u
               {needsAttention ? (
                 <View
                   style={[styles.lateBadge, { backgroundColor: colors.red + '20', borderColor: colors.red }]}
-                  accessibilityLabel="Jour passé sans pointage"
+                  accessibilityLabel={t('menageCard.lateA11y')}
                 >
                   <AlertTriangle size={11} color={colors.red} />
-                  <Text style={[styles.lateBadgeText, { color: colors.red }]}>Non pointé</Text>
+                  <Text style={[styles.lateBadgeText, { color: colors.red }]}>{t('menage.statusNotClockedIn')}</Text>
                 </View>
               ) : null}
               {menage.has_pending_reschedule ? (
                 <View
                   style={[styles.reschedulePill, { backgroundColor: colors.statusEnCours + '25' }]}
-                  accessibilityLabel="Demande de changement en attente"
+                  accessibilityLabel={t('planning.pendingRescheduleA11y')}
                 >
                   <Clock size={12} color={colors.statusEnCours} />
                 </View>
@@ -114,10 +118,10 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, u
               return (
                 <View
                   style={[styles.typeBadge, { backgroundColor: typeColor + '20' }]}
-                  accessibilityLabel={prestationTypeLabel(menage.prestation_type)}
+                  accessibilityLabel={typeLabel}
                 >
                   <Text style={[styles.typeBadgeText, { color: typeColor }]}>
-                    {prestationTypeLabel(menage.prestation_type)}
+                    {typeLabel}
                   </Text>
                 </View>
               );

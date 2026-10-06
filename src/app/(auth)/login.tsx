@@ -21,11 +21,13 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import AutoScrollInput from '@/components/AutoScrollInput';
 import LanguageSwitch from '@/components/LanguageSwitch';
 import EstiaLogo from '@/components/EstiaLogo';
+import { useTranslation } from '@/contexts/I18nContext';
 
 export default function LoginScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const { login } = useAuth();
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,7 +37,7 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      setError('Veuillez remplir tous les champs.');
+      setError(t('auth.fillAllFields'));
       return;
     }
 
@@ -46,9 +48,9 @@ export default function LoginScreen() {
       await login({ email: email.trim(), password });
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.statusCode === 401 ? 'Email ou mot de passe incorrect.' : String(err.details));
+        setError(err.statusCode === 401 ? t('auth.invalidCredentials') : String(err.details));
       } else {
-        setError('Erreur de connexion. Vérifiez votre réseau.');
+        setError(t('auth.networkError'));
       }
     } finally {
       setLoading(false);
@@ -61,24 +63,24 @@ export default function LoginScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
             <EstiaLogo size={200} color={colors.primary} />
-            <Text style={[styles.subtitle, { color: colors.text2 }]}>Gestion de menages</Text>
+            <Text style={[styles.subtitle, { color: colors.text2 }]}>{t('auth.tagline')}</Text>
           </View>
 
           <View style={styles.form}>
-            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{t('auth.email')}</Text>
             <AutoScrollInput
               style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
-              placeholder="votre@email.com"
+              placeholder={t('auth.emailPlaceholder')}
               placeholderTextColor={colors.placeholder}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
-              accessibilityLabel="Adresse email"
+              accessibilityLabel={t('auth.emailAddress')}
             />
 
-            <Text style={[styles.label, { color: colors.text }]}>Mot de passe</Text>
+            <Text style={[styles.label, { color: colors.text }]}>{t('auth.password')}</Text>
             <View style={styles.passwordWrap}>
               <AutoScrollInput
                 style={[styles.input, styles.passwordInput, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
@@ -87,14 +89,14 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
-                accessibilityLabel="Mot de passe"
+                accessibilityLabel={t('auth.password')}
               />
               <TouchableOpacity
                 style={styles.eyeButton}
                 onPress={() => setShowPassword((s) => !s)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityRole="button"
-                accessibilityLabel={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                accessibilityLabel={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
               >
                 {showPassword ? (
                   <EyeOff size={20} color={colors.text2} />
@@ -108,7 +110,7 @@ export default function LoginScreen() {
 
             <Link href="/(auth)/forgot-password" asChild>
               <TouchableOpacity style={styles.forgotContainer} accessibilityRole="link">
-                <Text style={[styles.forgotText, { color: colors.primary }]}>Mot de passe oublié ?</Text>
+                <Text style={[styles.forgotText, { color: colors.primary }]}>{t('auth.forgotPassword')}</Text>
               </TouchableOpacity>
             </Link>
 
@@ -117,20 +119,20 @@ export default function LoginScreen() {
               onPress={handleLogin}
               disabled={loading}
               accessibilityRole="button"
-              accessibilityLabel="Se connecter"
+              accessibilityLabel={t('auth.signIn')}
             >
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.buttonText}>Se connecter</Text>
+                <Text style={styles.buttonText}>{t('auth.signIn')}</Text>
               )}
             </TouchableOpacity>
 
             <Link href="/(auth)/register" asChild>
               <TouchableOpacity style={styles.linkContainer} accessibilityRole="link">
                 <Text style={[styles.linkText, { color: colors.text2 }]}>
-                  Pas encore de compte ?{' '}
-                  <Text style={{ color: colors.primary, fontWeight: FontWeight.semibold }}>S'inscrire</Text>
+                  {t('auth.noAccount')}{' '}
+                  <Text style={{ color: colors.primary, fontWeight: FontWeight.semibold }}>{t('auth.signUpLink')}</Text>
                 </Text>
               </TouchableOpacity>
             </Link>

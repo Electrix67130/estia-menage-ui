@@ -17,11 +17,13 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import AutoScrollInput from '@/components/AutoScrollInput';
+import { useTranslation } from '@/contexts/I18nContext';
 
 export default function ResetPasswordScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const { token } = useLocalSearchParams<{ token: string }>();
+  const { t } = useTranslation();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -31,15 +33,15 @@ export default function ResetPasswordScreen() {
 
   const handleReset = async () => {
     if (!password.trim()) {
-      setError('Veuillez entrer un nouveau mot de passe.');
+      setError(t('auth.enterNewPassword'));
       return;
     }
     if (password.length < 12 || !/\p{L}/u.test(password) || !/[0-9]/.test(password)) {
-      setError('Le mot de passe doit faire au moins 12 caractères et contenir une lettre et un chiffre.');
+      setError(t('auth.passwordRules'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas.');
+      setError(t('auth.passwordMismatch'));
       return;
     }
 
@@ -56,12 +58,12 @@ export default function ResetPasswordScreen() {
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.message.includes('expired')) {
-          setError('Le lien a expiré. Veuillez refaire une demande.');
+          setError(t('auth.linkExpired'));
         } else {
           setError(err.message);
         }
       } else {
-        setError('Erreur de connexion. Vérifiez votre réseau.');
+        setError(t('auth.networkError'));
       }
     } finally {
       setLoading(false);
@@ -73,43 +75,41 @@ export default function ResetPasswordScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.header}>
-            <Text style={[styles.logo, { color: colors.primary }]}>Buildr</Text>
-            <Text style={[styles.title, { color: colors.text }]}>Nouveau mot de passe</Text>
+            <Text style={[styles.logo, { color: colors.primary }]}>Estia Clean Connect</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{t('auth.newPasswordTitle')}</Text>
           </View>
 
           {success ? (
             <View style={[styles.successBox, { backgroundColor: colors.green + '15', borderColor: colors.green + '30' }]}>
-              <Text style={[styles.successText, { color: colors.green }]}>
-                Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter.
-              </Text>
+              <Text style={[styles.successText, { color: colors.green }]}>{t('auth.resetSuccess')}</Text>
               <Link href="/(auth)/login" asChild>
                 <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary, marginTop: Spacing.lg }]}>
-                  <Text style={styles.buttonText}>Se connecter</Text>
+                  <Text style={styles.buttonText}>{t('auth.signIn')}</Text>
                 </TouchableOpacity>
               </Link>
             </View>
           ) : (
             <View style={styles.form}>
-              <Text style={[styles.label, { color: colors.text }]}>Nouveau mot de passe</Text>
+              <Text style={[styles.label, { color: colors.text }]}>{t('auth.newPasswordTitle')}</Text>
               <AutoScrollInput
                 style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
-                placeholder="12 caractères, dont une lettre et un chiffre"
+                placeholder={t('auth.passwordPlaceholder')}
                 placeholderTextColor={colors.placeholder}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
-                accessibilityLabel="Nouveau mot de passe"
+                accessibilityLabel={t('auth.newPasswordTitle')}
               />
 
-              <Text style={[styles.label, { color: colors.text }]}>Confirmer le mot de passe</Text>
+              <Text style={[styles.label, { color: colors.text }]}>{t('auth.confirmPassword')}</Text>
               <AutoScrollInput
                 style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
-                placeholder="Retapez le mot de passe"
+                placeholder={t('auth.retypePassword')}
                 placeholderTextColor={colors.placeholder}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 secureTextEntry
-                accessibilityLabel="Confirmer le mot de passe"
+                accessibilityLabel={t('auth.confirmPassword')}
               />
 
               {error ? <Text style={[styles.error, { color: colors.red }]}>{error}</Text> : null}
@@ -123,7 +123,7 @@ export default function ResetPasswordScreen() {
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.buttonText}>Réinitialiser</Text>
+                  <Text style={styles.buttonText}>{t('auth.resetBtn')}</Text>
                 )}
               </TouchableOpacity>
             </View>

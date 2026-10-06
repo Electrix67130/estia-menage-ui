@@ -38,6 +38,7 @@ import { Colors } from '@/constants/Colors';
 import AppHeader from '@/components/AppHeader';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { formatDateFr } from '@/lib/date-fr';
 import AutoScrollInput from '@/components/AutoScrollInput';
 import { useDialog } from '@/contexts/DialogContext';
 
@@ -65,6 +66,14 @@ export default function ProfilScreen() {
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [showCreateOrgModal, setShowCreateOrgModal] = useState(false);
+
+  const roleLabel = (role: string): string => {
+    if (role === 'admin') return t('collab.role.admin');
+    if (role === 'prestataire') return t('collab.role.prestataire');
+    if (role === 'manager') return t('collab.role.manager');
+    if (role === 'client') return t('collab.role.client');
+    return role;
+  };
 
   const handleOpenDashboardCreateOrg = async () => {
     setShowCreateOrgModal(false);
@@ -156,7 +165,7 @@ export default function ProfilScreen() {
   const handleSiretLookup = async () => {
     const siret = providerSiret.replace(/\s/g, '');
     if (!/^\d{14}$/.test(siret)) {
-      void dialog.alert({ title: 'SIRET invalide', message: 'Le SIRET doit comporter 14 chiffres.' });
+      void dialog.alert({ title: t('profile.siretInvalidTitle'), message: t('profile.siretInvalidBody') });
       return;
     }
     try {
@@ -165,19 +174,19 @@ export default function ProfilScreen() {
       setProviderAddress(r.address || providerAddress);
       setProviderVat(r.vat_number || providerVat);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Entreprise introuvable';
-      void dialog.alert({ title: 'Introuvable', message: msg });
+      const msg = err instanceof Error ? err.message : t('profile.companyNotFound');
+      void dialog.alert({ title: t('common.notFound'), message: msg });
     }
   };
 
   const handleChangePassword = async () => {
     setPasswordError('');
     if (newPassword.length < 12 || !/\p{L}/u.test(newPassword) || !/[0-9]/.test(newPassword)) {
-      setPasswordError('Le mot de passe doit faire au moins 12 caractères et contenir une lettre et un chiffre.');
+      setPasswordError(t('profile.passwordRules'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError('Les mots de passe ne correspondent pas.');
+      setPasswordError(t('profile.passwordMismatch'));
       return;
     }
     try {
@@ -186,10 +195,10 @@ export default function ProfilScreen() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      void dialog.alert({ title: 'Mot de passe modifié', message: 'Votre mot de passe a été mis à jour avec succès.' });
+      void dialog.alert({ title: t('profile.passwordChangedTitle'), message: t('profile.passwordChangedBody') });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erreur';
-      setPasswordError(msg.includes('Current') ? 'Mot de passe actuel incorrect.' : msg);
+      const msg = err instanceof Error ? err.message : t('common.error');
+      setPasswordError(msg.includes('Current') ? t('profile.currentPasswordWrong') : msg);
     }
   };
 
@@ -251,7 +260,7 @@ export default function ProfilScreen() {
                 <View style={styles.identityInfo}>
                   <Text style={[styles.email, { color: colors.text }]}>{user.email}</Text>
                   <View style={[styles.roleBadge, { backgroundColor: colors.primary + '15' }]}>
-                    <Text style={[styles.roleText, { color: colors.primary }]}>{user.role}</Text>
+                    <Text style={[styles.roleText, { color: colors.primary }]}>{roleLabel(user.role)}</Text>
                   </View>
                 </View>
               </View>
@@ -327,7 +336,7 @@ export default function ProfilScreen() {
                 ) : (
                   <>
                     {/* Entreprise du prestataire — renseignée via SIRET (facturation). */}
-                    <Text style={[styles.label, { color: colors.text2 }]}>SIRET de ton entreprise</Text>
+                    <Text style={[styles.label, { color: colors.text2 }]}>{t('profile.providerSiret')}</Text>
                     <View style={styles.inputRow}>
                       <Receipt size={IconSize.md} color={colors.mutedText} style={styles.inputIcon} />
                       <AutoScrollInput
@@ -336,15 +345,15 @@ export default function ProfilScreen() {
                         onChangeText={setProviderSiret}
                         editable
                         keyboardType="number-pad"
-                        placeholder="14 chiffres"
+                        placeholder={t('profile.siretPlaceholder')}
                         placeholderTextColor={colors.placeholder}
-                        accessibilityLabel="SIRET"
+                        accessibilityLabel={t('legal.siret')}
                       />
                       <TouchableOpacity
                         onPress={handleSiretLookup}
                         disabled={companyLookup.isPending}
                         style={styles.siretLookupBtn}
-                        accessibilityLabel="Rechercher l'entreprise par SIRET"
+                        accessibilityLabel={t('profile.siretLookupA11y')}
                       >
                         {companyLookup.isPending ? (
                           <ActivityIndicator size="small" color={colors.primary} />
@@ -354,10 +363,10 @@ export default function ProfilScreen() {
                       </TouchableOpacity>
                     </View>
                     <Text style={[styles.hint, { color: colors.mutedText }]}>
-                      Renseigne ton SIRET puis appuie sur la loupe pour pré-remplir.
+                      {t('profile.siretLookupHint')}
                     </Text>
 
-                    <Text style={[styles.label, { color: colors.text2 }]}>Raison sociale</Text>
+                    <Text style={[styles.label, { color: colors.text2 }]}>{t('profile.companyName')}</Text>
                     <View style={styles.inputRow}>
                       <Building2 size={IconSize.md} color={colors.mutedText} style={styles.inputIcon} />
                       <AutoScrollInput
@@ -365,13 +374,13 @@ export default function ProfilScreen() {
                         value={providerCompany}
                         onChangeText={setProviderCompany}
                         editable
-                        placeholder="Ton entreprise"
+                        placeholder={t('profile.companyPlaceholder')}
                         placeholderTextColor={colors.placeholder}
-                        accessibilityLabel="Raison sociale"
+                        accessibilityLabel={t('profile.companyName')}
                       />
                     </View>
 
-                    <Text style={[styles.label, { color: colors.text2 }]}>Adresse</Text>
+                    <Text style={[styles.label, { color: colors.text2 }]}>{t('legal.streetAddress')}</Text>
                     <View style={styles.inputRow}>
                       <MapPin size={IconSize.md} color={colors.mutedText} style={styles.inputIcon} />
                       <AutoScrollInput
@@ -379,13 +388,13 @@ export default function ProfilScreen() {
                         value={providerAddress}
                         onChangeText={setProviderAddress}
                         editable
-                        placeholder="Adresse de l'entreprise"
+                        placeholder={t('profile.companyAddressPlaceholder')}
                         placeholderTextColor={colors.placeholder}
-                        accessibilityLabel="Adresse"
+                        accessibilityLabel={t('legal.streetAddress')}
                       />
                     </View>
 
-                    <Text style={[styles.label, { color: colors.text2 }]}>N° TVA</Text>
+                    <Text style={[styles.label, { color: colors.text2 }]}>{t('client.vatNumber')}</Text>
                     <View style={styles.inputRow}>
                       <FileText size={IconSize.md} color={colors.mutedText} style={styles.inputIcon} />
                       <AutoScrollInput
@@ -396,11 +405,11 @@ export default function ProfilScreen() {
                         autoCapitalize="characters"
                         placeholder="FR…"
                         placeholderTextColor={colors.placeholder}
-                        accessibilityLabel="Numéro de TVA"
+                        accessibilityLabel={t('profile.vatA11y')}
                       />
                     </View>
                     <Text style={[styles.hint, { color: colors.mutedText }]}>
-                      L&apos;organisation pour laquelle tu travailles apparaît dans « Mes organisations ».
+                      {t('profile.providerOrgHint')}
                     </Text>
                   </>
                 )}
@@ -431,17 +440,17 @@ export default function ProfilScreen() {
               </View>
 
               {/* Security */}
-              <Text style={[styles.sectionTitle, { color: colors.text2 }]}>MES GAINS</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('profile.earningsSection')}</Text>
               <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <TouchableOpacity
                   style={[styles.securityBtn, { borderColor: colors.border }]}
                   onPress={() => router.push('/earnings' as never)}
                   accessibilityRole="button"
-                  accessibilityLabel="Mes gains"
+                  accessibilityLabel={t('profile.myEarnings')}
                 >
                   <Wallet size={IconSize.md} color={colors.primary} />
                   <Text style={[styles.securityBtnText, { color: colors.text }]}>
-                    Mes gains
+                    {t('profile.myEarnings')}
                   </Text>
                   <ChevronRight size={IconSize.sm} color={colors.mutedText} />
                 </TouchableOpacity>
@@ -449,17 +458,17 @@ export default function ProfilScreen() {
 
               {isAdmin ? (
                 <>
-                  <Text style={[styles.sectionTitle, { color: colors.text2 }]}>ARCHIVES</Text>
+                  <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('profile.archivesSection')}</Text>
                   <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <TouchableOpacity
                       style={[styles.securityBtn, { borderColor: colors.border }]}
                       onPress={() => router.push('/(tabs)/archives' as never)}
                       accessibilityRole="button"
-                      accessibilityLabel="Ménages archivés"
+                      accessibilityLabel={t('profile.archivedMenages')}
                     >
                       <Archive size={IconSize.md} color={colors.primary} />
                       <Text style={[styles.securityBtnText, { color: colors.text }]}>
-                        Ménages archivés
+                        {t('profile.archivedMenages')}
                       </Text>
                       <ChevronRight size={IconSize.sm} color={colors.mutedText} />
                     </TouchableOpacity>
@@ -467,23 +476,23 @@ export default function ProfilScreen() {
                 </>
               ) : null}
 
-              <Text style={[styles.sectionTitle, { color: colors.text2 }]}>SÉCURITÉ</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('profile.securitySection')}</Text>
               <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <TouchableOpacity
                   style={[styles.securityBtn, { borderColor: colors.border }]}
                   onPress={() => setShowPasswordModal(true)}
                   accessibilityRole="button"
-                  accessibilityLabel="Changer le mot de passe"
+                  accessibilityLabel={t('profile.changePassword')}
                 >
                   <KeyRound size={IconSize.md} color={colors.primary} />
                   <Text style={[styles.securityBtnText, { color: colors.text }]}>
-                    Changer le mot de passe
+                    {t('profile.changePassword')}
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {/* Mes organisations */}
-              <Text style={[styles.sectionTitle, { color: colors.text2 }]}>MES ORGANISATIONS</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('profile.orgsSection')}</Text>
               <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 {(user?.memberships ?? []).map((m) => {
                   const isActive = m.organization_id === user?.active_organization_id;
@@ -500,17 +509,13 @@ export default function ProfilScreen() {
                           {m.organization_name}
                         </Text>
                         <Text style={[styles.orgRole, { color: colors.mutedText }]}>
-                          {m.role === 'admin'
-                            ? 'Admin'
-                            : m.role === 'prestataire'
-                              ? 'Prestataire'
-                              : 'Client'}
+                          {roleLabel(m.role)}
                         </Text>
                       </View>
                       {isActive ? (
                         <View style={[styles.orgActiveBadge, { backgroundColor: colors.primary + '20' }]}>
                           <Check size={14} color={colors.primary} />
-                          <Text style={[styles.orgActiveText, { color: colors.primary }]}>Actuelle</Text>
+                          <Text style={[styles.orgActiveText, { color: colors.primary }]}>{t('profile.orgCurrent')}</Text>
                         </View>
                       ) : (
                         <TouchableOpacity
@@ -518,18 +523,18 @@ export default function ProfilScreen() {
                           onPress={() => {
                             switchOrg.mutate(m.organization_id, {
                               onError: (err) =>
-                                void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Impossible de changer' }),
+                                void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('profile.switchFailed') }),
                             });
                           }}
                           disabled={switchOrg.isPending}
-                          accessibilityLabel={`Changer de compte vers ${m.organization_name}`}
+                          accessibilityLabel={t('profile.switchOrgA11y', { name: m.organization_name })}
                         >
                           {switchOrg.isPending ? (
                             <ActivityIndicator color="#FFFFFF" />
                           ) : (
                             <>
                               <ArrowRightLeft size={14} color="#FFFFFF" />
-                              <Text style={styles.orgSwitchText}>Changer de compte</Text>
+                              <Text style={styles.orgSwitchText}>{t('profile.switchOrg')}</Text>
                             </>
                           )}
                         </TouchableOpacity>
@@ -541,11 +546,11 @@ export default function ProfilScreen() {
                 <TouchableOpacity
                   style={[styles.createOrgBtn, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}
                   onPress={() => setShowCreateOrgModal(true)}
-                  accessibilityLabel="Créer une organisation"
+                  accessibilityLabel={t('profile.createOrg')}
                 >
                   <Plus size={IconSize.md} color={colors.primary} />
                   <Text style={[styles.createOrgText, { color: colors.primary }]}>
-                    Créer une organisation
+                    {t('profile.createOrg')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -590,21 +595,21 @@ export default function ProfilScreen() {
               </TouchableOpacity>
 
               {/* Réglages */}
-              <Text style={[styles.sectionTitle, { color: colors.text2 }]}>RÉGLAGES</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('profile.settingsSection')}</Text>
               <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <TouchableOpacity
                   style={styles.notifRow}
                   onPress={() => router.push('/notification-preferences' as never)}
                   accessibilityRole="button"
-                  accessibilityLabel="Notifications"
+                  accessibilityLabel={t('profile.notifications')}
                 >
                   <View style={[styles.notifIcon, { backgroundColor: colors.primary + '15' }]}>
                     <Bell size={IconSize.md} color={colors.primary} />
                   </View>
                   <View style={styles.notifInfo}>
-                    <Text style={[styles.notifTitle, { color: colors.text }]}>Notifications</Text>
+                    <Text style={[styles.notifTitle, { color: colors.text }]}>{t('profile.notifications')}</Text>
                     <Text style={[styles.notifHint, { color: colors.mutedText }]}>
-                      Gérer les notifications que tu reçois
+                      {t('profile.notificationsHint')}
                     </Text>
                   </View>
                   <ChevronRight size={IconSize.sm} color={colors.mutedText} />
@@ -679,7 +684,7 @@ export default function ProfilScreen() {
                 onPress={async () => {
                   const ok = await dialog.confirm({
                     title: t('profile.logout'),
-                    message: 'Tu seras déconnecté de ton compte sur cet appareil.',
+                    message: t('profile.logoutConfirm'),
                     confirmLabel: t('profile.logout'),
                     destructive: true,
                   });
@@ -698,9 +703,12 @@ export default function ProfilScreen() {
                 v{Updates.runtimeVersion ?? '?'}
                 {' · '}
                 {Updates.isEmbeddedLaunch
-                  ? 'build natif'
+                  ? t('profile.buildNative')
                   : Updates.createdAt
-                    ? `MàJ ${Updates.createdAt.toLocaleDateString('fr-FR')} ${Updates.createdAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                    ? t('profile.buildOta', {
+                        date: formatDateFr(Updates.createdAt, 'short'),
+                        time: formatDateFr(Updates.createdAt, 'time'),
+                      })
                     : 'OTA'}
               </Text>
             </>
@@ -727,35 +735,35 @@ export default function ProfilScreen() {
               ]}
             >
               <SheetHandle gesture={passwordSwipe.gesture} />
-              <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.sm }]}>Changer le mot de passe</Text>
+              <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.sm }]}>{t('profile.changePassword')}</Text>
 
-            <Text style={[styles.label, { color: colors.text2 }]}>Mot de passe actuel</Text>
+            <Text style={[styles.label, { color: colors.text2 }]}>{t('profile.currentPassword')}</Text>
             <AutoScrollInput
               style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
               value={currentPassword}
               onChangeText={setCurrentPassword}
               secureTextEntry
-              accessibilityLabel="Mot de passe actuel"
+              accessibilityLabel={t('profile.currentPassword')}
             />
 
-            <Text style={[styles.label, { color: colors.text2 }]}>Nouveau mot de passe</Text>
+            <Text style={[styles.label, { color: colors.text2 }]}>{t('profile.newPassword')}</Text>
             <AutoScrollInput
               style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
               value={newPassword}
               onChangeText={setNewPassword}
               secureTextEntry
-              placeholder="12 caractères, dont une lettre et un chiffre"
+              placeholder={t('profile.newPasswordPlaceholder')}
               placeholderTextColor={colors.placeholder}
-              accessibilityLabel="Nouveau mot de passe"
+              accessibilityLabel={t('profile.newPassword')}
             />
 
-            <Text style={[styles.label, { color: colors.text2 }]}>Confirmer</Text>
+            <Text style={[styles.label, { color: colors.text2 }]}>{t('common.confirm')}</Text>
             <AutoScrollInput
               style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
               secureTextEntry
-              accessibilityLabel="Confirmer le mot de passe"
+              accessibilityLabel={t('profile.confirmPasswordA11y')}
             />
 
             {passwordError ? (
@@ -767,12 +775,12 @@ export default function ProfilScreen() {
               onPress={handleChangePassword}
               disabled={updatePassword.isPending}
               accessibilityRole="button"
-              accessibilityLabel="Valider"
+              accessibilityLabel={t('common.validate')}
             >
               {updatePassword.isPending ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.saveBtnText}>Modifier le mot de passe</Text>
+                <Text style={styles.saveBtnText}>{t('profile.submitPassword')}</Text>
               )}
             </TouchableOpacity>
             </Animated.View>
@@ -792,27 +800,26 @@ export default function ProfilScreen() {
               ]}
             >
               <SheetHandle gesture={createOrgSwipe.gesture} />
-              <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.sm }]}>Nouvelle organisation</Text>
+              <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.sm }]}>{t('profile.newOrgTitle')}</Text>
 
             <View style={[styles.dashRedirectBubble, { backgroundColor: colors.primary + '15' }]}>
               <Building2 size={IconSize.lg} color={colors.primary} />
             </View>
             <Text style={[styles.dashRedirectTitle, { color: colors.text }]}>
-              La création se fait sur le dashboard
+              {t('profile.createOrgOnDashboard')}
             </Text>
             <Text style={[styles.dashRedirectBody, { color: colors.text2 }]}>
-              Pour saisir le SIRET, les infos légales et plus tard la facturation, ouvre Buildr sur le web.
-              L&apos;app mobile restera dédiée au terrain.
+              {t('profile.createOrgBody')}
             </Text>
 
             <TouchableOpacity
               style={[styles.saveBtn, { backgroundColor: colors.primary, marginTop: Spacing.lg, flexDirection: 'row', gap: Spacing.sm }]}
               onPress={handleOpenDashboardCreateOrg}
               accessibilityRole="link"
-              accessibilityLabel="Ouvrir le dashboard pour créer l'organisation"
+              accessibilityLabel={t('profile.openDashboardA11y')}
             >
               <ExternalLink size={IconSize.sm} color="#FFFFFF" />
-              <Text style={[styles.saveBtnText, { color: '#FFFFFF' }]}>Ouvrir le dashboard</Text>
+              <Text style={[styles.saveBtnText, { color: '#FFFFFF' }]}>{t('profile.openDashboard')}</Text>
             </TouchableOpacity>
             </Animated.View>
         </GestureHandlerRootView>

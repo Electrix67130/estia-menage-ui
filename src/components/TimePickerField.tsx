@@ -5,6 +5,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import WheelPicker from './WheelPicker';
+import { useTranslation } from '@/contexts/I18nContext';
 
 interface Props {
   label: string;
@@ -20,11 +21,13 @@ const TimePickerField: React.FC<Props> = ({
   label,
   value,
   onChange,
-  placeholder = 'Sélectionner un horaire',
+  placeholder,
   minuteStep = 5,
 }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
+  const effectivePlaceholder = placeholder ?? t('picker.selectTime');
   const [open, setOpen] = useState(false);
 
   const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')), []);
@@ -63,7 +66,7 @@ const TimePickerField: React.FC<Props> = ({
           numberOfLines={1}
           ellipsizeMode="tail"
         >
-          {display || placeholder}
+          {display || effectivePlaceholder}
         </Text>
         <Clock size={IconSize.md} color={colors.mutedText} />
       </TouchableOpacity>
@@ -72,7 +75,7 @@ const TimePickerField: React.FC<Props> = ({
         <View style={styles.overlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
           <View style={[styles.modal, { backgroundColor: colors.surface }, Shadow.lg]}>
-            <Text style={[styles.title, { color: colors.text }]}>Choisis un horaire</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{t('picker.chooseTime')}</Text>
             <View style={styles.wheelsRow}>
               <WheelPicker items={hours} selectedIndex={hIdx} onChange={setHIdx} width={80} />
               <Text style={[styles.colon, { color: colors.text }]}>:</Text>
@@ -87,7 +90,7 @@ const TimePickerField: React.FC<Props> = ({
                   }}
                   style={[styles.btn, { backgroundColor: colors.itemBackground }]}
                 >
-                  <Text style={{ color: colors.text, fontWeight: FontWeight.medium }}>Effacer</Text>
+                  <Text style={{ color: colors.text, fontWeight: FontWeight.medium }}>{t('picker.clear')}</Text>
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity
@@ -97,7 +100,7 @@ const TimePickerField: React.FC<Props> = ({
                 }}
                 style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}
               >
-                <Text style={{ color: '#FFFFFF', fontWeight: FontWeight.semibold }}>Valider</Text>
+                <Text style={{ color: '#FFFFFF', fontWeight: FontWeight.semibold }}>{t('common.validate')}</Text>
               </TouchableOpacity>
             </View>
           </View>

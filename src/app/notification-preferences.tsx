@@ -11,24 +11,27 @@ import {
   useUpdateNotificationPreference,
   type NotificationPreferenceKey,
 } from '@/api/hooks/useNotificationPreferences';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 
-const PREFERENCES: { key: NotificationPreferenceKey; label: string }[] = [
-  { key: 'assignment', label: 'Ménages assignés / modifiés / annulés' },
-  { key: 'available', label: 'Nouveaux ménages disponibles' },
-  { key: 'reminders', label: 'Rappels (veille & 2h avant)' },
-  { key: 'reschedule', label: 'Demandes de report' },
-  { key: 'presence', label: 'Réponses présent/absent' },
-  { key: 'pointage', label: 'Arrivées / départs' },
-  { key: 'validation', label: 'Ménages validés' },
-  { key: 'comments', label: 'Commentaires' },
-  { key: 'consumables', label: 'Consommables à racheter' },
-  { key: 'invitations', label: 'Invitations acceptées' },
+const PREFERENCES: { key: NotificationPreferenceKey; labelKey: TranslationKeys }[] = [
+  { key: 'assignment', labelKey: 'notifPrefs.category.assignment' },
+  { key: 'available', labelKey: 'notifPrefs.category.available' },
+  { key: 'reminders', labelKey: 'notifPrefs.category.reminders' },
+  { key: 'reschedule', labelKey: 'notifPrefs.category.reschedule' },
+  { key: 'presence', labelKey: 'notifPrefs.category.presence' },
+  { key: 'pointage', labelKey: 'notifPrefs.category.pointage' },
+  { key: 'validation', labelKey: 'notifPrefs.category.validation' },
+  { key: 'comments', labelKey: 'notifPrefs.category.comments' },
+  { key: 'consumables', labelKey: 'notifPrefs.category.consumables' },
+  { key: 'invitations', labelKey: 'notifPrefs.category.invitations' },
 ];
 
 export default function NotificationPreferencesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
+  const { t } = useTranslation();
   const { data, isLoading } = useNotificationPreferences();
   const updatePreference = useUpdateNotificationPreference();
 
@@ -39,12 +42,12 @@ export default function NotificationPreferencesScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('common.back')}
         >
           <ArrowLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-          Notifications
+          {t('profile.notifications')}
         </Text>
         <View style={{ width: IconSize.lg }} />
       </View>
@@ -56,7 +59,7 @@ export default function NotificationPreferencesScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.body}>
           <Text style={[styles.hint, { color: colors.mutedText }]}>
-            Choisis les notifications que tu souhaites recevoir.
+            {t('notifPrefs.hint')}
           </Text>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             {PREFERENCES.map((pref, index) => (
@@ -67,12 +70,12 @@ export default function NotificationPreferencesScreen() {
                   index < PREFERENCES.length - 1 ? { borderBottomWidth: 1, borderColor: colors.border } : null,
                 ]}
               >
-                <Text style={[styles.label, { color: colors.text }]}>{pref.label}</Text>
+                <Text style={[styles.label, { color: colors.text }]}>{t(pref.labelKey)}</Text>
                 <Switch
                   value={data[pref.key]}
                   onValueChange={(enabled) => updatePreference.mutate({ key: pref.key, enabled })}
                   trackColor={{ false: colors.border, true: colors.primary }}
-                  accessibilityLabel={pref.label}
+                  accessibilityLabel={t(pref.labelKey)}
                 />
               </View>
             ))}

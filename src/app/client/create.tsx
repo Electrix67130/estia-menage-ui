@@ -15,12 +15,14 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import KeyboardAwareScroll from '@/components/KeyboardAwareScroll';
 import AutoScrollInput from '@/components/AutoScrollInput';
 import { useCreateClient, type CreateClientInput } from '@/api/hooks/useClients';
+import { useTranslation } from '@/contexts/I18nContext';
 
 export default function CreateClientScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
   const create = useCreateClient();
+  const { t } = useTranslation();
 
   const [form, setForm] = useState<CreateClientInput>({ country: 'FR' });
   const [error, setError] = useState('');
@@ -28,14 +30,14 @@ export default function CreateClientScreen() {
   const handleSubmit = async () => {
     setError('');
     if (!form.first_name?.trim() && !form.last_name?.trim() && !form.company_name?.trim()) {
-      setError('Au moins un nom (personne ou entreprise) est requis.');
+      setError(t('client.nameRequired'));
       return;
     }
     try {
       const c = await create.mutateAsync(form);
       router.replace(`/client/${c.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la création.');
+      setError(err instanceof Error ? err.message : t('client.createFailed'));
     }
   };
 
@@ -49,29 +51,29 @@ export default function CreateClientScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('common.back')}
         >
           <ArrowLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Nouveau client</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('client.new')}</Text>
         <View style={{ width: IconSize.lg }} />
       </View>
 
       <KeyboardAwareScroll contentContainerStyle={styles.body}>
-        <Text style={[styles.section, { color: colors.text2 }]}>IDENTITÉ</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('client.sectionIdentity')}</Text>
         <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
           <AutoScrollInput
             style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={form.first_name ?? ''}
             onChangeText={(v) => set('first_name', v)}
-            placeholder="Prénom"
+            placeholder={t('auth.firstName')}
             placeholderTextColor={colors.placeholder}
           />
           <AutoScrollInput
             style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={form.last_name ?? ''}
             onChangeText={(v) => set('last_name', v)}
-            placeholder="Nom"
+            placeholder={t('auth.lastName')}
             placeholderTextColor={colors.placeholder}
           />
         </View>
@@ -79,16 +81,16 @@ export default function CreateClientScreen() {
           style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
           value={form.company_name ?? ''}
           onChangeText={(v) => set('company_name', v)}
-          placeholder="Entreprise (si pro)"
+          placeholder={t('client.companyIfPro')}
           placeholderTextColor={colors.placeholder}
         />
 
-        <Text style={[styles.section, { color: colors.text2 }]}>CONTACT</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('client.sectionContact')}</Text>
         <AutoScrollInput
           style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
           value={form.email ?? ''}
           onChangeText={(v) => set('email', v)}
-          placeholder="Email"
+          placeholder={t('auth.email')}
           placeholderTextColor={colors.placeholder}
           keyboardType="email-address"
           autoCapitalize="none"
@@ -97,17 +99,17 @@ export default function CreateClientScreen() {
           style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
           value={form.phone ?? ''}
           onChangeText={(v) => set('phone', v)}
-          placeholder="Téléphone"
+          placeholder={t('auth.phone')}
           placeholderTextColor={colors.placeholder}
           keyboardType="phone-pad"
         />
 
-        <Text style={[styles.section, { color: colors.text2 }]}>FACTURATION</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('client.sectionBilling')}</Text>
         <AutoScrollInput
           style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
           value={form.billing_address ?? ''}
           onChangeText={(v) => set('billing_address', v)}
-          placeholder="Adresse de facturation"
+          placeholder={t('client.billingAddress')}
           placeholderTextColor={colors.placeholder}
         />
         <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
@@ -115,7 +117,7 @@ export default function CreateClientScreen() {
             style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={form.postal_code ?? ''}
             onChangeText={(v) => set('postal_code', v)}
-            placeholder="CP"
+            placeholder={t('client.postalCodeShort')}
             placeholderTextColor={colors.placeholder}
             keyboardType="number-pad"
           />
@@ -123,7 +125,7 @@ export default function CreateClientScreen() {
             style={[styles.input, { flex: 2, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={form.city ?? ''}
             onChangeText={(v) => set('city', v)}
-            placeholder="Ville"
+            placeholder={t('legal.city')}
             placeholderTextColor={colors.placeholder}
           />
         </View>
@@ -132,7 +134,7 @@ export default function CreateClientScreen() {
             style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={form.siret ?? ''}
             onChangeText={(v) => set('siret', v)}
-            placeholder="SIRET"
+            placeholder={t('legal.siret')}
             placeholderTextColor={colors.placeholder}
             maxLength={14}
           />
@@ -140,12 +142,12 @@ export default function CreateClientScreen() {
             style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={form.vat_number ?? ''}
             onChangeText={(v) => set('vat_number', v)}
-            placeholder="N° TVA"
+            placeholder={t('client.vatNumber')}
             placeholderTextColor={colors.placeholder}
           />
         </View>
 
-        <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('client.sectionNotes')}</Text>
         <AutoScrollInput
           style={[
             styles.input,
@@ -153,7 +155,7 @@ export default function CreateClientScreen() {
           ]}
           value={form.notes ?? ''}
           onChangeText={(v) => set('notes', v)}
-          placeholder="Notes…"
+          placeholder={t('client.notesPlaceholder')}
           placeholderTextColor={colors.placeholder}
           multiline
         />
@@ -166,7 +168,7 @@ export default function CreateClientScreen() {
           disabled={create.isPending}
         >
           <Save size={IconSize.md} color="#FFFFFF" />
-          <Text style={styles.submitText}>{create.isPending ? 'Création…' : 'Créer le client'}</Text>
+          <Text style={styles.submitText}>{create.isPending ? t('client.creating') : t('client.create')}</Text>
         </TouchableOpacity>
       </KeyboardAwareScroll>
     </SafeAreaView>

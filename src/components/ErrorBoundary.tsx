@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight } from '@/constants/Layout';
+import { translate } from '@/i18n/runtime';
 
 /**
  * Capture les erreurs de rendu React d'une sous-arborescence pour éviter que
@@ -40,13 +41,15 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       return (
         <ScrollView contentContainerStyle={styles.wrap}>
           <Text style={[styles.title, { color: colors.text }]}>
-            Impossible d&apos;afficher {this.props.label ?? 'cette section'}
+            {translate('errorBoundary.cannotDisplay', {
+              label: this.props.label ?? translate('errorBoundary.thisSection'),
+            })}
           </Text>
           <Text style={[styles.msg, { color: colors.text2 }]}>
             {this.state.error.message || String(this.state.error)}
           </Text>
           <TouchableOpacity style={[styles.btn, { backgroundColor: colors.primary }]} onPress={this.reset}>
-            <Text style={styles.btnText}>Réessayer</Text>
+            <Text style={styles.btnText}>{translate('common.retry')}</Text>
           </TouchableOpacity>
         </ScrollView>
       );

@@ -2,6 +2,7 @@ import React, { ReactNode } from 'react';
 import { Modal, View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { X } from 'lucide-react-native';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
+import { useTranslation } from '@/contexts/I18nContext';
 
 /**
  * Lightbox photo standardisée : utilisée partout dans l'app pour ouvrir une image
@@ -25,6 +26,7 @@ export default function PhotoLightbox({
   subtitle?: string;
   footer?: ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -38,7 +40,7 @@ export default function PhotoLightbox({
             style={styles.closeBtn}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityRole="button"
-            accessibilityLabel="Fermer"
+            accessibilityLabel={t('common.close')}
           >
             <X size={IconSize.lg} color="#FFFFFF" />
           </TouchableOpacity>

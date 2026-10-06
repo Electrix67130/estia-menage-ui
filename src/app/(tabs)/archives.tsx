@@ -21,20 +21,23 @@ import MenageCard from '@/components/MenageCard';
 import { useMenages } from '@/api/hooks/useMenages';
 import { useAuth } from '@/contexts/AuthContext';
 import { menageLogementLabel } from '@/api/types';
+import { useTranslation } from '@/contexts/I18nContext';
+import { INTL_LOCALES } from '@/i18n/runtime';
+import type { TranslationKeys } from '@/i18n/translations';
 
 type StatusFilter = 'all' | 'valide' | 'annule';
 type Granularity = 'week' | 'month' | 'year' | 'all';
 
-const STATUSES: { key: StatusFilter; label: string }[] = [
-  { key: 'all', label: 'Tous' },
-  { key: 'valide', label: 'Validés' },
-  { key: 'annule', label: 'Annulés' },
+const STATUSES: { key: StatusFilter; labelKey: TranslationKeys }[] = [
+  { key: 'all', labelKey: 'common.all' },
+  { key: 'valide', labelKey: 'archives.statusValidated' },
+  { key: 'annule', labelKey: 'archives.statusCancelled' },
 ];
-const GRANULARITIES: { key: Granularity; label: string }[] = [
-  { key: 'week', label: 'Semaine' },
-  { key: 'month', label: 'Mois' },
-  { key: 'year', label: 'Année' },
-  { key: 'all', label: 'Tout' },
+const GRANULARITIES: { key: Granularity; labelKey: TranslationKeys }[] = [
+  { key: 'week', labelKey: 'archives.periodWeek' },
+  { key: 'month', labelKey: 'archives.periodMonth' },
+  { key: 'year', labelKey: 'archives.periodYear' },
+  { key: 'all', labelKey: 'archives.periodAll' },
 ];
 
 function ymd(d: Date): string {
@@ -47,6 +50,7 @@ export default function ArchivesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
+  const { t, locale } = useTranslation();
 
   const [statusFilter, setStatusFilter] = usePersistedState<StatusFilter>('archives.filter.status', 'all');
   const [granularity, setGranularity] = usePersistedState<Granularity>('archives.filter.period', 'all');
@@ -62,17 +66,21 @@ export default function ArchivesScreen() {
       monday.setDate(now.getDate() - dow + offset * 7);
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
-      const f = (d: Date) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+      const f = (d: Date) => new Intl.DateTimeFormat(INTL_LOCALES[locale], { day: 'numeric', month: 'short' }).format(d);
       return { from: ymd(monday), to: ymd(sunday), label: `${f(monday)} – ${f(sunday)}` };
     }
     if (granularity === 'month') {
       const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
       const last = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
-      return { from: ymd(first), to: ymd(last), label: first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }) };
+      return {
+        from: ymd(first),
+        to: ymd(last),
+        label: new Intl.DateTimeFormat(INTL_LOCALES[locale], { month: 'long', year: 'numeric' }).format(first),
+      };
     }
     const y = now.getFullYear() + offset;
     return { from: `${y}-01-01`, to: `${y}-12-31`, label: String(y) };
-  }, [granularity, offset]);
+  }, [granularity, offset, locale]);
 
   const list = useMenages({
     closed: true,
@@ -103,7 +111,7 @@ export default function ArchivesScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <AppHeader>
-        <Text style={[styles.title, { color: colors.text }]}>Archives</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('archives.title')}</Text>
       </AppHeader>
 
       <FlatList
@@ -120,11 +128,11 @@ export default function ArchivesScreen() {
               <Search size={IconSize.sm} color={colors.mutedText} />
               <TextInput
                 style={[styles.searchInput, { color: colors.text }]}
-                placeholder="Logement, ville, prestataire…"
+                placeholder={t('archives.searchPlaceholder')}
                 placeholderTextColor={colors.placeholder}
                 value={search}
                 onChangeText={setSearch}
-                accessibilityLabel="Rechercher dans les archives"
+                accessibilityLabel={t('archives.search')}
               />
             </View>
             <View style={styles.pillRow}>
@@ -137,7 +145,7 @@ export default function ArchivesScreen() {
                     onPress={() => setStatusFilter(s.key)}
                   >
                     <Text style={[styles.pillText, { color: active ? '#FFFFFF' : colors.text2, fontWeight: active ? FontWeight.semibold : FontWeight.medium }]}>
-                      {s.label}
+                      {t(s.labelKey)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -156,7 +164,7 @@ export default function ArchivesScreen() {
                     }}
                   >
                     <Text style={[styles.pillText, { color: active ? '#FFFFFF' : colors.text2, fontWeight: active ? FontWeight.semibold : FontWeight.medium }]}>
-                      {p.label}
+                      {t(p.labelKey)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -164,16 +172,16 @@ export default function ArchivesScreen() {
             </View>
             {granularity !== 'all' ? (
               <View style={styles.periodNav}>
-                <TouchableOpacity onPress={() => setOffset((o) => o - 1)} style={styles.periodNavBtn} accessibilityLabel="Période précédente">
+                <TouchableOpacity onPress={() => setOffset((o) => o - 1)} style={styles.periodNavBtn} accessibilityLabel={t('archives.prevPeriod')}>
                   <ChevronLeft size={IconSize.md} color={colors.text} />
                 </TouchableOpacity>
                 <Text style={[styles.periodNavLabel, { color: colors.text }]} numberOfLines={1}>{period.label}</Text>
-                <TouchableOpacity onPress={() => setOffset((o) => o + 1)} style={styles.periodNavBtn} accessibilityLabel="Période suivante">
+                <TouchableOpacity onPress={() => setOffset((o) => o + 1)} style={styles.periodNavBtn} accessibilityLabel={t('archives.nextPeriod')}>
                   <ChevronRight size={IconSize.md} color={colors.text} />
                 </TouchableOpacity>
                 {offset !== 0 ? (
                   <TouchableOpacity onPress={() => setOffset(0)} style={styles.periodNavToday}>
-                    <Text style={[styles.periodNavTodayLabel, { color: colors.primary }]}>Aujourd&apos;hui</Text>
+                    <Text style={[styles.periodNavTodayLabel, { color: colors.primary }]}>{t('common.today')}</Text>
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -190,7 +198,7 @@ export default function ArchivesScreen() {
             </View>
           ) : (
             <View style={styles.center}>
-              <Text style={[styles.empty, { color: colors.mutedText }]}>Aucun ménage clôturé sur ces critères.</Text>
+              <Text style={[styles.empty, { color: colors.mutedText }]}>{t('archives.emptyFiltered')}</Text>
             </View>
           )
         }

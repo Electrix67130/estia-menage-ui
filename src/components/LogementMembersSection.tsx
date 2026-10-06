@@ -39,6 +39,8 @@ import {
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 import {
   useLogementMembers,
   useAddMember,
@@ -58,23 +60,36 @@ interface Props {
   role: SectionRole;
 }
 
-const SECTION_LABELS: Record<
+/** Clés i18n par rôle de section (`members.prestataire.*` / `members.manager.*`). */
+const SECTION_KEYS: Record<
   SectionRole,
-  { title: string; subtitle: string; emptyAdmin: string; addLabel: string; pickerTitle: string }
+  {
+    title: TranslationKeys;
+    subtitle: TranslationKeys;
+    empty: TranslationKeys;
+    emptyAdmin: TranslationKeys;
+    pickerTitle: TranslationKeys;
+    searchPlaceholder: TranslationKeys;
+    removeBody: TranslationKeys;
+  }
 > = {
   prestataire: {
-    title: 'PRESTATAIRES DU LOGEMENT',
-    subtitle: 'Ces prestataires peuvent être affectés aux ménages de ce logement.',
-    emptyAdmin: 'Ajoutes-en un pour pouvoir affecter les ménages.',
-    addLabel: 'Ajouter',
-    pickerTitle: 'Ajouter un prestataire',
+    title: 'members.prestataire.title',
+    subtitle: 'members.prestataire.subtitle',
+    empty: 'members.prestataire.empty',
+    emptyAdmin: 'members.prestataire.emptyAdmin',
+    pickerTitle: 'members.prestataire.pickerTitle',
+    searchPlaceholder: 'members.prestataire.searchPlaceholder',
+    removeBody: 'members.prestataire.removeBody',
   },
   manager: {
-    title: 'RESPONSABLES DU LOGEMENT',
-    subtitle: "Les responsables peuvent suivre et modifier l'activité du logement.",
-    emptyAdmin: 'Désigne un admin ou un manager comme responsable.',
-    addLabel: 'Ajouter',
-    pickerTitle: 'Ajouter un responsable',
+    title: 'members.manager.title',
+    subtitle: 'members.manager.subtitle',
+    empty: 'members.manager.empty',
+    emptyAdmin: 'members.manager.emptyAdmin',
+    pickerTitle: 'members.manager.pickerTitle',
+    searchPlaceholder: 'members.manager.searchPlaceholder',
+    removeBody: 'members.manager.removeBody',
   },
 };
 
@@ -82,13 +97,14 @@ const LogementMembersSection: React.FC<Props> = ({ logementId, isAdmin, role }) 
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const { t } = useTranslation();
   const members = useLogementMembers(logementId);
   const remove = useRemoveMember();
   const [addOpen, setAddOpen] = useState(false);
   const [viewing, setViewing] = useState<MemberWithUser | null>(null);
   const [editingPerms, setEditingPerms] = useState<MemberWithUser | null>(null);
 
-  const labels = SECTION_LABELS[role];
+  const keys = SECTION_KEYS[role];
 
   const items = useMemo(
     () => (members.data?.data ?? []).filter((m) => m.role === role),
@@ -98,12 +114,9 @@ const LogementMembersSection: React.FC<Props> = ({ logementId, isAdmin, role }) 
   const handleRemove = async (member: MemberWithUser) => {
     const name = [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email;
     const ok = await dialog.confirm({
-      title: `Retirer ${name} ?`,
-      message:
-        role === 'prestataire'
-          ? 'Le prestataire perdra son accès à ce logement.'
-          : 'Le responsable perdra son accès à ce logement.',
-      confirmLabel: 'Retirer',
+      title: t('members.removeConfirmTitle', { name }),
+      message: t(keys.removeBody),
+      confirmLabel: t('common.remove'),
       destructive: true,
     });
     if (!ok) return;
@@ -111,7 +124,10 @@ const LogementMembersSection: React.FC<Props> = ({ logementId, isAdmin, role }) 
       await remove.mutateAsync(member.id);
       setViewing(null);
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.unknownError'),
+      });
     }
   };
 
@@ -119,8 +135,8 @@ const LogementMembersSection: React.FC<Props> = ({ logementId, isAdmin, role }) 
     <View style={styles.wrap}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.title, { color: colors.text2 }]}>{labels.title}</Text>
-          <Text style={[styles.subtitle, { color: colors.mutedText }]}>{labels.subtitle}</Text>
+          <Text style={[styles.title, { color: colors.text2 }]}>{t(keys.title)}</Text>
+          <Text style={[styles.subtitle, { color: colors.mutedText }]}>{t(keys.subtitle)}</Text>
         </View>
         {isAdmin ? (
           <TouchableOpacity
@@ -128,7 +144,7 @@ const LogementMembersSection: React.FC<Props> = ({ logementId, isAdmin, role }) 
             onPress={() => setAddOpen(true)}
           >
             <UserPlus size={IconSize.sm} color="#FFFFFF" />
-            <Text style={styles.addBtnText}>{labels.addLabel}</Text>
+            <Text style={styles.addBtnText}>{t('common.add')}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -140,8 +156,8 @@ const LogementMembersSection: React.FC<Props> = ({ logementId, isAdmin, role }) 
       ) : items.length === 0 ? (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={{ color: colors.mutedText, textAlign: 'center' }}>
-            {role === 'prestataire' ? 'Aucun prestataire.' : 'Aucun responsable.'}{' '}
-            {isAdmin ? labels.emptyAdmin : ''}
+            {t(keys.empty)}
+            {isAdmin ? ` ${t(keys.emptyAdmin)}` : ''}
           </Text>
         </View>
       ) : (
@@ -172,7 +188,7 @@ const LogementMembersSection: React.FC<Props> = ({ logementId, isAdmin, role }) 
                   handleRemove(m);
                 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityLabel="Retirer"
+                accessibilityLabel={t('common.remove')}
               >
                 <Trash2 size={IconSize.sm} color={colors.red} />
               </TouchableOpacity>
@@ -187,7 +203,8 @@ const LogementMembersSection: React.FC<Props> = ({ logementId, isAdmin, role }) 
         role={role}
         existingUserIds={items.map((m) => m.user_id)}
         onClose={() => setAddOpen(false)}
-        title={labels.pickerTitle}
+        title={t(keys.pickerTitle)}
+        searchPlaceholder={t(keys.searchPlaceholder)}
       />
 
       <MemberContactSheet
@@ -230,6 +247,7 @@ function AddMemberModal({
   existingUserIds,
   onClose,
   title,
+  searchPlaceholder,
 }: {
   visible: boolean;
   logementId: string;
@@ -237,10 +255,12 @@ function AddMemberModal({
   existingUserIds: string[];
   onClose: () => void;
   title: string;
+  searchPlaceholder: string;
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const { t } = useTranslation();
   const allUsers = useAllUsers();
   const add = useAddMember();
   const [search, setSearch] = useState('');
@@ -282,7 +302,10 @@ function AddMemberModal({
       setSearch('');
       onClose();
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.unknownError'),
+      });
     }
   };
 
@@ -309,7 +332,7 @@ function AddMemberModal({
             <Search size={16} color={colors.placeholder} />
             <TextInput
               style={[sheetStyles.searchInput, { color: colors.text }]}
-              placeholder={role === 'prestataire' ? 'Rechercher un prestataire…' : 'Rechercher un responsable…'}
+              placeholder={searchPlaceholder}
               placeholderTextColor={colors.placeholder}
               value={search}
               onChangeText={setSearch}
@@ -332,9 +355,9 @@ function AddMemberModal({
               ListEmptyComponent={
                 <Text style={[sheetStyles.empty, { color: colors.mutedText }]}>
                   {search
-                    ? 'Aucun résultat.'
+                    ? t('members.noResult')
                     : available.length === 0
-                      ? 'Aucun candidat disponible.'
+                      ? t('members.noCandidate')
                       : ''}
                 </Text>
               }
@@ -396,6 +419,7 @@ export function MemberContactSheet({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const [copiedField, setCopiedField] = useState<'email' | 'phone' | null>(null);
 
   const copy = async (value: string, field: 'email' | 'phone') => {
@@ -460,10 +484,10 @@ export function MemberContactSheet({
                     style={{ color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semibold }}
                   >
                     {member.role === 'prestataire'
-                      ? 'Prestataire'
+                      ? t('collab.role.prestataire')
                       : member.role === 'manager'
-                        ? 'Responsable'
-                        : 'Client propriétaire'}
+                        ? t('members.role.manager')
+                        : t('members.role.client_proprietaire')}
                   </Text>
                 </View>
               </View>
@@ -471,12 +495,12 @@ export function MemberContactSheet({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={[contactStyles.sectionLabel, { color: colors.text2 }]}>CONTACT</Text>
+            <Text style={[contactStyles.sectionLabel, { color: colors.text2 }]}>{t('members.contactSection')}</Text>
 
             {member.email ? (
               <ContactRow
                 icon={<Mail size={IconSize.md} color={colors.primary} />}
-                label="Email"
+                label={t('auth.email')}
                 value={member.email}
                 accent={colors.primary}
                 onPress={() => Linking.openURL(`mailto:${member.email}`)}
@@ -488,7 +512,7 @@ export function MemberContactSheet({
             {member.phone ? (
               <ContactRow
                 icon={<Phone size={IconSize.md} color="#059669" />}
-                label="Téléphone"
+                label={t('auth.phone')}
                 value={member.phone}
                 accent="#059669"
                 onPress={() => Linking.openURL(`tel:${member.phone}`)}
@@ -505,7 +529,7 @@ export function MemberContactSheet({
               >
                 <Pencil size={IconSize.md} color={colors.primary} />
                 <Text style={{ color: colors.primary, fontSize: FontSize.base, fontWeight: FontWeight.medium }}>
-                  Gérer les permissions
+                  {t('members.managePermissions')}
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -517,7 +541,7 @@ export function MemberContactSheet({
               >
                 <Trash2 size={IconSize.md} color={colors.red} />
                 <Text style={{ color: colors.red, fontSize: FontSize.base, fontWeight: FontWeight.medium }}>
-                  Retirer du logement
+                  {t('members.removeFromLogement')}
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -549,6 +573,7 @@ function ContactRow({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   return (
     <TouchableOpacity
       style={[
@@ -577,7 +602,7 @@ function ContactRow({
           },
         ]}
         onPress={onCopy}
-        accessibilityLabel="Copier"
+        accessibilityLabel={t('common.copy')}
       >
         {copied ? (
           <Check size={IconSize.sm} color={colors.green} />
@@ -595,23 +620,23 @@ function ContactRow({
 
 const PERMISSION_TOGGLES: {
   key: 'can_view_prestataires' | 'can_view_responsables' | 'can_view_clients';
-  label: string;
-  desc: string;
+  label: TranslationKeys;
+  desc: TranslationKeys;
 }[] = [
   {
     key: 'can_view_prestataires',
-    label: 'Voir les autres prestataires',
-    desc: 'Liste les prestataires affiliés à ce logement.',
+    label: 'members.perm.viewPrestataires',
+    desc: 'members.perm.viewPrestatairesDesc',
   },
   {
     key: 'can_view_responsables',
-    label: 'Voir les responsables',
-    desc: 'Liste les managers / responsables de ce logement.',
+    label: 'members.perm.viewResponsables',
+    desc: 'members.perm.viewResponsablesDesc',
   },
   {
     key: 'can_view_clients',
-    label: 'Voir le client de facturation',
-    desc: 'Affiche le client (facturation) attaché au logement.',
+    label: 'members.perm.viewClients',
+    desc: 'members.perm.viewClientsDesc',
   },
 ];
 
@@ -627,6 +652,7 @@ function MemberPermissionsModal({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
   const update = useUpdateMember();
   // On lit la version FRAÎCHE du member depuis la query — quand le mutation
   // invalide le cache, la liste se rafraîchit et on récupère les nouveaux
@@ -664,7 +690,7 @@ function MemberPermissionsModal({
           </View>
           <View style={sheetStyles.header}>
             <View style={{ flex: 1 }}>
-              <Text style={[sheetStyles.title, { color: colors.text }]}>Permissions</Text>
+              <Text style={[sheetStyles.title, { color: colors.text }]}>{t('members.permissionsTitle')}</Text>
               <Text style={{ color: colors.mutedText, fontSize: FontSize.sm, marginTop: 2 }}>
                 {[liveMember.first_name, liveMember.last_name].filter(Boolean).join(' ') ||
                   liveMember.email}
@@ -673,7 +699,7 @@ function MemberPermissionsModal({
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={[contactStyles.sectionLabel, { color: colors.text2 }]}>QUOI VOIR ?</Text>
+            <Text style={[contactStyles.sectionLabel, { color: colors.text2 }]}>{t('members.permissionsSection')}</Text>
 
             {PERMISSION_TOGGLES.map((p) => {
               const value = !!liveMember[p.key];
@@ -683,10 +709,10 @@ function MemberPermissionsModal({
                     <Text
                       style={{ color: colors.text, fontSize: FontSize.base, fontWeight: FontWeight.medium }}
                     >
-                      {p.label}
+                      {t(p.label)}
                     </Text>
                     <Text style={{ color: colors.mutedText, fontSize: FontSize.xs, marginTop: 2 }}>
-                      {p.desc}
+                      {t(p.desc)}
                     </Text>
                   </View>
                   <Switch

@@ -16,18 +16,21 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useMenages, useRestoreMenage } from '@/api/hooks/useMenages';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDialog } from '@/contexts/DialogContext';
-import { prestationTypeLabel, prestationTypeColorKey } from '@/api/types';
+import { prestationTypeColorKey } from '@/api/types';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
+import { INTL_LOCALES } from '@/i18n/runtime';
 import type { Menage } from '@/api/types';
 import { formatDateFr } from '@/lib/date-fr';
 import { PAST_WINDOW_DAYS, ymdLocal } from '@/lib/prestations';
 
 type HistFilter = 'all' | 'valide' | 'annule' | 'untreated';
 
-const FILTERS: { key: HistFilter; label: string }[] = [
-  { key: 'all', label: 'Tous' },
-  { key: 'valide', label: 'Validés' },
-  { key: 'annule', label: 'Annulés' },
-  { key: 'untreated', label: 'Non traitées' },
+const FILTERS: { key: HistFilter; label: TranslationKeys }[] = [
+  { key: 'all', label: 'common.all' },
+  { key: 'valide', label: 'historique.filterValidated' },
+  { key: 'annule', label: 'historique.filterCancelled' },
+  { key: 'untreated', label: 'historique.filterUntreated' },
 ];
 
 /** Non clôturée (jamais validée / jamais pointée) : « oubliée », rangée ici passé
@@ -47,6 +50,7 @@ export default function HistoriqueList() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const { confirm } = useDialog();
+  const { t, locale } = useTranslation();
   const [filter, setFilter] = useState<HistFilter>('all');
   // Un mois à la fois : l'Historique grandit sans fin, une fenêtre glissante le
   // garde lisible (et sous la limite de 200 lignes par appel de l'API).
@@ -58,9 +62,9 @@ export default function HistoriqueList() {
     return {
       from: ymdLocal(first),
       to: ymdLocal(last),
-      label: first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+      label: new Intl.DateTimeFormat(INTL_LOCALES[locale], { month: 'long', year: 'numeric' }).format(first),
     };
-  }, [monthOffset]);
+  }, [monthOffset, locale]);
   // Au-delà de la fenêtre du chip « Passées », une non clôturée est « oubliée » :
   // elle apparaît ici (étiquette « Non traitée ») au lieu de disparaître.
   const staleBefore = useMemo(() => {
@@ -96,9 +100,9 @@ export default function HistoriqueList() {
 
   const handleRestore = async (m: Menage) => {
     const ok = await confirm({
-      title: 'Remettre cette prestation ?',
-      message: 'Elle repassera en « à venir » et la synchronisation la reprendra normalement.',
-      confirmLabel: 'Remettre',
+      title: t('historique.restoreTitle'),
+      message: t('historique.restoreBody'),
+      confirmLabel: t('historique.restore'),
     });
     if (ok) await restore.mutateAsync(m.id);
   };
@@ -121,7 +125,7 @@ export default function HistoriqueList() {
             </Text>
             <View style={[styles.typeTag, { backgroundColor: typeColor + '20' }]}>
               <Text style={[styles.typeTagText, { color: typeColor }]}>
-                {prestationTypeLabel(item.prestation_type)}
+                {t(`prestationType.${item.prestation_type ?? 'menage'}` as TranslationKeys)}
               </Text>
             </View>
           </View>
@@ -134,15 +138,15 @@ export default function HistoriqueList() {
           <View style={styles.row}>
             <Text style={[styles.status, { color: statusColor }]}>
               {item.status === 'valide'
-                ? 'Validé'
+                ? t('menage.statusValidated')
                 : untreated
                   ? item.status === 'termine'
-                    ? 'Non traitée · à valider'
-                    : 'Non traitée · jamais pointée'
-                  : 'Annulé'}
+                    ? t('historique.untreatedToValidate')
+                    : t('historique.untreatedNeverClocked')
+                  : t('menage.statusCancelled')}
             </Text>
             {isRetired ? (
-              <Text style={[styles.retiredTag, { color: colors.mutedText }]}>· Retirée (auto)</Text>
+              <Text style={[styles.retiredTag, { color: colors.mutedText }]}>{t('historique.retiredAuto')}</Text>
             ) : null}
           </View>
         </View>
@@ -154,7 +158,7 @@ export default function HistoriqueList() {
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <RotateCcw size={14} color={colors.primary} />
-            <Text style={[styles.restoreText, { color: colors.primary }]}>Remettre</Text>
+            <Text style={[styles.restoreText, { color: colors.primary }]}>{t('historique.restore')}</Text>
           </TouchableOpacity>
         ) : null}
       </TouchableOpacity>
@@ -179,7 +183,7 @@ export default function HistoriqueList() {
               ]}
             >
               <Text style={[styles.chipText, { color: active ? colors.primary : colors.text2 }]}>
-                {f.label}
+                {t(f.label)}
               </Text>
             </TouchableOpacity>
           );
@@ -190,7 +194,7 @@ export default function HistoriqueList() {
         <TouchableOpacity
           onPress={() => setMonthOffset((o) => o - 1)}
           style={[styles.monthNavBtn, { backgroundColor: colors.itemBackground }]}
-          accessibilityLabel="Mois précédent"
+          accessibilityLabel={t('historique.prevMonth')}
         >
           <ChevronLeft size={IconSize.md} color={colors.text} />
         </TouchableOpacity>
@@ -201,13 +205,13 @@ export default function HistoriqueList() {
           onPress={() => setMonthOffset((o) => o + 1)}
           style={[styles.monthNavBtn, { backgroundColor: colors.itemBackground }]}
           disabled={monthOffset >= 0}
-          accessibilityLabel="Mois suivant"
+          accessibilityLabel={t('historique.nextMonth')}
         >
           <ChevronRight size={IconSize.md} color={monthOffset >= 0 ? colors.mutedText : colors.text} />
         </TouchableOpacity>
         {monthOffset !== 0 ? (
           <TouchableOpacity onPress={() => setMonthOffset(0)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={[styles.monthNavToday, { color: colors.primary }]}>Ce mois</Text>
+            <Text style={[styles.monthNavToday, { color: colors.primary }]}>{t('historique.thisMonth')}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -225,7 +229,7 @@ export default function HistoriqueList() {
           ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
           ListEmptyComponent={
             <Text style={{ color: colors.mutedText, textAlign: 'center', marginTop: Spacing.xl }}>
-              {filter === 'untreated' ? 'Aucune prestation non traitée ce mois-ci.' : 'Aucune prestation clôturée ce mois-ci.'}
+              {filter === 'untreated' ? t('historique.emptyUntreated') : t('historique.emptyClosed')}
             </Text>
           }
           refreshControl={

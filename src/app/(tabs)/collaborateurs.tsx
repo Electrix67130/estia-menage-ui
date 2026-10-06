@@ -19,15 +19,17 @@ import AppHeader from '@/components/AppHeader';
 import SearchBar from '@/components/SearchBar';
 import { useRouter } from 'expo-router';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 
 const ROLE_COLORS: Record<string, string> = {
   admin: '#2563EB',
   prestataire: '#0891B2',
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: 'Admin',
-  prestataire: 'Prestataire',
+const ROLE_KEYS: Record<string, TranslationKeys> = {
+  admin: 'collab.role.admin',
+  prestataire: 'collab.role.prestataire',
 };
 
 type Tab = 'members' | 'clients';
@@ -45,6 +47,8 @@ export default function CollaborateursScreen() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const dialog = useDialog();
+  const { t } = useTranslation();
+  const roleLabel = (role: string): string => (ROLE_KEYS[role] ? t(ROLE_KEYS[role]) : role);
 
   const usersQuery = useAllUsers();
   const invitationsQuery = useInvitations();
@@ -96,9 +100,9 @@ export default function CollaborateursScreen() {
       await createInvitation.mutateAsync({ email: inviteEmail.trim(), role: inviteRole });
       setShowInviteModal(false);
       setInviteEmail('');
-      void dialog.alert({ title: 'Invitation envoyée', message: `${inviteEmail.trim()} recevra un email.` });
+      void dialog.alert({ title: t('collab.inviteSentTitle'), message: t('collab.inviteSentBody', { email: inviteEmail.trim() }) });
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Envoi impossible' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('collab.sendFailed') });
     }
   };
 
@@ -119,16 +123,16 @@ export default function CollaborateursScreen() {
   const handleResendInvite = async (id: string, email: string) => {
     try {
       await resendInvitation.mutateAsync(id);
-      void dialog.alert({ title: 'Invitation renvoyée', message: `${email} va recevoir un nouvel email.` });
+      void dialog.alert({ title: t('collab.inviteResentTitle'), message: t('collab.inviteResentBody', { email }) });
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Renvoi impossible' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('collab.resendFailed') });
     }
   };
 
   const handleCancelInvite = async (id: string, email: string) => {
     const ok = await dialog.confirm({
-      title: "Annuler l'invitation ?",
-      message: `L'invitation de ${email} sera supprimée.`,
+      title: t('collab.cancelInviteTitle'),
+      message: t('collab.cancelInviteBody', { email }),
     });
     if (!ok) return;
     await cancelInvitation.mutateAsync(id);
@@ -137,7 +141,7 @@ export default function CollaborateursScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <AppHeader>
-        <Text style={[styles.title, { color: colors.text }]}>Équipe</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('collab.title')}</Text>
         {isAdmin ? (
           tab === 'members' ? (
             <TouchableOpacity
@@ -145,7 +149,7 @@ export default function CollaborateursScreen() {
               onPress={() => setShowInviteModal(true)}
             >
               <UserPlus size={IconSize.sm} color="#FFFFFF" />
-              <Text style={styles.inviteBtnText}>Inviter</Text>
+              <Text style={styles.inviteBtnText}>{t('collab.invite')}</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -153,7 +157,7 @@ export default function CollaborateursScreen() {
               onPress={() => router.push('/client/create' as never)}
             >
               <Plus size={IconSize.sm} color="#FFFFFF" />
-              <Text style={styles.inviteBtnText}>Nouveau</Text>
+              <Text style={styles.inviteBtnText}>{t('collab.new')}</Text>
             </TouchableOpacity>
           )
         ) : null}
@@ -162,18 +166,18 @@ export default function CollaborateursScreen() {
       <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm, gap: Spacing.sm }}>
         <View style={[styles.tabRow, { backgroundColor: colors.itemBackground }]}>
           {([
-            { key: 'members', label: 'Membres' },
-            ...(isAdmin ? [{ key: 'clients' as Tab, label: 'Clients' }] : []),
-          ] as { key: Tab; label: string }[]).map((t) => {
-            const active = tab === t.key;
+            { key: 'members', label: t('collab.tabMembers') },
+            ...(isAdmin ? [{ key: 'clients' as Tab, label: t('collab.tabClients') }] : []),
+          ] as { key: Tab; label: string }[]).map((tabItem) => {
+            const active = tab === tabItem.key;
             return (
               <TouchableOpacity
-                key={t.key}
+                key={tabItem.key}
                 style={[
                   styles.tabBtn,
                   { backgroundColor: active ? colors.surface : 'transparent' },
                 ]}
-                onPress={() => setTab(t.key)}
+                onPress={() => setTab(tabItem.key)}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
               >
@@ -183,13 +187,13 @@ export default function CollaborateursScreen() {
                     { color: active ? colors.text : colors.mutedText, fontWeight: active ? FontWeight.semibold : FontWeight.medium },
                   ]}
                 >
-                  {t.label}
+                  {tabItem.label}
                 </Text>
               </TouchableOpacity>
             );
           })}
         </View>
-        <SearchBar value={search} onChangeText={setSearch} placeholder="Rechercher…" />
+        <SearchBar value={search} onChangeText={setSearch} placeholder={t('collab.searchPlaceholder')} />
       </View>
 
       {tab === 'members' ? (
@@ -207,7 +211,7 @@ export default function CollaborateursScreen() {
               isAdmin && pendingInvites.length > 0 ? (
                 <View style={{ marginBottom: Spacing.lg, gap: Spacing.sm }}>
                   <Text style={[styles.inviteSectionTitle, { color: colors.mutedText }]}>
-                    INVITATIONS EN ATTENTE
+                    {t('collab.pendingInvites')}
                   </Text>
                   {pendingInvites.map((inv) => (
                     <View
@@ -220,21 +224,21 @@ export default function CollaborateursScreen() {
                           {inv.email}
                         </Text>
                         <Text style={[styles.inviteRole, { color: colors.mutedText }]}>
-                          {ROLE_LABELS[inv.role] || inv.role}
+                          {roleLabel(inv.role)}
                         </Text>
                       </View>
                       <TouchableOpacity
                         onPress={() => handleResendInvite(inv.id, inv.email)}
                         disabled={resendInvitation.isPending}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        accessibilityLabel="Renvoyer l'invitation"
+                        accessibilityLabel={t('collab.resendInvite')}
                       >
                         <RefreshCw size={IconSize.md} color={colors.primary} />
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => handleCancelInvite(inv.id, inv.email)}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                        accessibilityLabel="Annuler l'invitation"
+                        accessibilityLabel={t('collab.cancelInvite')}
                       >
                         <Trash2 size={IconSize.md} color={colors.red} />
                       </TouchableOpacity>
@@ -245,7 +249,7 @@ export default function CollaborateursScreen() {
             }
             ListEmptyComponent={
               <Text style={{ color: colors.mutedText, textAlign: 'center', marginTop: Spacing.xl }}>
-                Aucun membre.
+                {t('collab.noMembers')}
               </Text>
             }
             refreshControl={
@@ -281,7 +285,7 @@ export default function CollaborateursScreen() {
                   </View>
                   <View style={[styles.roleBadge, { backgroundColor: roleColor + '15' }]}>
                     <Text style={[styles.roleText, { color: roleColor }]}>
-                      {ROLE_LABELS[item.role] || item.role}
+                      {roleLabel(item.role)}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -301,7 +305,7 @@ export default function CollaborateursScreen() {
           ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
           ListEmptyComponent={
             <Text style={{ color: colors.mutedText, textAlign: 'center', marginTop: Spacing.xl }}>
-              Aucun client. {isAdmin ? 'Crée-en un avec le bouton Nouveau.' : ''}
+              {isAdmin ? `${t('collab.noClients')} ${t('collab.noClientsAdminHint')}` : t('collab.noClients')}
             </Text>
           }
           refreshControl={
@@ -329,7 +333,7 @@ export default function CollaborateursScreen() {
                 </Text>
               </View>
               <View style={[styles.roleBadge, { backgroundColor: '#0EA5E9' + '15' }]}>
-                <Text style={[styles.roleText, { color: '#0EA5E9' }]}>Client</Text>
+                <Text style={[styles.roleText, { color: '#0EA5E9' }]}>{t('collab.role.client')}</Text>
               </View>
             </TouchableOpacity>
           )}
@@ -349,18 +353,18 @@ export default function CollaborateursScreen() {
               ]}
             >
               <SheetHandle gesture={inviteSwipe.gesture} />
-              <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.sm }]}>Inviter un collaborateur</Text>
-            <Text style={[styles.label, { color: colors.text2 }]}>Email</Text>
+              <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.sm }]}>{t('collab.inviteTitle')}</Text>
+            <Text style={[styles.label, { color: colors.text2 }]}>{t('auth.email')}</Text>
             <TextInput
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
               value={inviteEmail}
               onChangeText={setInviteEmail}
-              placeholder="nom@exemple.fr"
+              placeholder={t('collab.emailPlaceholder')}
               placeholderTextColor={colors.placeholder}
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            <Text style={[styles.label, { color: colors.text2 }]}>Rôle</Text>
+            <Text style={[styles.label, { color: colors.text2 }]}>{t('collab.role')}</Text>
             <View style={styles.rolePicker}>
               {(['admin', 'prestataire'] as const).map((r) => (
                 <TouchableOpacity
@@ -375,7 +379,7 @@ export default function CollaborateursScreen() {
                   onPress={() => setInviteRole(r)}
                 >
                   <Text style={{ color: inviteRole === r ? ROLE_COLORS[r] : colors.text2 }}>
-                    {ROLE_LABELS[r]}
+                    {roleLabel(r)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -387,7 +391,7 @@ export default function CollaborateursScreen() {
             >
               <Mail size={IconSize.md} color="#FFFFFF" />
               <Text style={styles.submitText}>
-                {createInvitation.isPending ? 'Envoi…' : "Envoyer l'invitation"}
+                {createInvitation.isPending ? t('collab.sending') : t('collab.sendInvite')}
               </Text>
             </TouchableOpacity>
             </Animated.View>
@@ -425,7 +429,7 @@ const styles = StyleSheet.create({
   avatarImage: { width: 44, height: 44, borderRadius: 22 },
   avatarText: { fontWeight: FontWeight.bold, fontSize: FontSize.md },
   info: { flex: 1 },
-  inviteSectionTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, letterSpacing: 0.5 },
+  inviteSectionTitle: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold, letterSpacing: 0.5, textTransform: 'uppercase' },
   inviteCard: {
     flexDirection: 'row',
     alignItems: 'center',

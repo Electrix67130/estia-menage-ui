@@ -11,17 +11,9 @@ import type { MenageStatus } from '@/api/types';
 const STATUS_KEYS: Record<MenageStatus, TranslationKeys> = {
   a_venir: 'menage.statusUpcoming',
   en_cours: 'menage.statusInProgress',
-  termine: 'menage.statusCompleted',
-  valide: 'menage.statusUpcoming',
-  annule: 'menage.statusUpcoming',
-};
-
-const STATUS_LABELS: Record<MenageStatus, string> = {
-  a_venir: 'À venir',
-  en_cours: 'En cours',
-  termine: 'À valider',
-  valide: 'Validé',
-  annule: 'Annulé',
+  termine: 'menage.statusToValidate',
+  valide: 'menage.statusValidated',
+  annule: 'menage.statusCancelled',
 };
 
 interface Props {
@@ -54,7 +46,7 @@ const StatusBadge: React.FC<Props> = ({ status }) => {
       ) : (
         <View style={[styles.dot, { backgroundColor: badgeColor }]} />
       )}
-      <Text style={[styles.text, { color: badgeColor }]}>{STATUS_LABELS[status]}</Text>
+      <Text style={[styles.text, { color: badgeColor }]}>{t(STATUS_KEYS[status])}</Text>
     </View>
   );
 };

@@ -18,6 +18,7 @@ import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/const
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
 import {
   useLogementCodes,
   useCodeLabelSuggestions,
@@ -43,6 +44,7 @@ interface Props {
 const LogementCodesSection: React.FC<Props> = ({ logementId, isAdmin }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const codes = useLogementCodes(logementId);
   const [editing, setEditing] = useState<{ item: LogementCode | null } | null>(null);
 
@@ -54,9 +56,9 @@ const LogementCodesSection: React.FC<Props> = ({ logementId, isAdmin }) => {
     <View style={styles.wrap}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.title, { color: colors.text2 }]}>CODES D&apos;ACCÈS</Text>
+          <Text style={[styles.title, { color: colors.text2 }]}>{t('logementCodes.title').toUpperCase()}</Text>
           <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-            Boîte à clés, portail, alarme… un libellé par code.
+            {t('logementCodes.subtitle')}
           </Text>
         </View>
       </View>
@@ -68,7 +70,7 @@ const LogementCodesSection: React.FC<Props> = ({ logementId, isAdmin }) => {
       ) : list.length === 0 ? (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={{ color: colors.mutedText, textAlign: 'center' }}>
-            Aucun code d&apos;accès renseigné.
+            {t('logementCodes.empty')}
           </Text>
         </View>
       ) : (
@@ -89,7 +91,7 @@ const LogementCodesSection: React.FC<Props> = ({ logementId, isAdmin }) => {
         >
           <Plus size={IconSize.sm} color={colors.primary} />
           <Text style={{ color: colors.primary, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
-            Ajouter un code
+            {t('logementCodes.add')}
           </Text>
         </TouchableOpacity>
       ) : null}
@@ -117,6 +119,7 @@ function CodeRow({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const [revealed, setRevealed] = useState(false);
 
   return (
@@ -149,7 +152,7 @@ function CodeRow({
         onPress={() => setRevealed((v) => !v)}
         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         accessibilityRole="button"
-        accessibilityLabel={revealed ? 'Masquer le code' : 'Révéler le code'}
+        accessibilityLabel={revealed ? t('logementCodes.hide') : t('logementCodes.reveal')}
       >
         {revealed ? (
           <EyeOff size={IconSize.md} color={colors.text2} />
@@ -175,6 +178,7 @@ function CodeEditModal({
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
+  const { t } = useTranslation();
   const suggestions = useCodeLabelSuggestions();
   const create = useCreateLogementCode(logementId);
   const update = useUpdateLogementCode(logementId);
@@ -189,11 +193,11 @@ function CodeEditModal({
 
   const handleSave = async () => {
     if (!label.trim()) {
-      void dialog.alert({ title: 'Libellé requis', message: 'Donne un libellé au code.' });
+      void dialog.alert({ title: t('logementCodes.labelRequiredTitle'), message: t('logementCodes.labelRequiredBody') });
       return;
     }
     if (!code.trim()) {
-      void dialog.alert({ title: 'Code requis', message: 'Saisis le code.' });
+      void dialog.alert({ title: t('logementCodes.codeRequiredTitle'), message: t('logementCodes.codeRequiredBody') });
       return;
     }
     const body = { label: label.trim(), code: code.trim(), notes: notes.trim() || null };
@@ -203,8 +207,8 @@ function CodeEditModal({
       onClose();
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Enregistrement impossible',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.saveFailed'),
       });
     }
   };
@@ -212,9 +216,9 @@ function CodeEditModal({
   const handleDelete = async () => {
     if (!item) return;
     const ok = await dialog.confirm({
-      title: 'Supprimer ce code ?',
-      message: `« ${item.label} » sera supprimé.`,
-      confirmLabel: 'Supprimer',
+      title: t('logementCodes.deleteTitle'),
+      message: t('logementCodes.deleteBody', { label: item.label }),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -223,8 +227,8 @@ function CodeEditModal({
       onClose();
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Suppression impossible',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.deleteFailed'),
       });
     }
   };
@@ -245,11 +249,11 @@ function CodeEditModal({
             <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <Text style={[sheetStyles.title, { color: colors.text }]}>
-            {item ? 'Modifier le code' : 'Nouveau code'}
+            {item ? t('logementCodes.edit') : t('logementCodes.new')}
           </Text>
 
           <ScrollView keyboardShouldPersistTaps="handled">
-            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>LIBELLÉ</Text>
+            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('logementCodes.labelField').toUpperCase()}</Text>
             <TextInput
               style={[
                 sheetStyles.input,
@@ -257,7 +261,7 @@ function CodeEditModal({
               ]}
               value={label}
               onChangeText={setLabel}
-              placeholder="Ex : Portail"
+              placeholder={t('logementCodes.labelPlaceholder')}
               placeholderTextColor={colors.placeholder}
               maxLength={100}
             />
@@ -285,7 +289,7 @@ function CodeEditModal({
               })}
             </View>
 
-            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>CODE</Text>
+            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('logementCodes.codeField').toUpperCase()}</Text>
             <TextInput
               style={[
                 sheetStyles.input,
@@ -293,14 +297,14 @@ function CodeEditModal({
               ]}
               value={code}
               onChangeText={setCode}
-              placeholder="Ex : 1984"
+              placeholder={t('logementCodes.codePlaceholder')}
               placeholderTextColor={colors.placeholder}
               autoCapitalize="characters"
               autoCorrect={false}
               maxLength={100}
             />
 
-            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>NOTES (OPTIONNEL)</Text>
+            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('logementCodes.notesField').toUpperCase()}</Text>
             <TextInput
               style={[
                 sheetStyles.input,
@@ -308,7 +312,7 @@ function CodeEditModal({
               ]}
               value={notes}
               onChangeText={setNotes}
-              placeholder="Ex : à gauche de la porte"
+              placeholder={t('logementCodes.notesPlaceholder')}
               placeholderTextColor={colors.placeholder}
             />
           </ScrollView>
@@ -321,7 +325,7 @@ function CodeEditModal({
             {saving ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={sheetStyles.submitText}>Enregistrer</Text>
+              <Text style={sheetStyles.submitText}>{t('common.save')}</Text>
             )}
           </TouchableOpacity>
 
@@ -333,7 +337,7 @@ function CodeEditModal({
             >
               <Trash2 size={IconSize.sm} color={colors.red} />
               <Text style={{ color: colors.red, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
-                Supprimer
+                {t('common.delete')}
               </Text>
             </TouchableOpacity>
           ) : null}

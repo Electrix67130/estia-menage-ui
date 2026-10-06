@@ -12,6 +12,7 @@ import { useUnreadCounts, useMarkTabViewed } from '@/api/hooks/useMenageViews';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Comment } from '@/api/types';
 import { formatDateFr } from '@/lib/date-fr';
+import { useTranslation } from '@/contexts/I18nContext';
 
 type CommentWithAuthor = Comment & { first_name: string; last_name: string; avatar_url?: string };
 
@@ -35,6 +36,7 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   const { data, isLoading, refetch, isRefetching } = useComments(menageId, sectionFilter);
   const createMutation = useCreateComment();
@@ -132,11 +134,7 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
     setEditText('');
   }, [selectedComment, editText, updateMutation]);
 
-  const formatTime = (date: string) => {
-    const day = formatDateFr(date, 'dayShort');
-    const time = formatDateFr(date, 'time');
-    return `${day} à ${time}`;
-  };
+  const formatTime = (date: string) => formatDateFr(date, 'dayShortTime');
 
   const renderItem = useCallback(
     ({ item }: { item: CommentWithAuthor }) => {
@@ -159,11 +157,11 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
               {isUnread ? (
                 <View
                   style={[styles.unreadDot, { backgroundColor: colors.red }]}
-                  accessibilityLabel="Nouveau message non lu"
+                  accessibilityLabel={t('comments.unreadA11y')}
                 />
               ) : null}
               <Text style={[styles.author, { color: colors.primary }]}>
-                {isOwn ? 'Vous' : `${item.first_name} ${item.last_name}`}
+                {isOwn ? t('comments.you') : `${item.first_name} ${item.last_name}`}
               </Text>
             </View>
             <Text style={[styles.time, { color: colors.mutedText }]}>{formatTime(item.created_at)}</Text>
@@ -172,7 +170,7 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
         </TouchableOpacity>
       );
     },
-    [user, colors, readThreshold],
+    [user, colors, readThreshold, readonly, t],
   );
 
   return (
@@ -206,7 +204,7 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
             }
             ListEmptyComponent={
               !isLoading ? (
-                <Text style={[styles.empty, { color: colors.mutedText }]}>Aucun commentaire pour le moment.</Text>
+                <Text style={[styles.empty, { color: colors.mutedText }]}>{t('comments.empty')}</Text>
               ) : null
             }
           />
@@ -215,21 +213,21 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
         {!readonly && <View style={[styles.inputRow, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <TextInput
             style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
-            placeholder="Écrire un commentaire..."
+            placeholder={t('comments.placeholder')}
             placeholderTextColor={colors.placeholder}
             value={text}
             onChangeText={setText}
             onFocus={onInputFocus}
             onBlur={onInputBlur}
             multiline
-            accessibilityLabel="Écrire un commentaire"
+            accessibilityLabel={t('comments.writeA11y')}
           />
           <TouchableOpacity
             style={[styles.sendBtn, { backgroundColor: text.trim() ? colors.primary : colors.itemBackground }]}
             onPress={handleSend}
             disabled={!text.trim() || createMutation.isPending}
             accessibilityRole="button"
-            accessibilityLabel="Envoyer"
+            accessibilityLabel={t('common.send')}
           >
             <Send size={IconSize.md} color={text.trim() ? '#FFFFFF' : colors.mutedText} />
           </TouchableOpacity>
@@ -249,12 +247,12 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
 
                 <TouchableOpacity style={styles.actionRow} onPress={handleStartEdit}>
                   <Pencil size={IconSize.lg} color={colors.primary} />
-                  <Text style={[styles.actionLabel, { color: colors.text }]}>Modifier</Text>
+                  <Text style={[styles.actionLabel, { color: colors.text }]}>{t('common.edit')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.actionRow} onPress={handleDelete}>
                   <Trash2 size={IconSize.lg} color={colors.red} />
-                  <Text style={[styles.actionLabel, { color: colors.red }]}>Supprimer</Text>
+                  <Text style={[styles.actionLabel, { color: colors.red }]}>{t('common.delete')}</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -267,7 +265,7 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
         <View style={styles.modalOverlay}>
           <Reanimated.View style={[styles.editSheet, { backgroundColor: colors.surface }, animatedEditModalStyle]}>
             <View style={styles.editHeader}>
-              <Text style={[styles.editTitle, { color: colors.text }]}>Modifier le commentaire</Text>
+              <Text style={[styles.editTitle, { color: colors.text }]}>{t('comments.editTitle')}</Text>
               <TouchableOpacity onPress={() => { setIsEditing(false); setSelectedComment(null); }} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <X size={IconSize.lg} color={colors.text} />
               </TouchableOpacity>
@@ -278,17 +276,17 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
               onChangeText={setEditText}
               multiline
               autoFocus
-              accessibilityLabel="Modifier le commentaire"
+              accessibilityLabel={t('comments.editTitle')}
             />
             <TouchableOpacity
               style={[styles.saveBtn, { backgroundColor: editText.trim() ? colors.primary : colors.itemBackground }]}
               onPress={handleSaveEdit}
               disabled={!editText.trim() || updateMutation.isPending}
               accessibilityRole="button"
-              accessibilityLabel="Sauvegarder"
+              accessibilityLabel={t('comments.save')}
             >
               <Text style={[styles.saveBtnText, { color: editText.trim() ? '#FFFFFF' : colors.mutedText }]}>
-                Sauvegarder
+                {t('comments.save')}
               </Text>
             </TouchableOpacity>
           </Reanimated.View>

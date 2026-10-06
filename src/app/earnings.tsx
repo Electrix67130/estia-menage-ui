@@ -24,14 +24,16 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, FontSize, FontWeight, Radius, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { formatDateFr, formatCurrencyFr } from '@/lib/date-fr';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 
 type Granularity = 'week' | 'month' | 'year' | 'all';
 
-const PERIOD_OPTIONS: { key: Granularity; label: string }[] = [
-  { key: 'week', label: 'Semaine' },
-  { key: 'month', label: 'Mois' },
-  { key: 'year', label: 'Année' },
-  { key: 'all', label: 'Tout' },
+const PERIOD_OPTIONS: { key: Granularity; labelKey: TranslationKeys }[] = [
+  { key: 'week', labelKey: 'earnings.period.week' },
+  { key: 'month', labelKey: 'earnings.period.month' },
+  { key: 'year', labelKey: 'earnings.period.year' },
+  { key: 'all', labelKey: 'earnings.period.all' },
 ];
 
 const ymd = (d: Date) =>
@@ -47,7 +49,7 @@ function computeRange(g: Granularity, offset: number): { from?: string; to?: str
     monday.setDate(now.getDate() - dow + offset * 7);
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
-    const f = (d: Date) => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    const f = (d: Date) => formatDateFr(d, 'dayShort');
     return { from: ymd(monday), to: ymd(sunday), label: `${f(monday)} – ${f(sunday)} ${sunday.getFullYear()}` };
   }
   if (g === 'month') {
@@ -56,7 +58,7 @@ function computeRange(g: Granularity, offset: number): { from?: string; to?: str
     return {
       from: ymd(first),
       to: ymd(last),
-      label: first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+      label: formatDateFr(first, 'month'),
     };
   }
   const y = now.getFullYear() + offset;
@@ -69,6 +71,7 @@ export default function EarningsScreen() {
   const colors = Colors[colorScheme];
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const { t, tp } = useTranslation();
   const [granularity, setGranularity] = usePersistedState<Granularity>(
     'earnings.filter.granularity',
     'month',
@@ -87,12 +90,12 @@ export default function EarningsScreen() {
           style={styles.backBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('common.back')}
         >
           <ArrowLeft size={IconSize.md} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]}>
-          {isAdmin ? 'Gains de l\'équipe' : 'Mes gains'}
+          {isAdmin ? t('earnings.teamTitle') : t('profile.myEarnings')}
         </Text>
       </View>
 
@@ -105,7 +108,7 @@ export default function EarningsScreen() {
         >
           <Wallet size={IconSize.lg} color="#fff" />
           <Text style={styles.totalLabel}>
-            {isAdmin ? "Total équipe (coût prestataire)" : 'Total période'}
+            {isAdmin ? t('earnings.teamTotal') : t('earnings.periodTotal')}
           </Text>
           {(isAdmin ? adminEarnings.isLoading : earnings.isLoading) ? (
             <ActivityIndicator color="#fff" />
@@ -118,8 +121,7 @@ export default function EarningsScreen() {
             </Text>
           )}
           <Text style={styles.totalCount}>
-            {(isAdmin ? adminEarnings.data?.count : earnings.data?.count) ?? 0} ménage
-            {((isAdmin ? adminEarnings.data?.count : earnings.data?.count) ?? 0) > 1 ? 's' : ''}
+            {tp('earnings.menageCount', (isAdmin ? adminEarnings.data?.count : earnings.data?.count) ?? 0)}
           </Text>
         </View>
 
@@ -148,7 +150,7 @@ export default function EarningsScreen() {
                   },
                 ]}
               >
-                {opt.label}
+                {t(opt.labelKey)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -159,7 +161,7 @@ export default function EarningsScreen() {
             <TouchableOpacity
               onPress={() => setPeriodOffset((o) => o - 1)}
               style={[styles.periodNavBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              accessibilityLabel="Période précédente"
+              accessibilityLabel={t('earnings.prevPeriod')}
             >
               <ChevronLeft size={IconSize.md} color={colors.text} />
             </TouchableOpacity>
@@ -169,13 +171,13 @@ export default function EarningsScreen() {
             <TouchableOpacity
               onPress={() => setPeriodOffset((o) => o + 1)}
               style={[styles.periodNavBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              accessibilityLabel="Période suivante"
+              accessibilityLabel={t('earnings.nextPeriod')}
             >
               <ChevronRight size={IconSize.md} color={colors.text} />
             </TouchableOpacity>
             {periodOffset !== 0 ? (
               <TouchableOpacity onPress={() => setPeriodOffset(0)} style={styles.periodNavToday}>
-                <Text style={[styles.periodNavTodayLabel, { color: colors.primary }]}>Aujourd&apos;hui</Text>
+                <Text style={[styles.periodNavTodayLabel, { color: colors.primary }]}>{t('common.today')}</Text>
               </TouchableOpacity>
             ) : null}
           </View>
@@ -191,7 +193,7 @@ export default function EarningsScreen() {
           />
         ) : (
           <>
-            <Text style={[styles.sectionTitle, { color: colors.text2 }]}>Détail</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('earnings.detail')}</Text>
             {earnings.isLoading ? (
               <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />
             ) : earnings.data && earnings.data.items.length > 0 ? (
@@ -211,16 +213,16 @@ export default function EarningsScreen() {
                       {item.validated_at ? (
                         <View style={styles.statusBadge}>
                           <CheckCircle2 size={12} color="#10b981" />
-                          <Text style={styles.statusLabel}>Validé</Text>
+                          <Text style={styles.statusLabel}>{t('menage.statusValidated')}</Text>
                         </View>
                       ) : (
                         <Text style={[styles.statusLabelMuted, { color: colors.mutedText }]}>
-                          {item.status === 'termine' ? 'Terminé' : item.status}
+                          {item.status === 'termine' ? t('menage.statusCompleted') : item.status}
                         </Text>
                       )}
                       {item.laundry_included ? (
                         <Text style={[styles.itemSub, { color: colors.mutedText }]}>
-                          · linge {formatCurrencyFr(item.laundry_provider_price)}
+                          {t('earnings.laundry', { amount: formatCurrencyFr(item.laundry_provider_price) })}
                         </Text>
                       ) : null}
                     </View>
@@ -232,7 +234,7 @@ export default function EarningsScreen() {
               ))
             ) : (
               <Text style={[styles.empty, { color: colors.mutedText }]}>
-                Aucun ménage sur cette période.
+                {t('earnings.emptyPeriod')}
               </Text>
             )}
           </>
@@ -265,6 +267,7 @@ function DetailSheet({
 }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { t, tp } = useTranslation();
   const visible = !!detail;
   const isClient = detail?.kind === 'client';
   const isPresta = detail?.kind === 'presta';
@@ -281,7 +284,7 @@ function DetailSheet({
     ? (clientReport.data?.menages ?? []).map((m) => ({
         id: m.id,
         date: m.date_prevue,
-        label: m.logement_name ?? m.logement_city ?? 'Logement',
+        label: m.logement_name ?? m.logement_city ?? t('earnings.logement'),
         subtotal:
           Number(m.validated_price ?? m.client_price_ht ?? 0) +
           (m.laundry_included ? Number(m.laundry_client_price_ht ?? 0) : 0),
@@ -317,14 +320,14 @@ function DetailSheet({
             {detail?.name}
           </Text>
           <Text style={{ color: colors.mutedText, fontSize: FontSize.xs, marginBottom: Spacing.sm }}>
-            {items.length} ménage{items.length > 1 ? 's' : ''} ·{' '}
+            {tp('earnings.menageCount', items.length)} ·{' '}
             {formatCurrencyFr(total, currency)}
           </Text>
           {loading ? (
             <ActivityIndicator color={colors.primary} style={{ padding: Spacing.lg }} />
           ) : items.length === 0 ? (
             <Text style={[styles.empty, { color: colors.mutedText }]}>
-              Aucun ménage sur cette période.
+              {t('earnings.emptyPeriod')}
             </Text>
           ) : (
             <ScrollView
@@ -382,6 +385,7 @@ function AdminBreakdown({
   onSelectClient: (b: { id: string; name: string }) => void;
   onSelectPresta: (b: { id: string; name: string }) => void;
 }) {
+  const { t, tp } = useTranslation();
   if (loading) {
     return <ActivityIndicator color={colors.primary} style={{ marginTop: Spacing.xl }} />;
   }
@@ -392,10 +396,10 @@ function AdminBreakdown({
     <>
       <View style={styles.breakdownHeader}>
         <Building2 size={IconSize.sm} color={colors.text2} />
-        <Text style={[styles.sectionTitle, { color: colors.text2, marginTop: 0 }]}>Par client</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text2, marginTop: 0 }]}>{t('earnings.byClient')}</Text>
       </View>
       {data.by_client.length === 0 ? (
-        <Text style={[styles.empty, { color: colors.mutedText }]}>Aucune donnée.</Text>
+        <Text style={[styles.empty, { color: colors.mutedText }]}>{t('earnings.noData')}</Text>
       ) : (
         data.by_client.map((b) => (
           <TouchableOpacity
@@ -410,7 +414,7 @@ function AdminBreakdown({
                 {b.name}
               </Text>
               <Text style={[styles.itemSub, { color: colors.mutedText }]}>
-                {b.count} ménage{b.count > 1 ? 's' : ''}
+                {tp('earnings.menageCount', b.count)}
               </Text>
             </View>
             <Text style={[styles.itemAmount, { color: colors.text }]}>
@@ -426,14 +430,14 @@ function AdminBreakdown({
       <View style={styles.breakdownHeader}>
         <UserIcon size={IconSize.sm} color={colors.text2} />
         <Text style={[styles.sectionTitle, { color: colors.text2, marginTop: 0 }]}>
-          Par prestataire
+          {t('earnings.byPresta')}
         </Text>
       </View>
       <Text style={[styles.hint, { color: colors.mutedText }]}>
-        Pour un ménage multi-prestataires, le coût est réparti à parts égales.
+        {t('earnings.multiPrestaHint')}
       </Text>
       {data.by_prestataire.length === 0 ? (
-        <Text style={[styles.empty, { color: colors.mutedText }]}>Aucune donnée.</Text>
+        <Text style={[styles.empty, { color: colors.mutedText }]}>{t('earnings.noData')}</Text>
       ) : (
         data.by_prestataire.map((b) => (
           <TouchableOpacity
@@ -447,7 +451,7 @@ function AdminBreakdown({
                 {b.name}
               </Text>
               <Text style={[styles.itemSub, { color: colors.mutedText }]}>
-                {Number.isInteger(b.count) ? b.count : b.count.toFixed(1)} ménage{b.count > 1 ? 's' : ''}
+                {tp('earnings.menageCount', b.count, { count: Number.isInteger(b.count) ? b.count : b.count.toFixed(1) })}
               </Text>
             </View>
             <Text style={[styles.itemAmount, { color: colors.text }]}>

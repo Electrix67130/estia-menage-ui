@@ -5,12 +5,14 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import type { MenageStatus } from '@/api/types';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 
 export type MenageFilter = MenageStatus | 'all' | 'to_validate' | 'past';
 
 interface Chip {
   key: MenageFilter;
-  label: string;
+  label: TranslationKeys;
 }
 
 /** Chip "picker" supplémentaire (logement / presta / créateur) : ouvre une feuille. */
@@ -29,11 +31,11 @@ export interface ExtraChip {
 // pointées) : elles ne traînent plus au fond de « Tous », qui ne montre que le
 // présent et le futur, mais restent à un tap.
 const CHIPS: Chip[] = [
-  { key: 'all', label: 'Tous' },
-  { key: 'a_venir', label: 'À venir' },
-  { key: 'en_cours', label: 'En cours' },
-  { key: 'to_validate', label: 'À valider' },
-  { key: 'past', label: 'Passées' },
+  { key: 'all', label: 'common.all' },
+  { key: 'a_venir', label: 'menage.statusUpcoming' },
+  { key: 'en_cours', label: 'menage.statusInProgress' },
+  { key: 'to_validate', label: 'menage.statusToValidate' },
+  { key: 'past', label: 'filters.past' },
 ];
 
 interface Props {
@@ -46,6 +48,7 @@ interface Props {
 const FilterChips: React.FC<Props> = ({ selected, onSelect, extra }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
 
   const getChipColor = (key: string) => {
     if (key === 'a_venir') return colors.statusAVenir;
@@ -74,11 +77,11 @@ const FilterChips: React.FC<Props> = ({ selected, onSelect, extra }) => {
             ]}
             onPress={() => onSelect(chip.key)}
             accessibilityRole="tab"
-            accessibilityLabel={chip.label}
+            accessibilityLabel={t(chip.label)}
             accessibilityState={{ selected: isActive }}
           >
             <Text style={[styles.chipText, { color: isActive ? chipColor : colors.text2 }]}>
-              {chip.label}
+              {t(chip.label)}
             </Text>
           </TouchableOpacity>
         );

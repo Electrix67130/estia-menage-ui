@@ -15,6 +15,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
 import { useLogementEquipements } from '@/api/hooks/useLogementEquipements';
 import {
   useMenageEquipements,
@@ -41,6 +42,7 @@ const MenageEquipementsSection: React.FC<Props> = ({ menageId, logementId, isAdm
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const { t } = useTranslation();
   const list = useMenageEquipements(menageId);
   const toggle = useToggleMenageEquipement(menageId);
   const [picking, setPicking] = useState(false);
@@ -60,8 +62,8 @@ const MenageEquipementsSection: React.FC<Props> = ({ menageId, logementId, isAdm
       });
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Action impossible',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('menageEquipements.actionFailed'),
       });
     }
   };
@@ -70,7 +72,8 @@ const MenageEquipementsSection: React.FC<Props> = ({ menageId, logementId, isAdm
     <View style={styles.wrap}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text2 }]}>
-          À PRÉPARER{items.length > 0 ? ` · ${doneCount}/${items.length}` : ''}
+          {t('menageEquipements.sectionTitle')}
+          {items.length > 0 ? ` · ${doneCount}/${items.length}` : ''}
         </Text>
         {isAdmin ? (
           <TouchableOpacity
@@ -79,7 +82,7 @@ const MenageEquipementsSection: React.FC<Props> = ({ menageId, logementId, isAdm
           >
             <Pencil size={IconSize.sm} color={colors.primary} />
             <Text style={{ color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.medium }}>
-              Modifier
+              {t('common.edit')}
             </Text>
           </TouchableOpacity>
         ) : null}
@@ -92,7 +95,7 @@ const MenageEquipementsSection: React.FC<Props> = ({ menageId, logementId, isAdm
       ) : items.length === 0 ? (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={{ color: colors.mutedText, textAlign: 'center' }}>
-            Rien à préparer. « Modifier » pour choisir dans l&apos;inventaire du logement.
+            {t('menageEquipements.empty')}
           </Text>
         </View>
       ) : (
@@ -129,7 +132,12 @@ const MenageEquipementsSection: React.FC<Props> = ({ menageId, logementId, isAdm
                 </Text>
                 {i.room_name || (done && i.done_by_first_name) ? (
                   <Text style={{ color: colors.mutedText, fontSize: FontSize.xs }}>
-                    {[i.room_name, done && i.done_by_first_name ? `préparé par ${i.done_by_first_name}` : null]
+                    {[
+                      i.room_name,
+                      done && i.done_by_first_name
+                        ? t('menageEquipements.preparedBy', { name: i.done_by_first_name })
+                        : null,
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </Text>
@@ -168,6 +176,7 @@ function EquipementsPickerModal({
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
+  const { t } = useTranslation();
   const inventory = useLogementEquipements(logementId);
   const save = useSetMenageEquipements(menageId);
   const [checked, setChecked] = useState<string[]>(
@@ -183,8 +192,8 @@ function EquipementsPickerModal({
       onClose();
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Enregistrement impossible',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.saveFailed'),
       });
     }
   };
@@ -205,17 +214,16 @@ function EquipementsPickerModal({
           <View style={sheetStyles.handle}>
             <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
           </View>
-          <Text style={[sheetStyles.title, { color: colors.text }]}>Équipements à préparer</Text>
+          <Text style={[sheetStyles.title, { color: colors.text }]}>{t('menageEquipements.pickerTitle')}</Text>
           <Text style={[sheetStyles.hint, { color: colors.mutedText }]}>
-            Coche ce que le prestataire doit préparer pour cette prestation.
+            {t('menageEquipements.pickerHint')}
           </Text>
 
           {inventory.isLoading ? (
             <ActivityIndicator color={colors.primary} style={{ marginVertical: Spacing.lg }} />
           ) : items.length === 0 ? (
             <Text style={{ color: colors.mutedText, marginVertical: Spacing.lg }}>
-              L&apos;inventaire de ce logement est vide. Ajoute d&apos;abord des équipements sur la
-              fiche logement.
+              {t('menageEquipements.inventoryEmpty')}
             </Text>
           ) : (
             <ScrollView style={{ maxHeight: 400 }}>
@@ -263,7 +271,8 @@ function EquipementsPickerModal({
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text style={sheetStyles.submitText}>
-                Enregistrer{checked.length > 0 ? ` (${checked.length})` : ''}
+                {t('common.save')}
+                {checked.length > 0 ? ` (${checked.length})` : ''}
               </Text>
             )}
           </TouchableOpacity>

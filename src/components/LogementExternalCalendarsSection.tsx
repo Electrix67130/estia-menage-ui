@@ -26,6 +26,7 @@ import {
   type ExternalCalendar,
 } from '@/api/hooks/useExternalCalendars';
 import { formatDateFr } from '@/lib/date-fr';
+import { useTranslation } from '@/contexts/I18nContext';
 
 /**
  * Section "Calendriers externes" sur la page logement (admin only).
@@ -41,11 +42,11 @@ interface Props {
   logementId: string;
 }
 
-const PROVIDER_LABELS: Record<ExternalCalendarProvider, string> = {
+/** Noms propres des plateformes ; le fournisseur iCal générique est traduit. */
+const PROVIDER_BRANDS: Record<Exclude<ExternalCalendarProvider, 'ical'>, string> = {
   airbnb: 'Airbnb',
   booking: 'Booking.com',
   vrbo: 'Vrbo',
-  ical: 'iCal générique',
 };
 
 const PROVIDERS: ExternalCalendarProvider[] = ['airbnb', 'booking', 'vrbo', 'ical'];
@@ -54,6 +55,9 @@ const LogementExternalCalendarsSection: React.FC<Props> = ({ logementId }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const { t, tp } = useTranslation();
+  const providerLabel = (p: ExternalCalendarProvider): string =>
+    p === 'ical' ? t('logementCalendars.providerIcal') : PROVIDER_BRANDS[p];
   const list = useExternalCalendars(logementId);
   const create = useCreateExternalCalendar();
   const remove = useDeleteExternalCalendar();
@@ -62,10 +66,9 @@ const LogementExternalCalendarsSection: React.FC<Props> = ({ logementId }) => {
 
   const handleRemove = async (cal: ExternalCalendar) => {
     const ok = await dialog.confirm({
-      title: 'Supprimer ce calendrier ?',
-      message:
-        'Les ménages déjà créés depuis ce calendrier ne seront pas supprimés. Le calendrier ne sera juste plus sync.',
-      confirmLabel: 'Supprimer',
+      title: t('logementCalendars.deleteTitle'),
+      message: t('logementCalendars.deleteBody'),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -73,8 +76,8 @@ const LogementExternalCalendarsSection: React.FC<Props> = ({ logementId }) => {
       await remove.mutateAsync(cal.id);
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Échec',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.unknownError'),
       });
     }
   };
@@ -84,29 +87,34 @@ const LogementExternalCalendarsSection: React.FC<Props> = ({ logementId }) => {
       const result = await sync.mutateAsync(cal.id);
       if (result.error) {
         void dialog.alert({
-          title: 'Erreur de sync',
+          title: t('logementCalendars.syncErrorTitle'),
           message: result.error,
         });
         return;
       }
       // `fetched_events` = événements lus dans le flux. L'afficher distingue
       // « le lien ne renvoie rien » de « le flux est lu mais rien n'en sort ».
-      const lus = `${result.fetched_events} événement${result.fetched_events > 1 ? 's' : ''} lu${result.fetched_events > 1 ? 's' : ''}`;
+      const fetched = tp('logementCalendars.fetched', result.fetched_events);
       const impact =
         result.created_menages + result.updated_menages + result.cancelled_menages;
       void dialog.alert({
-        title: 'Sync terminée',
+        title: t('logementCalendars.syncDoneTitle'),
         message:
           result.fetched_events === 0
-            ? 'Aucun événement dans le flux (calendrier vide ou lien invalide).'
+            ? t('logementCalendars.syncEmpty')
             : impact === 0
-              ? `${lus}, aucune prestation impactée (déjà à jour ou dates bloquées).`
-              : `${lus} · ${result.created_menages} créé${result.created_menages > 1 ? 's' : ''}, ${result.updated_menages} mis à jour, ${result.cancelled_menages} annulé${result.cancelled_menages > 1 ? 's' : ''}.`,
+              ? t('logementCalendars.syncNoImpact', { fetched })
+              : t('logementCalendars.syncSummary', {
+                  fetched,
+                  created: result.created_menages,
+                  updated: result.updated_menages,
+                  cancelled: result.cancelled_menages,
+                }),
       });
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Échec',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.unknownError'),
       });
     }
   };
@@ -117,9 +125,9 @@ const LogementExternalCalendarsSection: React.FC<Props> = ({ logementId }) => {
     <View style={styles.wrap}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.title, { color: colors.text2 }]}>CALENDRIERS EXTERNES</Text>
+          <Text style={[styles.title, { color: colors.text2 }]}>{t('logementCalendars.title').toUpperCase()}</Text>
           <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-            Connecte Airbnb, Booking, Vrbo… Les bookings deviennent des ménages auto.
+            {t('logementCalendars.subtitle')}
           </Text>
         </View>
         <TouchableOpacity
@@ -127,7 +135,7 @@ const LogementExternalCalendarsSection: React.FC<Props> = ({ logementId }) => {
           onPress={() => setAddOpen(true)}
         >
           <CalendarPlus size={IconSize.sm} color="#FFFFFF" />
-          <Text style={styles.addBtnText}>Ajouter</Text>
+          <Text style={styles.addBtnText}>{t('common.add')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -138,8 +146,7 @@ const LogementExternalCalendarsSection: React.FC<Props> = ({ logementId }) => {
       ) : items.length === 0 ? (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={{ color: colors.mutedText, textAlign: 'center' }}>
-            Aucun calendrier. Colle l&apos;URL publique iCal d&apos;Airbnb / Booking pour automatiser
-            la création des ménages.
+            {t('logementCalendars.empty')}
           </Text>
         </View>
       ) : (
@@ -152,13 +159,13 @@ const LogementExternalCalendarsSection: React.FC<Props> = ({ logementId }) => {
               <View style={styles.calTitleRow}>
                 <ExternalLink size={IconSize.sm} color={colors.primary} />
                 <Text style={[styles.calLabel, { color: colors.text }]} numberOfLines={1}>
-                  {cal.label || PROVIDER_LABELS[cal.provider]}
+                  {cal.label || providerLabel(cal.provider)}
                 </Text>
                 <View
                   style={[styles.providerPill, { backgroundColor: colors.primary + '15' }]}
                 >
                   <Text style={{ color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semibold }}>
-                    {PROVIDER_LABELS[cal.provider]}
+                    {providerLabel(cal.provider)}
                   </Text>
                 </View>
               </View>
@@ -170,17 +177,17 @@ const LogementExternalCalendarsSection: React.FC<Props> = ({ logementId }) => {
               </Text>
               <Text style={{ color: colors.text2, fontSize: FontSize.xs, marginTop: 2 }}>
                 {cal.last_error
-                  ? `⚠ Erreur : ${cal.last_error}`
+                  ? t('logementCalendars.lastError', { error: cal.last_error })
                   : cal.last_synced_at
-                    ? `Dernière sync : ${formatDateFr(cal.last_synced_at, 'datetime')}`
-                    : 'Jamais sync'}
+                    ? t('logementCalendars.lastSync', { date: formatDateFr(cal.last_synced_at, 'datetime') })
+                    : t('logementCalendars.neverSynced')}
               </Text>
             </View>
             <TouchableOpacity
               onPress={() => handleSync(cal)}
               disabled={sync.isPending}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="Synchroniser"
+              accessibilityLabel={t('logementCalendars.syncA11y')}
             >
               <RefreshCw
                 size={IconSize.md}
@@ -190,7 +197,7 @@ const LogementExternalCalendarsSection: React.FC<Props> = ({ logementId }) => {
             <TouchableOpacity
               onPress={() => handleRemove(cal)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              accessibilityLabel="Supprimer"
+              accessibilityLabel={t('common.delete')}
             >
               <Trash2 size={IconSize.sm} color={colors.red} />
             </TouchableOpacity>
@@ -208,8 +215,8 @@ const LogementExternalCalendarsSection: React.FC<Props> = ({ logementId }) => {
             setAddOpen(false);
           } catch (err) {
             void dialog.alert({
-              title: 'Erreur',
-              message: err instanceof Error ? err.message : 'Échec',
+              title: t('common.error'),
+              message: err instanceof Error ? err.message : t('common.unknownError'),
             });
           }
         }}
@@ -235,6 +242,9 @@ function AddCalendarModal({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
+  const providerLabel = (p: ExternalCalendarProvider): string =>
+    p === 'ical' ? t('logementCalendars.providerIcal') : PROVIDER_BRANDS[p];
   const [provider, setProvider] = useState<ExternalCalendarProvider>('airbnb');
   const [label, setLabel] = useState('');
   const [url, setUrl] = useState('');
@@ -286,10 +296,10 @@ function AddCalendarModal({
             <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <View style={sheetStyles.header}>
-            <Text style={[sheetStyles.title, { color: colors.text }]}>Ajouter un calendrier</Text>
+            <Text style={[sheetStyles.title, { color: colors.text }]}>{t('logementCalendars.addTitle')}</Text>
           </View>
 
-          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>SOURCE</Text>
+          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('logementCalendars.source').toUpperCase()}</Text>
           <View style={sheetStyles.providerRow}>
             {PROVIDERS.map((p) => {
               const active = provider === p;
@@ -312,14 +322,14 @@ function AddCalendarModal({
                       fontWeight: FontWeight.medium,
                     }}
                   >
-                    {PROVIDER_LABELS[p]}
+                    {providerLabel(p)}
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </View>
 
-          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>LIBELLÉ (OPTIONNEL)</Text>
+          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('logementCalendars.labelOptional').toUpperCase()}</Text>
           <TextInput
             style={[
               sheetStyles.input,
@@ -327,11 +337,11 @@ function AddCalendarModal({
             ]}
             value={label}
             onChangeText={setLabel}
-            placeholder="Ex : Appartement Bastille"
+            placeholder={t('logementCalendars.labelPlaceholder')}
             placeholderTextColor={colors.placeholder}
           />
 
-          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>URL iCAL</Text>
+          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('logementCalendars.urlField').toUpperCase()}</Text>
           <TextInput
             style={[
               sheetStyles.input,
@@ -346,7 +356,7 @@ function AddCalendarModal({
             keyboardType="url"
           />
           <Text style={[sheetStyles.hint, { color: colors.mutedText }]}>
-            Sur Airbnb : Calendrier → Exporter le calendrier → copie l&apos;URL.
+            {t('logementCalendars.urlHint')}
           </Text>
 
           <TouchableOpacity
@@ -360,7 +370,7 @@ function AddCalendarModal({
             {submitting ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={sheetStyles.submitText}>Ajouter et synchroniser</Text>
+              <Text style={sheetStyles.submitText}>{t('logementCalendars.addAndSync')}</Text>
             )}
           </TouchableOpacity>
         </Animated.View>

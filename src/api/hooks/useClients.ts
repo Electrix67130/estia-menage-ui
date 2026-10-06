@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../client';
+import { translate } from '@/i18n/runtime';
 
 export interface Client {
   id: string;
@@ -44,7 +45,7 @@ export function clientDisplayName(c: {
   last_name?: string | null;
 }): string {
   if (c.company_name) return c.company_name;
-  return [c.first_name, c.last_name].filter(Boolean).join(' ') || 'Client sans nom';
+  return [c.first_name, c.last_name].filter(Boolean).join(' ') || translate('client.unnamed');
 }
 
 interface PaginatedClients {

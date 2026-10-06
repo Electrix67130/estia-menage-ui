@@ -20,6 +20,7 @@ import SectionCard from '@/components/SectionCard';
 function RoomCounter({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   return (
     <View style={[counterStyles.row, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
       <Text style={[counterStyles.label, { color: colors.text }]}>{label}</Text>
@@ -27,7 +28,7 @@ function RoomCounter({ label, value, onChange }: { label: string; value: number;
         <TouchableOpacity
           style={[counterStyles.btn, { borderColor: colors.border }]}
           onPress={() => onChange(Math.max(0, value - 1))}
-          accessibilityLabel={`Diminuer ${label}`}
+          accessibilityLabel={t('logementForm.decrease', { label })}
         >
           <Text style={{ color: colors.text, fontSize: FontSize.lg }}>−</Text>
         </TouchableOpacity>
@@ -35,7 +36,7 @@ function RoomCounter({ label, value, onChange }: { label: string; value: number;
         <TouchableOpacity
           style={[counterStyles.btn, { borderColor: colors.border }]}
           onPress={() => onChange(value + 1)}
-          accessibilityLabel={`Augmenter ${label}`}
+          accessibilityLabel={t('logementForm.increase', { label })}
         >
           <Text style={{ color: colors.text, fontSize: FontSize.lg }}>+</Text>
         </TouchableOpacity>
@@ -52,7 +53,7 @@ function RoomCounter({ label, value, onChange }: { label: string; value: number;
 export default function LogementInfoForm({ logementId }: { logementId: string }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
-  const { t: tr } = useTranslation();
+  const { t } = useTranslation();
   const { data: logement } = useLogement(logementId);
   const updateMutation = useUpdateLogement();
   const clientsQuery = useClients();
@@ -200,12 +201,12 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
 
   const saveLabel =
     saveState === 'saving'
-      ? 'Enregistrement…'
+      ? t('common.saving')
       : saveState === 'saved'
-        ? '✓ Enregistré'
+        ? t('logementForm.savedOk')
         : saveState === 'error'
-          ? '⚠ Erreur'
-          : 'Auto-enregistré';
+          ? t('logementForm.saveError')
+          : t('logementForm.autosaved');
 
   return (
     <View style={{ gap: Spacing.md }}>
@@ -213,13 +214,13 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
         <Text style={{ color: colors.mutedText, fontSize: FontSize.xs }}>{saveLabel}</Text>
       </View>
 
-      <SectionCard title="Infos générales">
-        <LabeledField label="Nom du logement *">
+      <SectionCard title={t('logementForm.sectionGeneral')}>
+        <LabeledField label={t('logementForm.nameLabel')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={name}
             onChangeText={setName}
-            placeholder="Ex. Studio Paris 11e"
+            placeholder={t('logementForm.namePlaceholder')}
             placeholderTextColor={colors.placeholder}
           />
         </LabeledField>
@@ -243,23 +244,23 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
           }}
         />
 
-        <LabeledField label="Surface (m²)">
+        <LabeledField label={t('logementForm.surface')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={surfaceM2}
             onChangeText={setSurfaceM2}
-            placeholder="ex. 65"
+            placeholder={t('logementForm.example', { value: 65 })}
             placeholderTextColor={colors.placeholder}
             keyboardType="number-pad"
           />
         </LabeledField>
 
-        <LabeledField label="Couleur (calendrier)">
+        <LabeledField label={t('logementForm.sectionColor')}>
           <ColorPicker label="" value={color} onChange={setColor} />
         </LabeledField>
       </SectionCard>
 
-      <SectionCard title="Client (facturation)">
+      <SectionCard title={t('logementForm.sectionClient')}>
         <TouchableOpacity
           style={[
             styles.optionRow,
@@ -285,41 +286,41 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
           >
             {selectedClient
               ? clientDisplayName(selectedClient)
-              : 'Aucun client — appuyer pour en choisir un'}
+              : t('logementForm.noClientPick')}
           </Text>
           <ChevronRight size={IconSize.sm} color={colors.text2} />
         </TouchableOpacity>
       </SectionCard>
 
-      <SectionCard title={tr('beds.section')} subtitle={tr('beds.hintLogement')}>
-        <RoomCounter label={tr('beds.simple')} value={nLitSimple} onChange={setNLitSimple} />
-        <RoomCounter label={tr('beds.double')} value={nLitDouble} onChange={setNLitDouble} />
-        <RoomCounter label={tr('beds.sofa')} value={nCanapeLit} onChange={setNCanapeLit} />
-        <RoomCounter label={tr('beds.extra')} value={nLitAppoint} onChange={setNLitAppoint} />
-        <RoomCounter label={tr('beds.crib')} value={nLitParapluie} onChange={setNLitParapluie} />
+      <SectionCard title={t('beds.section')} subtitle={t('beds.hintLogement')}>
+        <RoomCounter label={t('beds.simple')} value={nLitSimple} onChange={setNLitSimple} />
+        <RoomCounter label={t('beds.double')} value={nLitDouble} onChange={setNLitDouble} />
+        <RoomCounter label={t('beds.sofa')} value={nCanapeLit} onChange={setNCanapeLit} />
+        <RoomCounter label={t('beds.extra')} value={nLitAppoint} onChange={setNLitAppoint} />
+        <RoomCounter label={t('beds.crib')} value={nLitParapluie} onChange={setNLitParapluie} />
       </SectionCard>
 
-      <SectionCard title="Valeurs par défaut (ménages)" subtitle="Pré-remplies à la création d'un ménage.">
+      <SectionCard title={t('logementForm.sectionDefaultsMenages')} subtitle={t('logementForm.defaultsHint')}>
         <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
           <View style={{ flex: 1 }}>
-            <TimePickerField label="Tranche début" value={defaultHoraireDebut} onChange={setDefaultHoraireDebut} placeholder="--:--" />
+            <TimePickerField label={t('logementForm.slotStart')} value={defaultHoraireDebut} onChange={setDefaultHoraireDebut} placeholder="--:--" />
           </View>
           <View style={{ flex: 1 }}>
-            <TimePickerField label="Tranche fin" value={defaultHoraireFin} onChange={setDefaultHoraireFin} placeholder="--:--" />
+            <TimePickerField label={t('logementForm.slotEnd')} value={defaultHoraireFin} onChange={setDefaultHoraireFin} placeholder="--:--" />
           </View>
         </View>
-        <DurationPickerField label="Durée moyenne" value={defaultDurationMin} onChange={setDefaultDurationMin} />
-        <LabeledField label="Prix client HT (€)">
+        <DurationPickerField label={t('logementForm.avgDuration')} value={defaultDurationMin} onChange={setDefaultDurationMin} />
+        <LabeledField label={t('menage.fields.clientPriceHt')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={defaultClientPriceHt}
             onChangeText={setDefaultClientPriceHt}
-            placeholder="ex. 80"
+            placeholder={t('logementForm.example', { value: 80 })}
             placeholderTextColor={colors.placeholder}
             keyboardType="decimal-pad"
           />
         </LabeledField>
-        <LabeledField label="Taux TVA (%)">
+        <LabeledField label={t('logementForm.vatRate')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={defaultClientVatRate}
@@ -329,18 +330,18 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
             keyboardType="decimal-pad"
           />
         </LabeledField>
-        <LabeledField label="Prix prestataire (€)">
+        <LabeledField label={t('menage.fields.providerPrice')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={defaultProviderPrice}
             onChangeText={setDefaultProviderPrice}
-            placeholder="ex. 50"
+            placeholder={t('logementForm.example', { value: 50 })}
             placeholderTextColor={colors.placeholder}
             keyboardType="decimal-pad"
           />
         </LabeledField>
         <View style={[styles.switchRow, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
-          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Linge inclus par défaut</Text>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{t('logementForm.laundryDefault')}</Text>
           <Switch
             value={defaultLaundryIncluded}
             onValueChange={setDefaultLaundryIncluded}
@@ -349,22 +350,22 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
         </View>
         {defaultLaundryIncluded ? (
           <>
-            <LabeledField label="Prix linge — client HT (€)">
+            <LabeledField label={t('logementForm.laundryClient')}>
               <AutoScrollInput
                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
                 value={defaultLaundryClientPriceHt}
                 onChangeText={setDefaultLaundryClientPriceHt}
-                placeholder="ex. 15"
+                placeholder={t('logementForm.example', { value: 15 })}
                 placeholderTextColor={colors.placeholder}
                 keyboardType="decimal-pad"
               />
             </LabeledField>
-            <LabeledField label="Prix linge — prestataire (€)">
+            <LabeledField label={t('logementForm.laundryProvider')}>
               <AutoScrollInput
                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
                 value={defaultLaundryProviderPrice}
                 onChangeText={setDefaultLaundryProviderPrice}
-                placeholder="ex. 10"
+                placeholder={t('logementForm.example', { value: 10 })}
                 placeholderTextColor={colors.placeholder}
                 keyboardType="decimal-pad"
               />
@@ -373,29 +374,29 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
         ) : null}
       </SectionCard>
 
-      <SectionCard title="Équipements & prestations">
+      <SectionCard title={t('logementForm.sectionEquipPrestations')}>
         <View style={[styles.switchRow, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
-          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Piscine</Text>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{t('logementForm.pool')}</Text>
           <Switch value={hasPool} onValueChange={setHasPool} trackColor={{ false: colors.border, true: colors.primary }} />
         </View>
         <View style={[styles.switchRow, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
-          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Jacuzzi</Text>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{t('logementForm.jacuzzi')}</Text>
           <Switch value={hasJacuzzi} onValueChange={setHasJacuzzi} trackColor={{ false: colors.border, true: colors.primary }} />
         </View>
         <Text style={[styles.subLabel, { color: colors.text2 }]}>
-          {tr('logement.prestationsSection').toUpperCase()}
+          {t('logement.prestationsSection').toUpperCase()}
         </Text>
         <View style={[styles.switchRow, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
-          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{tr('logement.enableCheckIn')}</Text>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{t('logement.enableCheckIn')}</Text>
           <Switch value={enableCheckIn} onValueChange={setEnableCheckIn} trackColor={{ false: colors.border, true: colors.primary }} />
         </View>
         <View style={[styles.switchRow, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
-          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{tr('logement.enableCheckOut')}</Text>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{t('logement.enableCheckOut')}</Text>
           <Switch value={enableCheckOut} onValueChange={setEnableCheckOut} trackColor={{ false: colors.border, true: colors.primary }} />
         </View>
       </SectionCard>
 
-      <SectionCard title="Notes">
+      <SectionCard title={t('logement.sectionNotes')}>
         <AutoScrollInput
           style={[
             styles.input,
@@ -403,7 +404,7 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
           ]}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Code interphone, instructions particulières…"
+          placeholder={t('logementForm.notesPlaceholder')}
           placeholderTextColor={colors.placeholder}
           multiline
         />

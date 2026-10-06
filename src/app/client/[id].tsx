@@ -24,6 +24,7 @@ import {
   type UpdateClientInput,
 } from '@/api/hooks/useClients';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
 
 export default function ClientDetailScreen() {
   const colorScheme = useColorScheme();
@@ -33,6 +34,7 @@ export default function ClientDetailScreen() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const dialog = useDialog();
+  const { t } = useTranslation();
   const { data: client, isLoading } = useClient(id);
   const update = useUpdateClient(id!);
   const archive = useArchiveClient();
@@ -74,22 +76,22 @@ export default function ClientDetailScreen() {
   const handleSave = async () => {
     setError('');
     if (!form.first_name?.trim() && !form.last_name?.trim() && !form.company_name?.trim()) {
-      setError('Au moins un nom est requis.');
+      setError(t('client.nameRequiredShort'));
       return;
     }
     try {
       await update.mutateAsync(form);
       setEditMode(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur');
+      setError(err instanceof Error ? err.message : t('common.error'));
     }
   };
 
   const handleArchive = async () => {
     const ok = await dialog.confirm({
-      title: 'Archiver ce client ?',
-      message: 'Le client sera caché des listes. Les logements rattachés restent.',
-      confirmLabel: 'Archiver',
+      title: t('client.archiveTitle'),
+      message: t('client.archiveBody'),
+      confirmLabel: t('menage.archive'),
       destructive: true,
     });
     if (!ok) return;
@@ -97,7 +99,7 @@ export default function ClientDetailScreen() {
       await archive.mutateAsync(id!);
       router.back();
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Erreur' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('common.error') });
     }
   };
 
@@ -111,7 +113,7 @@ export default function ClientDetailScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('common.back')}
         >
           <ArrowLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
@@ -122,7 +124,7 @@ export default function ClientDetailScreen() {
           <TouchableOpacity
             onPress={handleArchive}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            accessibilityLabel="Archiver"
+            accessibilityLabel={t('menage.archive')}
           >
             <Trash2 size={IconSize.md} color={colors.red} />
           </TouchableOpacity>
@@ -134,20 +136,20 @@ export default function ClientDetailScreen() {
       <KeyboardAwareScroll contentContainerStyle={styles.body}>
         {editMode && isAdmin ? (
           <>
-            <Text style={[styles.section, { color: colors.text2 }]}>IDENTITÉ</Text>
+            <Text style={[styles.section, { color: colors.text2 }]}>{t('client.sectionIdentity')}</Text>
             <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
               <AutoScrollInput
                 style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={form.first_name ?? ''}
                 onChangeText={(v) => set('first_name', v)}
-                placeholder="Prénom"
+                placeholder={t('auth.firstName')}
                 placeholderTextColor={colors.placeholder}
               />
               <AutoScrollInput
                 style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={form.last_name ?? ''}
                 onChangeText={(v) => set('last_name', v)}
-                placeholder="Nom"
+                placeholder={t('auth.lastName')}
                 placeholderTextColor={colors.placeholder}
               />
             </View>
@@ -155,16 +157,16 @@ export default function ClientDetailScreen() {
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
               value={form.company_name ?? ''}
               onChangeText={(v) => set('company_name', v)}
-              placeholder="Entreprise"
+              placeholder={t('auth.company')}
               placeholderTextColor={colors.placeholder}
             />
 
-            <Text style={[styles.section, { color: colors.text2 }]}>CONTACT</Text>
+            <Text style={[styles.section, { color: colors.text2 }]}>{t('client.sectionContact')}</Text>
             <AutoScrollInput
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
               value={form.email ?? ''}
               onChangeText={(v) => set('email', v)}
-              placeholder="Email"
+              placeholder={t('auth.email')}
               placeholderTextColor={colors.placeholder}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -173,17 +175,17 @@ export default function ClientDetailScreen() {
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
               value={form.phone ?? ''}
               onChangeText={(v) => set('phone', v)}
-              placeholder="Téléphone"
+              placeholder={t('auth.phone')}
               placeholderTextColor={colors.placeholder}
               keyboardType="phone-pad"
             />
 
-            <Text style={[styles.section, { color: colors.text2 }]}>FACTURATION</Text>
+            <Text style={[styles.section, { color: colors.text2 }]}>{t('client.sectionBilling')}</Text>
             <AutoScrollInput
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
               value={form.billing_address ?? ''}
               onChangeText={(v) => set('billing_address', v)}
-              placeholder="Adresse"
+              placeholder={t('legal.streetAddress')}
               placeholderTextColor={colors.placeholder}
             />
             <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
@@ -191,7 +193,7 @@ export default function ClientDetailScreen() {
                 style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={form.postal_code ?? ''}
                 onChangeText={(v) => set('postal_code', v)}
-                placeholder="CP"
+                placeholder={t('client.postalCodeShort')}
                 placeholderTextColor={colors.placeholder}
                 keyboardType="number-pad"
               />
@@ -199,7 +201,7 @@ export default function ClientDetailScreen() {
                 style={[styles.input, { flex: 2, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={form.city ?? ''}
                 onChangeText={(v) => set('city', v)}
-                placeholder="Ville"
+                placeholder={t('legal.city')}
                 placeholderTextColor={colors.placeholder}
               />
             </View>
@@ -208,7 +210,7 @@ export default function ClientDetailScreen() {
                 style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={form.siret ?? ''}
                 onChangeText={(v) => set('siret', v)}
-                placeholder="SIRET"
+                placeholder={t('legal.siret')}
                 placeholderTextColor={colors.placeholder}
                 maxLength={14}
               />
@@ -216,17 +218,17 @@ export default function ClientDetailScreen() {
                 style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={form.vat_number ?? ''}
                 onChangeText={(v) => set('vat_number', v)}
-                placeholder="N° TVA"
+                placeholder={t('client.vatNumber')}
                 placeholderTextColor={colors.placeholder}
               />
             </View>
 
-            <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
+            <Text style={[styles.section, { color: colors.text2 }]}>{t('client.sectionNotes')}</Text>
             <AutoScrollInput
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface, minHeight: 80, textAlignVertical: 'top' }]}
               value={form.notes ?? ''}
               onChangeText={(v) => set('notes', v)}
-              placeholder="Notes…"
+              placeholder={t('client.notesPlaceholder')}
               placeholderTextColor={colors.placeholder}
               multiline
             />
@@ -238,7 +240,7 @@ export default function ClientDetailScreen() {
                 style={[styles.btn, { backgroundColor: colors.itemBackground, flex: 1 }]}
                 onPress={() => setEditMode(false)}
               >
-                <Text style={{ color: colors.text, fontWeight: FontWeight.semibold }}>Annuler</Text>
+                <Text style={{ color: colors.text, fontWeight: FontWeight.semibold }}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.btn, { backgroundColor: colors.primary, flex: 2 }]}
@@ -247,7 +249,7 @@ export default function ClientDetailScreen() {
               >
                 <Save size={IconSize.md} color="#FFFFFF" />
                 <Text style={{ color: '#FFFFFF', fontWeight: FontWeight.semibold }}>
-                  {update.isPending ? 'Enregistrement…' : 'Enregistrer'}
+                  {update.isPending ? t('common.saving') : t('common.save')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -277,22 +279,22 @@ export default function ClientDetailScreen() {
               </View>
             ) : null}
             {client.siret ? (
-              <Text style={[styles.meta, { color: colors.mutedText }]}>SIRET : {client.siret}</Text>
+              <Text style={[styles.meta, { color: colors.mutedText }]}>{t('client.siretLine', { siret: client.siret })}</Text>
             ) : null}
             {client.vat_number ? (
-              <Text style={[styles.meta, { color: colors.mutedText }]}>TVA : {client.vat_number}</Text>
+              <Text style={[styles.meta, { color: colors.mutedText }]}>{t('client.vatLine', { vat: client.vat_number })}</Text>
             ) : null}
 
             {client.notes ? (
               <>
-                <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
+                <Text style={[styles.section, { color: colors.text2 }]}>{t('client.sectionNotes')}</Text>
                 <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <Text style={{ color: colors.text }}>{client.notes}</Text>
                 </View>
               </>
             ) : null}
 
-            <Text style={[styles.section, { color: colors.text2 }]}>LOGEMENTS RATTACHÉS</Text>
+            <Text style={[styles.section, { color: colors.text2 }]}>{t('client.linkedLogements')}</Text>
             {logements.data && logements.data.length > 0 ? (
               logements.data.map((l) => (
                 <TouchableOpacity
@@ -310,7 +312,7 @@ export default function ClientDetailScreen() {
                 </TouchableOpacity>
               ))
             ) : (
-              <Text style={{ color: colors.mutedText, padding: Spacing.md }}>Aucun logement rattaché.</Text>
+              <Text style={{ color: colors.mutedText, padding: Spacing.md }}>{t('client.noLinkedLogements')}</Text>
             )}
 
             {isAdmin ? (
@@ -319,7 +321,7 @@ export default function ClientDetailScreen() {
                 onPress={() => setEditMode(true)}
               >
                 <Save size={IconSize.md} color="#FFFFFF" />
-                <Text style={{ color: '#FFFFFF', fontWeight: FontWeight.semibold }}>Modifier</Text>
+                <Text style={{ color: '#FFFFFF', fontWeight: FontWeight.semibold }}>{t('common.edit')}</Text>
               </TouchableOpacity>
             ) : null}
           </>

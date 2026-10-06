@@ -18,11 +18,13 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, FontSize, FontWeight, Radius, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { openPhone, openEmail } from '@/lib/contact-links';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 import type { UserRole } from '@/api/types';
 
-const ROLES: { value: UserRole; label: string }[] = [
-  { value: 'admin', label: 'Administrateur' },
-  { value: 'prestataire', label: 'Prestataire' },
+const ROLES: { value: UserRole; labelKey: TranslationKeys }[] = [
+  { value: 'admin', labelKey: 'common.admin' },
+  { value: 'prestataire', labelKey: 'collab.role.prestataire' },
 ];
 
 export default function CollaborateurDetailScreen() {
@@ -34,7 +36,12 @@ export default function CollaborateurDetailScreen() {
   const { data: user, isLoading } = useUser(id);
   const updateRole = useUpdateUserRole();
   const dialog = useDialog();
+  const { t } = useTranslation();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+  const labelForRole = (r: UserRole): string => {
+    const key = ROLES.find((opt) => opt.value === r)?.labelKey;
+    return key ? t(key) : r;
+  };
 
   React.useEffect(() => {
     if (user) setSelectedRole(user.role);
@@ -48,20 +55,24 @@ export default function CollaborateurDetailScreen() {
   const handleSaveRole = async () => {
     if (!selectedRole || !user || !roleChanged) return;
     const ok = await dialog.confirm({
-      title: 'Changer le rôle ?',
-      message: `${user.first_name ?? user.email} passera de "${user.role}" à "${selectedRole}". Cela modifie immédiatement ses permissions.`,
-      confirmLabel: 'Changer',
+      title: t('collabDetail.changeRoleTitle'),
+      message: t('collabDetail.changeRoleBody', {
+        name: user.first_name ?? user.email,
+        from: labelForRole(user.role),
+        to: labelForRole(selectedRole),
+      }),
+      confirmLabel: t('collabDetail.change'),
     });
     if (!ok) return;
     updateRole.mutate(
       { id: id!, role: selectedRole },
       {
         onSuccess: () => {
-          void dialog.alert({ title: 'Rôle mis à jour' });
+          void dialog.alert({ title: t('collabDetail.roleUpdated') });
         },
         onError: (err: unknown) => {
-          const msg = err instanceof Error ? err.message : 'Erreur';
-          void dialog.alert({ title: 'Erreur', message: msg });
+          const msg = err instanceof Error ? err.message : t('common.error');
+          void dialog.alert({ title: t('common.error'), message: msg });
         },
       },
     );
@@ -84,12 +95,12 @@ export default function CollaborateurDetailScreen() {
             style={styles.backBtn}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityRole="button"
-            accessibilityLabel="Retour"
+            accessibilityLabel={t('common.back')}
           >
             <ArrowLeft size={IconSize.md} color={colors.text} />
           </TouchableOpacity>
         </View>
-        <Text style={[styles.empty, { color: colors.mutedText }]}>Utilisateur introuvable.</Text>
+        <Text style={[styles.empty, { color: colors.mutedText }]}>{t('collabDetail.userNotFound')}</Text>
       </SafeAreaView>
     );
   }
@@ -102,11 +113,11 @@ export default function CollaborateurDetailScreen() {
           style={styles.backBtn}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('common.back')}
         >
           <ArrowLeft size={IconSize.md} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Collaborateur</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('collabDetail.title')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -123,7 +134,7 @@ export default function CollaborateurDetailScreen() {
           <View style={{ flex: 1 }}>
             <Text style={[styles.name, { color: colors.text }]}>
               {user.first_name} {user.last_name}
-              {isMe ? <Text style={[styles.me, { color: colors.mutedText }]}> (vous)</Text> : null}
+              {isMe ? <Text style={[styles.me, { color: colors.mutedText }]}> {t('collabDetail.you')}</Text> : null}
             </Text>
             <Text style={[styles.role, { color: colors.text2 }]}>
               {labelForRole(user.role)}
@@ -131,7 +142,7 @@ export default function CollaborateurDetailScreen() {
           </View>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.text2 }]}>Coordonnées</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('collabDetail.contactSection')}</Text>
 
         <TouchableOpacity
           style={[styles.contactRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -139,7 +150,7 @@ export default function CollaborateurDetailScreen() {
         >
           <Mail size={IconSize.sm} color={colors.primary} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.contactLabel, { color: colors.text2 }]}>Email</Text>
+            <Text style={[styles.contactLabel, { color: colors.text2 }]}>{t('auth.email')}</Text>
             <Text style={[styles.contactValue, { color: colors.text }]}>{user.email}</Text>
           </View>
         </TouchableOpacity>
@@ -151,7 +162,7 @@ export default function CollaborateurDetailScreen() {
           >
             <Phone size={IconSize.sm} color={colors.primary} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.contactLabel, { color: colors.text2 }]}>Téléphone</Text>
+              <Text style={[styles.contactLabel, { color: colors.text2 }]}>{t('auth.phone')}</Text>
               <Text style={[styles.contactValue, { color: colors.text }]}>{user.phone}</Text>
             </View>
           </TouchableOpacity>
@@ -163,7 +174,7 @@ export default function CollaborateurDetailScreen() {
           >
             <Building2 size={IconSize.sm} color={colors.text2} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.contactLabel, { color: colors.text2 }]}>Entreprise</Text>
+              <Text style={[styles.contactLabel, { color: colors.text2 }]}>{t('auth.company')}</Text>
               <Text style={[styles.contactValue, { color: colors.text }]}>
                 {user.company_name}
               </Text>
@@ -173,7 +184,7 @@ export default function CollaborateurDetailScreen() {
 
         {canChangeRole ? (
           <>
-            <Text style={[styles.sectionTitle, { color: colors.text2 }]}>Rôle</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('collab.role')}</Text>
             <View style={styles.rolesRow}>
               {ROLES.map((r) => {
                 const active = selectedRole === r.value;
@@ -195,7 +206,7 @@ export default function CollaborateurDetailScreen() {
                         { color: active ? '#fff' : colors.text },
                       ]}
                     >
-                      {r.label}
+                      {t(r.labelKey)}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -209,7 +220,7 @@ export default function CollaborateurDetailScreen() {
               >
                 <Check size={IconSize.sm} color="#fff" />
                 <Text style={styles.saveBtnText}>
-                  {updateRole.isPending ? 'Enregistrement…' : 'Enregistrer le rôle'}
+                  {updateRole.isPending ? t('common.saving') : t('collabDetail.saveRole')}
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -236,6 +247,7 @@ function PrestataireActivity({ userId }: { userId: string }) {
   const reschedules = useRescheduleRequestsForUser(userId);
   const decide = useDecideReschedule();
   const dialog = useDialog();
+  const { t, tp } = useTranslation();
 
   const upcoming = (menages.data?.data ?? [])
     .filter((m) => m.status === 'a_venir' || m.status === 'en_cours')
@@ -252,34 +264,34 @@ function PrestataireActivity({ userId }: { userId: string }) {
     try {
       await decide.mutateAsync({ id, decision, apply_to_menage: apply });
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('common.unknownError') });
     }
   };
 
   return (
     <View style={activityStyles.wrap}>
-      <Text style={[styles.sectionTitle, { color: colors.text2 }]}>GAINS DU PRESTATAIRE</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('collabDetail.earningsSection')}</Text>
       <View style={[activityStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {earnings.isLoading ? (
-          <Text style={{ color: colors.mutedText }}>Chargement…</Text>
+          <Text style={{ color: colors.mutedText }}>{t('common.loading')}</Text>
         ) : earnings.data ? (
           <>
             <Text style={[activityStyles.total, { color: colors.text }]}>
               {formatCurrencyFr(earnings.data.total, earnings.data.currency)}
             </Text>
             <Text style={{ color: colors.mutedText, fontSize: FontSize.sm }}>
-              sur {earnings.data.count} ménage{earnings.data.count > 1 ? 's' : ''} terminé{earnings.data.count > 1 ? 's' : ''}
+              {tp('collabDetail.completedCount', earnings.data.count)}
             </Text>
           </>
         ) : null}
       </View>
 
-      <Text style={[styles.sectionTitle, { color: colors.text2 }]}>PROCHAINS MÉNAGES</Text>
+      <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('collabDetail.upcomingSection')}</Text>
       <View style={[activityStyles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {menages.isLoading ? (
-          <Text style={{ color: colors.mutedText }}>Chargement…</Text>
+          <Text style={{ color: colors.mutedText }}>{t('common.loading')}</Text>
         ) : upcoming.length === 0 ? (
-          <Text style={{ color: colors.mutedText }}>Aucun ménage à venir.</Text>
+          <Text style={{ color: colors.mutedText }}>{t('collabDetail.noUpcoming')}</Text>
         ) : (
           upcoming.map((m) => (
             <TouchableOpacity
@@ -303,15 +315,15 @@ function PrestataireActivity({ userId }: { userId: string }) {
       {pendingReschedules.length > 0 ? (
         <>
           <Text style={[styles.sectionTitle, { color: colors.text2 }]}>
-            DEMANDES DE CHANGEMENT ({pendingReschedules.length})
+            {t('collabDetail.rescheduleSection', { count: pendingReschedules.length })}
           </Text>
           <View style={[activityStyles.card, { backgroundColor: colors.surface, borderColor: colors.border, gap: Spacing.md }]}>
             {pendingReschedules.map((r) => (
               <View key={r.id} style={activityStyles.reschedule}>
                 <Text style={{ color: colors.text, fontSize: FontSize.sm }}>
-                  <Text style={{ color: colors.mutedText }}>Du </Text>
+                  <Text style={{ color: colors.mutedText }}>{t('common.from')} </Text>
                   {formatDateFr(r.original_date.slice(0, 10), 'long')}
-                  <Text style={{ color: colors.mutedText }}> au </Text>
+                  <Text style={{ color: colors.mutedText }}> {t('common.to')} </Text>
                   <Text style={{ color: colors.primary, fontWeight: FontWeight.semibold }}>
                     {formatDateFr(r.proposed_date.slice(0, 10), 'long')}
                   </Text>
@@ -327,7 +339,7 @@ function PrestataireActivity({ userId }: { userId: string }) {
                     onPress={() => handleDecide(r.id, 'approved', true)}
                   >
                     <Text style={{ color: '#FFFFFF', fontSize: FontSize.xs, fontWeight: FontWeight.semibold }}>
-                      Approuver
+                      {t('collabDetail.approve')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -335,7 +347,7 @@ function PrestataireActivity({ userId }: { userId: string }) {
                     onPress={() => handleDecide(r.id, 'rejected', false)}
                   >
                     <Text style={{ color: '#FFFFFF', fontSize: FontSize.xs, fontWeight: FontWeight.semibold }}>
-                      Refuser
+                      {t('collabDetail.reject')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -366,10 +378,6 @@ const activityStyles = StyleSheet.create({
   reschedule: { gap: Spacing.xs },
   btn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.xs, borderRadius: Radius.sm },
 });
-
-function labelForRole(r: UserRole): string {
-  return ROLES.find((opt) => opt.value === r)?.label ?? r;
-}
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

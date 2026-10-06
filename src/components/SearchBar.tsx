@@ -4,6 +4,7 @@ import { Search } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTranslation } from '@/contexts/I18nContext';
 
 interface Props {
   value: string;
@@ -11,9 +12,11 @@ interface Props {
   placeholder?: string;
 }
 
-const SearchBar: React.FC<Props> = ({ value, onChangeText, placeholder = 'Rechercher...' }) => {
+const SearchBar: React.FC<Props> = ({ value, onChangeText, placeholder: placeholderProp }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
+  const placeholder = placeholderProp ?? t('search.placeholder');
 
   return (
     <View style={[styles.container, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>

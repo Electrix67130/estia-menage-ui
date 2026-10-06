@@ -17,6 +17,7 @@ import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/const
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useClients, clientDisplayName, type Client } from '@/api/hooks/useClients';
+import { useTranslation } from '@/contexts/I18nContext';
 
 export default function ClientsScreen() {
   const colorScheme = useColorScheme();
@@ -24,6 +25,7 @@ export default function ClientsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const list = useClients({ enabled: isAdmin });
 
@@ -58,7 +60,7 @@ export default function ClientsScreen() {
           </Text>
           {item.archived_at ? (
             <Text style={{ fontSize: 10, color: colors.mutedText, fontWeight: '700' }}>
-              · ARCHIVÉ
+              · {t('client.archivedTag')}
             </Text>
           ) : null}
         </View>
@@ -78,11 +80,11 @@ export default function ClientsScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('common.back')}
         >
           <ArrowLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Clients</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('client.title')}</Text>
         <View style={{ width: IconSize.lg }} />
       </View>
 
@@ -91,7 +93,7 @@ export default function ClientsScreen() {
           <Search size={IconSize.sm} color={colors.mutedText} />
           <TextInput
             style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Nom, entreprise, ville…"
+            placeholder={t('client.searchPlaceholder')}
             placeholderTextColor={colors.placeholder}
             value={search}
             onChangeText={setSearch}
@@ -112,7 +114,7 @@ export default function ClientsScreen() {
           contentContainerStyle={styles.list}
           ListEmptyComponent={
             <Text style={[styles.empty, { color: colors.mutedText }]}>
-              {search ? 'Aucun client trouvé.' : 'Aucun client encore. Appuie sur + pour en créer un.'}
+              {search ? t('client.noResults') : t('client.emptyHint')}
             </Text>
           }
           refreshControl={
@@ -131,7 +133,7 @@ export default function ClientsScreen() {
           style={[styles.fab, { backgroundColor: colors.primary }, Shadow.lg]}
           onPress={() => router.push('/client/create')}
           accessibilityRole="button"
-          accessibilityLabel="Nouveau client"
+          accessibilityLabel={t('client.new')}
         >
           <Plus size={IconSize.xl} color="#FFFFFF" />
         </TouchableOpacity>

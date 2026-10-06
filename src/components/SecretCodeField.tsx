@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTranslation } from '@/contexts/I18nContext';
 
 /**
  * Champ texte pour les codes/secrets : masqué par défaut, bouton oeil à droite
@@ -26,13 +27,14 @@ interface Props {
 const SecretCodeField: React.FC<Props> = ({
   value,
   onChangeText,
-  placeholder = 'Code…',
+  placeholder,
   readonly = false,
   style,
 }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const [revealed, setRevealed] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <View
@@ -46,7 +48,7 @@ const SecretCodeField: React.FC<Props> = ({
         style={[styles.input, { color: colors.text }]}
         value={value}
         onChangeText={onChangeText}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('secret.placeholder')}
         placeholderTextColor={colors.placeholder}
         secureTextEntry={!revealed}
         editable={!readonly}
@@ -59,7 +61,7 @@ const SecretCodeField: React.FC<Props> = ({
         onPress={() => setRevealed((r) => !r)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         accessibilityRole="button"
-        accessibilityLabel={revealed ? 'Masquer le code' : 'Révéler le code'}
+        accessibilityLabel={revealed ? t('secret.hide') : t('secret.reveal')}
       >
         {revealed ? (
           <EyeOff size={IconSize.sm} color={colors.text2} />

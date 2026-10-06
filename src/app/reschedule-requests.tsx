@@ -17,14 +17,24 @@ import { Spacing, FontSize, FontWeight, Radius, IconSize } from '@/constants/Lay
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useDialog } from '@/contexts/DialogContext';
 import { formatDateFr } from '@/lib/date-fr';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 
 type Tab = 'pending' | 'all';
+
+const STATUS_KEYS: Record<string, TranslationKeys> = {
+  pending: 'reschedule.status.pending',
+  approved: 'reschedule.status.approved',
+  rejected: 'reschedule.status.rejected',
+  cancelled: 'reschedule.status.cancelled',
+};
 
 export default function RescheduleRequestsScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('pending');
   const list = useMyRescheduleRequests(tab === 'pending' ? 'pending' : undefined);
   const decide = useDecideReschedule();
@@ -40,8 +50,8 @@ export default function RescheduleRequestsScreen() {
       await decide.mutateAsync({ id, decision, apply_to_menage: applyToMenage });
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Échec',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.unknownError'),
       });
     }
   };
@@ -56,26 +66,26 @@ export default function RescheduleRequestsScreen() {
         >
           <ArrowLeft size={IconSize.md} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Demandes de changement</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('reschedule.title')}</Text>
       </View>
 
       <View style={{ paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm }}>
         <View style={[styles.tabRow, { backgroundColor: colors.itemBackground }]}>
           {(
             [
-              { key: 'pending' as const, label: 'En attente' },
-              { key: 'all' as const, label: 'Tout' },
+              { key: 'pending' as const, label: t('reschedule.tabPending') },
+              { key: 'all' as const, label: t('reschedule.tabAll') },
             ]
-          ).map((t) => {
-            const active = tab === t.key;
+          ).map((tabItem) => {
+            const active = tab === tabItem.key;
             return (
               <TouchableOpacity
-                key={t.key}
+                key={tabItem.key}
                 style={[
                   styles.tabBtn,
                   { backgroundColor: active ? colors.surface : 'transparent' },
                 ]}
-                onPress={() => setTab(t.key)}
+                onPress={() => setTab(tabItem.key)}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
               >
@@ -88,7 +98,7 @@ export default function RescheduleRequestsScreen() {
                     },
                   ]}
                 >
-                  {t.label}
+                  {tabItem.label}
                 </Text>
               </TouchableOpacity>
             );
@@ -113,7 +123,7 @@ export default function RescheduleRequestsScreen() {
           <View style={styles.empty}>
             <CalendarClock size={36} color={colors.mutedText} />
             <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-              {tab === 'pending' ? 'Aucune demande en attente.' : 'Aucune demande.'}
+              {tab === 'pending' ? t('reschedule.emptyPending') : t('reschedule.emptyAll')}
             </Text>
           </View>
         ) : (
@@ -129,7 +139,7 @@ export default function RescheduleRequestsScreen() {
             >
               <View style={styles.rowBetween}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.cardSub, { color: colors.text2 }]}>Date actuelle</Text>
+                  <Text style={[styles.cardSub, { color: colors.text2 }]}>{t('reschedule.currentDate')}</Text>
                   <Text style={[styles.cardDate, { color: colors.text }]}>
                     {formatDateFr(r.original_date.slice(0, 10), 'long')}
                   </Text>
@@ -137,14 +147,18 @@ export default function RescheduleRequestsScreen() {
                 <StatusPill status={r.status} colors={colors} />
               </View>
               <View style={{ marginTop: Spacing.sm }}>
-                <Text style={[styles.cardSub, { color: colors.text2 }]}>Proposée</Text>
+                <Text style={[styles.cardSub, { color: colors.text2 }]}>{t('reschedule.proposedDate')}</Text>
                 <Text style={[styles.cardDate, { color: colors.primary }]}>
-                  {formatDateFr(r.proposed_date.slice(0, 10), 'long')}
-                  {r.proposed_time ? ` à ${r.proposed_time.slice(0, 5)}` : ''}
+                  {r.proposed_time
+                    ? t('reschedule.dateAtTime', {
+                        date: formatDateFr(r.proposed_date.slice(0, 10), 'long'),
+                        time: r.proposed_time.slice(0, 5),
+                      })
+                    : formatDateFr(r.proposed_date.slice(0, 10), 'long')}
                 </Text>
               </View>
               {r.reason ? (
-                <Text style={[styles.reason, { color: colors.text2 }]}>« {r.reason} »</Text>
+                <Text style={[styles.reason, { color: colors.text2 }]}>{t('reschedule.quotedReason', { reason: r.reason })}</Text>
               ) : null}
               {r.status === 'pending' ? (
                 <View style={[styles.actions, { borderTopColor: colors.border }]}>
@@ -154,7 +168,7 @@ export default function RescheduleRequestsScreen() {
                     disabled={decide.isPending}
                   >
                     <CheckCircle2 size={14} color="#FFFFFF" />
-                    <Text style={styles.btnText}>Approuver</Text>
+                    <Text style={styles.btnText}>{t('reschedule.approve')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.btn, { backgroundColor: colors.red }]}
@@ -162,7 +176,7 @@ export default function RescheduleRequestsScreen() {
                     disabled={decide.isPending}
                   >
                     <XIcon size={14} color="#FFFFFF" />
-                    <Text style={styles.btnText}>Refuser</Text>
+                    <Text style={styles.btnText}>{t('reschedule.reject')}</Text>
                   </TouchableOpacity>
                 </View>
               ) : null}
@@ -181,16 +195,19 @@ function StatusPill({
   status: string;
   colors: typeof Colors.light;
 }) {
-  const palette: Record<string, { bg: string; fg: string; label: string }> = {
-    pending: { bg: colors.statusEnCours + '25', fg: colors.statusEnCours, label: 'En attente' },
-    approved: { bg: colors.green + '25', fg: colors.green, label: 'Approuvée' },
-    rejected: { bg: colors.red + '25', fg: colors.red, label: 'Refusée' },
-    cancelled: { bg: colors.mutedText + '25', fg: colors.mutedText, label: 'Annulée' },
+  const { t } = useTranslation();
+  const palette: Record<string, { bg: string; fg: string }> = {
+    pending: { bg: colors.statusEnCours + '25', fg: colors.statusEnCours },
+    approved: { bg: colors.green + '25', fg: colors.green },
+    rejected: { bg: colors.red + '25', fg: colors.red },
+    cancelled: { bg: colors.mutedText + '25', fg: colors.mutedText },
   };
-  const p = palette[status] ?? { bg: colors.itemBackground, fg: colors.text2, label: status };
+  const p = palette[status] ?? { bg: colors.itemBackground, fg: colors.text2 };
+  const statusKey = STATUS_KEYS[status];
+  const label = statusKey ? t(statusKey) : status;
   return (
     <View style={[styles.pill, { backgroundColor: p.bg }]}>
-      <Text style={[styles.pillText, { color: p.fg }]}>{p.label}</Text>
+      <Text style={[styles.pillText, { color: p.fg }]}>{label}</Text>
     </View>
   );
 }

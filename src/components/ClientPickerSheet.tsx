@@ -16,6 +16,7 @@ import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/const
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { clientDisplayName, type Client } from '@/api/hooks/useClients';
+import { useTranslation } from '@/contexts/I18nContext';
 
 interface Props {
   visible: boolean;
@@ -41,6 +42,7 @@ const ClientPickerSheet: React.FC<Props> = ({
 }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const animatedModalStyle = useKeyboardAwareModalStyle({ visible });
 
@@ -77,7 +79,7 @@ const ClientPickerSheet: React.FC<Props> = ({
             <View style={[styles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.text }]}>Choisir un client</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{t('clientPicker.title')}</Text>
           </View>
 
           <View
@@ -89,7 +91,7 @@ const ClientPickerSheet: React.FC<Props> = ({
             <Search size={16} color={colors.placeholder} />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Rechercher un client…"
+              placeholder={t('clientPicker.searchPlaceholder')}
               placeholderTextColor={colors.placeholder}
               value={search}
               onChangeText={setSearch}
@@ -106,7 +108,7 @@ const ClientPickerSheet: React.FC<Props> = ({
             >
               <Plus size={IconSize.sm} color={colors.primary} />
               <Text style={[styles.createText, { color: colors.primary }]}>
-                Créer un nouveau client
+                {t('clientPicker.createNew')}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -135,13 +137,13 @@ const ClientPickerSheet: React.FC<Props> = ({
                     fontWeight: selectedId === '' ? FontWeight.semibold : FontWeight.regular,
                   }}
                 >
-                  Aucun client
+                  {t('clientPicker.none')}
                 </Text>
               </TouchableOpacity>
             }
             ListEmptyComponent={
               <Text style={[styles.empty, { color: colors.mutedText }]}>
-                {search ? 'Aucun résultat.' : 'Aucun client. Crée-en un.'}
+                {search ? t('clientPicker.noResults') : t('clientPicker.empty')}
               </Text>
             }
             renderItem={({ item }) => {

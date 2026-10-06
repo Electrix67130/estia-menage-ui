@@ -38,6 +38,7 @@ import {
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
 import {
   useCheckTemplate,
   useCreateTemplateSection,
@@ -70,6 +71,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const { t } = useTranslation();
   const template = useCheckTemplate(logementId);
   const createSection = useCreateTemplateSection(logementId);
   const updateSection = useUpdateTemplateSection(logementId);
@@ -101,7 +103,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
         await updateItem.mutateAsync({ id: target.id, label });
       }
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('checklist.failed') });
     }
   };
   const checklistTemplates = useChecklistTemplates();
@@ -111,9 +113,9 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
     setApplyOpen(false);
     try {
       await applyTemplate.mutateAsync({ logementId, templateId });
-      void dialog.alert({ title: 'Modèle appliqué', message: `"${name}" a été ajouté à la checklist.` });
+      void dialog.alert({ title: t('templateEditor.applied'), message: t('templateEditor.appliedBody', { name }) });
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('checklist.failed') });
     }
   };
 
@@ -125,24 +127,24 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
     }));
     try {
       await createOrgTemplate.mutateAsync({ name, sections: payloadSections });
-      void dialog.alert({ title: 'Modèle créé', message: `"${name}" est disponible comme modèle réutilisable.` });
+      void dialog.alert({ title: t('templateEditor.created'), message: t('templateEditor.createdBody', { name }) });
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('checklist.failed') });
     }
   };
 
   const handleDeleteSection = async (id: string, label: string) => {
     const ok = await dialog.confirm({
-      title: `Supprimer la section "${label}" ?`,
-      message: 'Tous les items de cette section seront supprimés.',
-      confirmLabel: 'Supprimer',
+      title: t('templateEditor.deleteSectionTitle', { label }),
+      message: t('templateEditor.deleteSectionBody'),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
     try {
       await deleteSection.mutateAsync(id);
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('checklist.failed') });
     }
   };
 
@@ -163,8 +165,8 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
           style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
           <Text style={{ color: colors.mutedText, textAlign: 'center' }}>
-            Aucune section.
-            {isAdmin ? ' Ajoute une section pour personnaliser la checklist du logement.' : ''}
+            {t('templateEditor.empty')}
+            {isAdmin ? ` ${t('templateEditor.emptyAdminHint')}` : ''}
           </Text>
         </View>
       ) : (
@@ -195,7 +197,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
                       setIconPickerFor(s);
                     }}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel="Choisir l'icône de la section"
+                    accessibilityLabel={t('templateEditor.pickIconA11y')}
                   >
                     {s.icon ? (
                       <Text style={styles.sectionEmoji}>{s.icon}</Text>
@@ -224,7 +226,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
                         setEditTarget({ type: 'section', id: s.id, label: s.label });
                       }}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityLabel={`Renommer ${s.label}`}
+                      accessibilityLabel={t('templateEditor.renameA11y', { label: s.label })}
                     >
                       <Pencil size={IconSize.sm} color={colors.text2} />
                     </TouchableOpacity>
@@ -234,7 +236,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
                         handleDeleteSection(s.id, s.label);
                       }}
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityLabel={`Supprimer ${s.label}`}
+                      accessibilityLabel={t('templateEditor.deleteA11y', { label: s.label })}
                     >
                       <Trash2 size={IconSize.sm} color={colors.red} />
                     </TouchableOpacity>
@@ -246,7 +248,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
                 <View style={styles.itemsBlock}>
                   {s.items.length === 0 ? (
                     <Text style={[styles.emptyItems, { color: colors.mutedText }]}>
-                      Aucun item.
+                      {t('templateEditor.emptyItems')}
                     </Text>
                   ) : (
                     s.items.map((it) => (
@@ -274,7 +276,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
                           fontWeight: FontWeight.semibold,
                         }}
                       >
-                        Ajouter un item
+                        {t('templateEditor.addItem')}
                       </Text>
                     </TouchableOpacity>
                   ) : null}
@@ -292,7 +294,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
             onPress={() => setAddingSection(true)}
           >
             <Plus size={IconSize.sm} color="#FFFFFF" />
-            <Text style={styles.addSectionText}>Ajouter une section</Text>
+            <Text style={styles.addSectionText}>{t('templates.addSection')}</Text>
           </TouchableOpacity>
           {sections.length > 1 ? (
             <TouchableOpacity
@@ -301,7 +303,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
             >
               <GripVertical size={IconSize.sm} color={colors.primary} />
               <Text style={[styles.applyTemplateText, { color: colors.primary }]}>
-                Réorganiser les sections
+                {t('templateEditor.reorder')}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -313,7 +315,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
             >
               <ListChecks size={IconSize.sm} color={colors.primary} />
               <Text style={[styles.applyTemplateText, { color: colors.primary }]}>
-                {createOrgTemplate.isPending ? 'Enregistrement…' : 'Enregistrer comme modèle'}
+                {createOrgTemplate.isPending ? t('common.saving') : t('templateEditor.saveAsTemplate')}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -325,7 +327,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
             >
               <ListChecks size={IconSize.sm} color={colors.primary} />
               <Text style={[styles.applyTemplateText, { color: colors.primary }]}>
-                {applyTemplate.isPending ? 'Application…' : 'Appliquer un modèle'}
+                {applyTemplate.isPending ? t('templateEditor.applying') : t('templateEditor.applyTemplate')}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -347,7 +349,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
             await createSection.mutateAsync({ label });
             setAddingSection(false);
           } catch (err) {
-            void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+            void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('checklist.failed') });
           }
         }}
       />
@@ -362,7 +364,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
           try {
             await updateSection.mutateAsync({ id: s.id, icon });
           } catch (err) {
-            void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+            void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('checklist.failed') });
           }
         }}
       />
@@ -389,7 +391,7 @@ const CheckTemplateEditor: React.FC<Props> = ({ logementId, isAdmin }) => {
           try {
             await reorderSections.mutateAsync(orderedIds);
           } catch (err) {
-            void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+            void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('checklist.failed') });
           }
         }}
       />
@@ -421,6 +423,7 @@ function SaveAsTemplateModal({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t, tp } = useTranslation();
   const [name, setName] = useState('');
   const animatedModalStyle = useKeyboardAwareModalStyle({ visible });
 
@@ -435,13 +438,12 @@ function SaveAsTemplateModal({
             <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <View style={sheetStyles.header}>
-            <Text style={[sheetStyles.title, { color: colors.text }]}>Enregistrer comme modèle</Text>
+            <Text style={[sheetStyles.title, { color: colors.text }]}>{t('templateEditor.saveAsTemplate')}</Text>
           </View>
           <Text style={{ color: colors.text2, fontSize: FontSize.sm, marginBottom: Spacing.md }}>
-            Crée un modèle réutilisable (applicable à d&apos;autres logements) à partir des {sectionCount} section
-            {sectionCount > 1 ? 's' : ''} de cette checklist.
+            {tp('templateEditor.saveAsTemplateBody', sectionCount)}
           </Text>
-          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>NOM DU MODÈLE</Text>
+          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('templateEditor.templateNameLabel')}</Text>
           <TextInput
             style={[
               sheetStyles.input,
@@ -449,7 +451,7 @@ function SaveAsTemplateModal({
             ]}
             value={name}
             onChangeText={setName}
-            placeholder="Ex : Appartement T2 standard"
+            placeholder={t('templateEditor.templateNamePlaceholder')}
             placeholderTextColor={colors.placeholder}
             autoFocus
             onSubmitEditing={() => name.trim() && onSubmit(name.trim())}
@@ -461,7 +463,7 @@ function SaveAsTemplateModal({
             disabled={!name.trim()}
           >
             <Check size={IconSize.sm} color="#FFFFFF" />
-            <Text style={sheetStyles.submitText}>Créer le modèle</Text>
+            <Text style={sheetStyles.submitText}>{t('templates.createBtn')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -484,6 +486,7 @@ function EditLabelModal({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const [label, setLabel] = useState('');
   const visible = !!target;
   const animatedModalStyle = useKeyboardAwareModalStyle({ visible });
@@ -506,7 +509,7 @@ function EditLabelModal({
           </View>
           <View style={sheetStyles.header}>
             <Text style={[sheetStyles.title, { color: colors.text }]}>
-              {target?.type === 'section' ? 'Renommer la section' : 'Renommer l’item'}
+              {target?.type === 'section' ? t('templateEditor.renameSection') : t('templateEditor.renameItem')}
             </Text>
           </View>
           <TextInput
@@ -516,7 +519,7 @@ function EditLabelModal({
             ]}
             value={label}
             onChangeText={setLabel}
-            placeholder="Nouveau nom"
+            placeholder={t('templateEditor.newNamePlaceholder')}
             placeholderTextColor={colors.placeholder}
             autoFocus
             onSubmitEditing={() => label.trim() && onSubmit(label.trim())}
@@ -528,7 +531,7 @@ function EditLabelModal({
             disabled={!label.trim()}
           >
             <Check size={IconSize.sm} color="#FFFFFF" />
-            <Text style={sheetStyles.submitText}>Enregistrer</Text>
+            <Text style={sheetStyles.submitText}>{t('common.save')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </View>
@@ -555,6 +558,7 @@ function ReorderSectionsModal({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const [order, setOrder] = useState<CheckTemplateSection[]>(sections);
 
   const renderRow = ({ item, drag, isActive }: RenderItemParams<CheckTemplateSection>) => (
@@ -597,10 +601,10 @@ function ReorderSectionsModal({
               <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
             </View>
             <View style={sheetStyles.header}>
-              <Text style={[sheetStyles.title, { color: colors.text }]}>Réorganiser les sections</Text>
+              <Text style={[sheetStyles.title, { color: colors.text }]}>{t('templateEditor.reorder')}</Text>
             </View>
             <Text style={{ color: colors.text2, fontSize: FontSize.sm, marginBottom: Spacing.md }}>
-              Maintiens une section appuyée puis glisse-la pour changer l&apos;ordre.
+              {t('templateEditor.reorderHint')}
             </Text>
             <DraggableFlatList
               data={order}
@@ -619,7 +623,7 @@ function ReorderSectionsModal({
               ) : (
                 <>
                   <Check size={IconSize.sm} color="#FFFFFF" />
-                  <Text style={sheetStyles.submitText}>Enregistrer l&apos;ordre</Text>
+                  <Text style={sheetStyles.submitText}>{t('templateEditor.saveOrder')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -652,19 +656,20 @@ function ItemRow({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const { t } = useTranslation();
   const deleteItem = useDeleteTemplateItem(logementId);
 
   const handleDelete = async () => {
     const ok = await dialog.confirm({
-      title: 'Supprimer cet item ?',
-      confirmLabel: 'Supprimer',
+      title: t('templateEditor.deleteItemTitle'),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
     try {
       await deleteItem.mutateAsync(itemId);
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('checklist.failed') });
     }
   };
 
@@ -680,7 +685,7 @@ function ItemRow({
       <Text style={[styles.itemLabel, { color: colors.text }]}>
         {label}
         {required ? (
-          <Text style={[styles.requiredTag, { color: colors.primary }]}> · Requis</Text>
+          <Text style={[styles.requiredTag, { color: colors.primary }]}>{` · ${t('templateEditor.required')}`}</Text>
         ) : null}
       </Text>
       {isAdmin ? (
@@ -688,14 +693,14 @@ function ItemRow({
           <TouchableOpacity
             onPress={onEdit}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel={`Renommer ${label}`}
+            accessibilityLabel={t('templateEditor.renameA11y', { label })}
           >
             <Pencil size={12} color={colors.mutedText} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleDelete}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel={`Supprimer ${label}`}
+            accessibilityLabel={t('templateEditor.deleteA11y', { label })}
           >
             <Trash2 size={12} color={colors.mutedText} />
           </TouchableOpacity>
@@ -726,6 +731,7 @@ function IconPickerModal({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   return (
     <Modal visible={!!section} transparent animationType="slide" onRequestClose={onClose}>
       <View style={sheetStyles.overlay}>
@@ -735,7 +741,7 @@ function IconPickerModal({
             <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <View style={sheetStyles.header}>
-            <Text style={[sheetStyles.title, { color: colors.text }]}>Icône de la section</Text>
+            <Text style={[sheetStyles.title, { color: colors.text }]}>{t('templateEditor.iconTitle')}</Text>
           </View>
           <View style={pickerStyles.grid}>
             {SECTION_EMOJIS.map((e) => {
@@ -761,7 +767,7 @@ function IconPickerModal({
             style={[pickerStyles.noneBtn, { borderColor: colors.border }]}
             onPress={() => onPick('')}
           >
-            <Text style={{ color: colors.text2, fontWeight: FontWeight.semibold }}>Aucune icône</Text>
+            <Text style={{ color: colors.text2, fontWeight: FontWeight.semibold }}>{t('templateEditor.noIcon')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -780,6 +786,7 @@ function AddSectionModal({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const [label, setLabel] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const animatedModalStyle = useKeyboardAwareModalStyle({ visible });
@@ -813,10 +820,10 @@ function AddSectionModal({
             <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <View style={sheetStyles.header}>
-            <Text style={[sheetStyles.title, { color: colors.text }]}>Nouvelle section</Text>
+            <Text style={[sheetStyles.title, { color: colors.text }]}>{t('templateEditor.newSection')}</Text>
           </View>
 
-          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>NOM DE LA SECTION</Text>
+          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('templateEditor.sectionNameLabel')}</Text>
           <TextInput
             style={[
               sheetStyles.input,
@@ -824,7 +831,7 @@ function AddSectionModal({
             ]}
             value={label}
             onChangeText={setLabel}
-            placeholder="Ex : Cuisine"
+            placeholder={t('templateEditor.sectionPlaceholder')}
             placeholderTextColor={colors.placeholder}
             autoFocus
             onSubmitEditing={handleSubmit}
@@ -844,7 +851,7 @@ function AddSectionModal({
             ) : (
               <>
                 <Plus size={IconSize.sm} color="#FFFFFF" />
-                <Text style={sheetStyles.submitText}>Créer la section</Text>
+                <Text style={sheetStyles.submitText}>{t('templateEditor.createSection')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -870,6 +877,7 @@ function AddItemModal({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const { t } = useTranslation();
   const createItem = useCreateTemplateItem(logementId);
   const [label, setLabel] = useState('');
   const [required, setRequired] = useState(false);
@@ -885,7 +893,7 @@ function AddItemModal({
       setRequired(false);
       onClose();
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('checklist.failed') });
     }
   };
 
@@ -912,14 +920,14 @@ function AddItemModal({
           </View>
           <View style={sheetStyles.header}>
             <View style={{ flex: 1 }}>
-              <Text style={[sheetStyles.title, { color: colors.text }]}>Nouvel item</Text>
+              <Text style={[sheetStyles.title, { color: colors.text }]}>{t('templateEditor.newItem')}</Text>
               <Text style={{ color: colors.mutedText, fontSize: FontSize.sm, marginTop: 2 }}>
-                Section : {section.label}
+                {t('templateEditor.sectionPrefix', { label: section.label })}
               </Text>
             </View>
           </View>
 
-          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>NOM DE L'ITEM</Text>
+          <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('templateEditor.itemNameLabel')}</Text>
           <TextInput
             style={[
               sheetStyles.input,
@@ -927,7 +935,7 @@ function AddItemModal({
             ]}
             value={label}
             onChangeText={setLabel}
-            placeholder="Ex : Nettoyer la plaque"
+            placeholder={t('templateEditor.itemPlaceholder')}
             placeholderTextColor={colors.placeholder}
             autoFocus
             onSubmitEditing={handleSubmit}
@@ -959,10 +967,10 @@ function AddItemModal({
               <Text
                 style={{ color: colors.text, fontSize: FontSize.base, fontWeight: FontWeight.medium }}
               >
-                Item requis
+                {t('templateEditor.requiredItem')}
               </Text>
               <Text style={{ color: colors.mutedText, fontSize: FontSize.xs, marginTop: 2 }}>
-                Le presta doit obligatoirement le cocher pour terminer le ménage.
+                {t('templateEditor.requiredItemHint')}
               </Text>
             </View>
           </TouchableOpacity>
@@ -983,7 +991,7 @@ function AddItemModal({
             ) : (
               <>
                 <Plus size={IconSize.sm} color="#FFFFFF" />
-                <Text style={sheetStyles.submitText}>Ajouter l&apos;item</Text>
+                <Text style={sheetStyles.submitText}>{t('templateEditor.addItemBtn')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -1010,30 +1018,31 @@ function ApplyTemplateModal({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t, tp } = useTranslation();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={sheetStyles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[sheetStyles.applyCard, { backgroundColor: colors.surface }, Shadow.lg]}>
           <View style={sheetStyles.header}>
-            <Text style={[sheetStyles.title, { color: colors.text }]}>Appliquer un modèle</Text>
+            <Text style={[sheetStyles.title, { color: colors.text }]}>{t('templateEditor.applyTemplate')}</Text>
           </View>
           <Text style={{ color: colors.text2, fontSize: FontSize.sm, marginBottom: Spacing.md }}>
-            Les sections du modèle sont ajoutées à la checklist actuelle.
+            {t('templateEditor.applyHint')}
           </Text>
-          {templates.map((t) => (
+          {templates.map((tpl) => (
             <TouchableOpacity
-              key={t.id}
+              key={tpl.id}
               style={[sheetStyles.applyRow, { borderColor: colors.border }]}
-              onPress={() => onPick(t.id, t.name)}
+              onPress={() => onPick(tpl.id, tpl.name)}
               activeOpacity={0.7}
             >
               <ListChecks size={IconSize.sm} color={colors.primary} />
               <Text style={{ flex: 1, color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.medium }}>
-                {t.name}
+                {tpl.name}
               </Text>
               <Text style={{ color: colors.mutedText, fontSize: FontSize.xs }}>
-                {t.section_count} section{t.section_count > 1 ? 's' : ''}
+                {tp('templates.sectionCount', tpl.section_count)}
               </Text>
             </TouchableOpacity>
           ))}

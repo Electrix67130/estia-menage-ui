@@ -18,6 +18,7 @@ import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/const
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
 import {
   useLogementOptions,
   useOptionSuggestions,
@@ -40,6 +41,7 @@ interface Props {
 const LogementOptionsSection: React.FC<Props> = ({ logementId, isAdmin }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const options = useLogementOptions(logementId);
   const [editing, setEditing] = useState<{ item: LogementOption | null } | null>(null);
 
@@ -50,9 +52,9 @@ const LogementOptionsSection: React.FC<Props> = ({ logementId, isAdmin }) => {
     <View style={styles.wrap}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.title, { color: colors.text2 }]}>OPTIONS</Text>
+          <Text style={[styles.title, { color: colors.text2 }]}>{t('options.sectionTitle')}</Text>
           <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-            Packs proposés au client (romantique, anniversaire…).
+            {t('options.sectionSubtitle')}
           </Text>
         </View>
       </View>
@@ -64,7 +66,7 @@ const LogementOptionsSection: React.FC<Props> = ({ logementId, isAdmin }) => {
       ) : list.length === 0 ? (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={{ color: colors.mutedText, textAlign: 'center' }}>
-            Aucune option proposée sur ce logement.
+            {t('options.empty')}
           </Text>
         </View>
       ) : (
@@ -96,7 +98,7 @@ const LogementOptionsSection: React.FC<Props> = ({ logementId, isAdmin }) => {
         >
           <Plus size={IconSize.sm} color={colors.primary} />
           <Text style={{ color: colors.primary, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
-            Ajouter une option
+            {t('options.addOne')}
           </Text>
         </TouchableOpacity>
       ) : null}
@@ -125,6 +127,7 @@ function OptionEditModal({
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
+  const { t } = useTranslation();
   const suggestions = useOptionSuggestions();
   const create = useCreateLogementOption(logementId);
   const update = useUpdateLogementOption(logementId);
@@ -138,7 +141,7 @@ function OptionEditModal({
 
   const handleSave = async () => {
     if (!label.trim()) {
-      void dialog.alert({ title: 'Libellé requis', message: 'Donne un nom à l’option.' });
+      void dialog.alert({ title: t('options.labelRequiredTitle'), message: t('options.labelRequiredBody') });
       return;
     }
     const body = { label: label.trim(), description: description.trim() || null };
@@ -148,8 +151,8 @@ function OptionEditModal({
       onClose();
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Enregistrement impossible',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.saveFailed'),
       });
     }
   };
@@ -157,9 +160,9 @@ function OptionEditModal({
   const handleDelete = async () => {
     if (!item) return;
     const ok = await dialog.confirm({
-      title: 'Supprimer cette option ?',
-      message: `« ${item.label} » sera retirée des prestations où elle était cochée.`,
-      confirmLabel: 'Supprimer',
+      title: t('options.deleteConfirmTitle'),
+      message: t('options.deleteConfirmBody', { label: item.label }),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -168,8 +171,8 @@ function OptionEditModal({
       onClose();
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Suppression impossible',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.deleteFailed'),
       });
     }
   };
@@ -190,11 +193,11 @@ function OptionEditModal({
             <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <Text style={[sheetStyles.title, { color: colors.text }]}>
-            {item ? 'Modifier l’option' : 'Nouvelle option'}
+            {item ? t('options.editTitle') : t('options.newTitle')}
           </Text>
 
           <ScrollView keyboardShouldPersistTaps="handled">
-            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>LIBELLÉ</Text>
+            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('options.fieldLabel')}</Text>
             <TextInput
               style={[
                 sheetStyles.input,
@@ -202,7 +205,7 @@ function OptionEditModal({
               ]}
               value={label}
               onChangeText={setLabel}
-              placeholder="Ex : Pack romantique"
+              placeholder={t('options.labelPlaceholder')}
               placeholderTextColor={colors.placeholder}
               maxLength={150}
             />
@@ -229,7 +232,7 @@ function OptionEditModal({
               })}
             </View>
 
-            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>À INSTALLER (OPTIONNEL)</Text>
+            <Text style={[sheetStyles.fieldLabel, { color: colors.text2 }]}>{t('options.fieldDescription')}</Text>
             <TextInput
               style={[
                 sheetStyles.input,
@@ -243,7 +246,7 @@ function OptionEditModal({
               ]}
               value={description}
               onChangeText={setDescription}
-              placeholder="Pétales sur le lit, bougies, champagne au frais"
+              placeholder={t('options.descriptionPlaceholder')}
               placeholderTextColor={colors.placeholder}
               multiline
             />
@@ -257,7 +260,7 @@ function OptionEditModal({
             {saving ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={sheetStyles.submitText}>Enregistrer</Text>
+              <Text style={sheetStyles.submitText}>{t('common.save')}</Text>
             )}
           </TouchableOpacity>
 
@@ -269,7 +272,7 @@ function OptionEditModal({
             >
               <Trash2 size={IconSize.sm} color={colors.red} />
               <Text style={{ color: colors.red, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
-                Supprimer
+                {t('common.delete')}
               </Text>
             </TouchableOpacity>
           ) : null}

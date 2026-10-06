@@ -12,6 +12,7 @@ import { Colors } from '@/constants/Colors';
 import { FontSize, FontWeight, Spacing } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useOnlineStatus } from '@/lib/network';
+import { useTranslation } from '@/contexts/I18nContext';
 
 /** Hauteur visible du bandeau sous la zone safe (le contenu descend d'autant). */
 const STRIP = 30;
@@ -26,6 +27,7 @@ export default function OfflineBanner({ children }: { children: React.ReactNode 
   const online = useOnlineStatus();
   const insets = useSafeAreaInsets();
   const colors = Colors[useColorScheme()];
+  const { t } = useTranslation();
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -54,7 +56,7 @@ export default function OfflineBanner({ children }: { children: React.ReactNode 
         ]}
       >
         <CloudOff size={15} color="#fff" />
-        <Text style={styles.text}>Mode hors ligne — dernières données enregistrées</Text>
+        <Text style={styles.text}>{t('offline.banner')}</Text>
       </Animated.View>
     </View>
   );

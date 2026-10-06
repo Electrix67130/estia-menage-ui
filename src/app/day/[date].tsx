@@ -20,9 +20,17 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { usePersistedState } from '@/hooks/usePersistedState';
 import { formatDateFr } from '@/lib/date-fr';
 import { DayTimeline } from '@/components/DayTimeline';
+import { useTranslation } from '@/contexts/I18nContext';
+import { INTL_LOCALES, getIntlLocale } from '@/i18n/runtime';
+import type { Locale } from '@/i18n/translations';
 
 const PRESTATAIRE_UNASSIGNED = '__unassigned__';
-const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+/** Initiales des jours (lundi en premier) dans la langue donnée, via `Intl`. */
+function weekdayInitials(locale: Locale): string[] {
+  const fmt = new Intl.DateTimeFormat(INTL_LOCALES[locale], { weekday: 'narrow' });
+  // 2024-01-01 est un lundi.
+  return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2024, 0, 1 + i)).toUpperCase());
+}
 const SCREEN_W = Dimensions.get('window').width;
 // Bandeau semaine swipeable : on rend N semaines autour de la semaine de départ
 // (swipe horizontal = changer de semaine). STRIP_HALF de chaque côté.
@@ -51,8 +59,8 @@ function mondayOf(iso: string): Date {
 /** Titre de colonne façon Calendrier Apple : « jeu. — 2 juil. » */
 function columnTitle(iso: string): string {
   const d = new Date(`${iso}T00:00:00`);
-  const wd = new Intl.DateTimeFormat('fr-FR', { weekday: 'short' }).format(d);
-  const dm = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(d);
+  const wd = new Intl.DateTimeFormat(getIntlLocale(), { weekday: 'short' }).format(d);
+  const dm = new Intl.DateTimeFormat(getIntlLocale(), { day: 'numeric', month: 'short' }).format(d);
   return `${wd} — ${dm}`;
 }
 
@@ -66,6 +74,8 @@ export default function DayScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
+  const { t, locale } = useTranslation();
+  const weekdays = useMemo(() => weekdayInitials(locale), [locale]);
   const { date } = useLocalSearchParams<{ date: string }>();
   // `baseIso` = date d'ouverture (figée) → sert d'ancre au bandeau semaine.
   // `activeDate` = jour affiché (change au tap d'un jour).
@@ -129,7 +139,7 @@ export default function DayScreen() {
                 accessibilityLabel={formatDateFr(iso, 'weekday')}
                 accessibilityState={{ selected: isSelected }}
               >
-                <Text style={[styles.weekLetter, { color: colors.text2 }]}>{WEEKDAYS[i]}</Text>
+                <Text style={[styles.weekLetter, { color: colors.text2 }]}>{weekdays[i]}</Text>
                 <View style={[styles.weekPill, isSelected && { backgroundColor: colors.primary }]}>
                   <Text
                     style={{
@@ -157,7 +167,7 @@ export default function DayScreen() {
         style={styles.backRow}
         hitSlop={{ top: 12, bottom: 12, left: 8, right: 12 }}
         accessibilityRole="button"
-        accessibilityLabel="Retour au calendrier"
+        accessibilityLabel={t('day.backToCalendar')}
       >
         <ChevronLeft size={IconSize.lg} color={colors.primary} />
         <Text style={[styles.backLabel, { color: colors.primary }]}>{formatDateFr(activeDate, 'month')}</Text>

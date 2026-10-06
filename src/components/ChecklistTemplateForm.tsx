@@ -11,6 +11,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
 import AutoScrollInput from '@/components/AutoScrollInput';
 import {
   useChecklistTemplate,
@@ -39,6 +40,7 @@ export default function ChecklistTemplateForm({ templateId }: { templateId?: str
   const colors = Colors[colorScheme];
   const router = useRouter();
   const dialog = useDialog();
+  const { t } = useTranslation();
   const isEdit = !!templateId;
 
   const detail = useChecklistTemplate(templateId);
@@ -89,7 +91,7 @@ export default function ChecklistTemplateForm({ templateId }: { templateId?: str
 
   const handleSave = async () => {
     if (!name.trim()) {
-      void dialog.alert({ title: 'Nom requis', message: 'Donne un nom au modèle.' });
+      void dialog.alert({ title: t('templates.nameRequiredTitle'), message: t('templates.nameRequiredBody') });
       return;
     }
     const cleanSections: TemplateSectionInput[] = sections
@@ -108,7 +110,7 @@ export default function ChecklistTemplateForm({ templateId }: { templateId?: str
       }
       router.back();
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('checklist.failed') });
     }
   };
 
@@ -131,7 +133,7 @@ export default function ChecklistTemplateForm({ templateId }: { templateId?: str
             onLongPress={drag}
             delayLongPress={120}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Déplacer la section (maintenir appuyé)"
+            accessibilityLabel={t('templates.dragSectionA11y')}
           >
             <GripVertical size={IconSize.md} color={colors.mutedText} />
           </TouchableOpacity>
@@ -142,7 +144,7 @@ export default function ChecklistTemplateForm({ templateId }: { templateId?: str
             ]}
             value={section.label}
             onChangeText={(t) => setSectionLabel(section.key, t)}
-            placeholder="Nom de la section (ex. Cuisine)"
+            placeholder={t('templates.sectionPlaceholder')}
             placeholderTextColor={colors.placeholder}
           />
           <TouchableOpacity
@@ -162,7 +164,7 @@ export default function ChecklistTemplateForm({ templateId }: { templateId?: str
               ]}
               value={item.label}
               onChangeText={(t) => setItemLabel(section.key, ii, t)}
-              placeholder="Tâche (ex. Nettoyer le plan de travail)"
+              placeholder={t('templates.taskPlaceholder')}
               placeholderTextColor={colors.placeholder}
             />
             <TouchableOpacity
@@ -176,7 +178,7 @@ export default function ChecklistTemplateForm({ templateId }: { templateId?: str
         <TouchableOpacity style={styles.addItemBtn} onPress={() => addItem(section.key)}>
           <Plus size={IconSize.sm} color={colors.primary} />
           <Text style={{ color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.semibold }}>
-            Ajouter une tâche
+            {t('templates.addTask')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -190,7 +192,7 @@ export default function ChecklistTemplateForm({ templateId }: { templateId?: str
           <ArrowLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: colors.text }]}>
-          {isEdit ? 'Modifier le modèle' : 'Nouveau modèle'}
+          {isEdit ? t('templates.titleEdit') : t('templates.titleNew')}
         </Text>
         <View style={{ width: IconSize.lg }} />
       </View>
@@ -209,7 +211,7 @@ export default function ChecklistTemplateForm({ templateId }: { templateId?: str
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
             <>
-              <Text style={[styles.label, { color: colors.text2 }]}>Nom du modèle</Text>
+              <Text style={[styles.label, { color: colors.text2 }]}>{t('templates.nameLabel')}</Text>
               <AutoScrollInput
                 style={[
                   styles.input,
@@ -217,11 +219,11 @@ export default function ChecklistTemplateForm({ templateId }: { templateId?: str
                 ]}
                 value={name}
                 onChangeText={setName}
-                placeholder="Ex. Studio standard"
+                placeholder={t('templates.namePlaceholderChecklist')}
                 placeholderTextColor={colors.placeholder}
               />
               <Text style={[styles.hint, { color: colors.mutedText }]}>
-                Maintiens appuyé sur la poignée à gauche d'une section pour la déplacer.
+                {t('templates.dragHint')}
               </Text>
             </>
           }
@@ -233,7 +235,7 @@ export default function ChecklistTemplateForm({ templateId }: { templateId?: str
               >
                 <Plus size={IconSize.sm} color={colors.primary} />
                 <Text style={{ color: colors.primary, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
-                  Ajouter une section
+                  {t('templates.addSection')}
                 </Text>
               </TouchableOpacity>
 
@@ -243,7 +245,7 @@ export default function ChecklistTemplateForm({ templateId }: { templateId?: str
                 disabled={saving}
               >
                 <Save size={IconSize.md} color="#FFFFFF" />
-                <Text style={styles.submitText}>{saving ? 'Enregistrement…' : 'Enregistrer'}</Text>
+                <Text style={styles.submitText}>{saving ? t('common.saving') : t('common.save')}</Text>
               </TouchableOpacity>
             </>
           }

@@ -4,12 +4,9 @@ import { AlertTriangle, ChevronRight } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, FontSize, FontWeight, Radius } from '@/constants/Layout';
 import type { Menage, MenageStatus } from '@/api/types';
-import {
-  menagePrestataireLabel,
-  menageLogementLabel,
-  prestationTypeLabel,
-  prestationTypeColorKey,
-} from '@/api/types';
+import { menagePrestataireLabel, menageLogementLabel, prestationTypeColorKey } from '@/api/types';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 
 type ColorSet = (typeof Colors)['light'];
 
@@ -17,19 +14,16 @@ type ColorSet = (typeof Colors)['light'];
 const TL_HOUR_H = 56;
 const TL_GUTTER = 52;
 
-export function labelForStatus(s: MenageStatus): string {
-  switch (s) {
-    case 'a_venir':
-      return 'À venir';
-    case 'en_cours':
-      return 'En cours';
-    case 'termine':
-      return 'Terminé';
-    case 'valide':
-      return 'Validé';
-    case 'annule':
-      return 'Annulé';
-  }
+const STATUS_KEYS: Record<MenageStatus, TranslationKeys> = {
+  a_venir: 'menage.statusUpcoming',
+  en_cours: 'menage.statusInProgress',
+  termine: 'menage.statusCompleted',
+  valide: 'menage.statusValidated',
+  annule: 'menage.statusCancelled',
+};
+
+export function statusKey(s: MenageStatus): TranslationKeys {
+  return STATUS_KEYS[s];
 }
 
 /** Une ligne agenda (style liste Calendrier Apple). */
@@ -46,9 +40,11 @@ export function AgendaRow({
   topBorder?: boolean;
   surface?: boolean;
 }) {
+  const { t } = useTranslation();
   const unassigned = !m.prestataire_user_id;
   const needsAttention = !!m.needs_attention;
   const typeColor = colors[prestationTypeColorKey(m.prestation_type)];
+  const typeLabel = t(`prestationType.${m.prestation_type ?? 'menage'}` as TranslationKeys);
   // Liseré = couleur du logement (le tag de type reste, lui, coloré par type).
   const logementColor = m.logement_color ?? typeColor;
   return (
@@ -73,23 +69,23 @@ export function AgendaRow({
           </Text>
           <View
             style={[styles.badgeType, { backgroundColor: typeColor + '20' }]}
-            accessibilityLabel={prestationTypeLabel(m.prestation_type)}
+            accessibilityLabel={typeLabel}
           >
-            <Text style={[styles.badgeTypeText, { color: typeColor }]}>{prestationTypeLabel(m.prestation_type)}</Text>
+            <Text style={[styles.badgeTypeText, { color: typeColor }]}>{typeLabel}</Text>
           </View>
         </View>
         <Text style={[styles.agendaSub, { color: colors.text2 }]} numberOfLines={1}>
-          {unassigned ? 'Non assigné' : menagePrestataireLabel(m)}
+          {unassigned ? t('common.unassigned') : menagePrestataireLabel(m)}
           {' · '}
-          {labelForStatus(m.status)}
+          {t(statusKey(m.status))}
         </Text>
         {needsAttention ? (
           <View
             style={[styles.badgeLate, { backgroundColor: colors.red + '20', alignSelf: 'flex-start', marginTop: 4 }]}
-            accessibilityLabel="Jour passé sans pointage"
+            accessibilityLabel={t('timeline.pastDayNotClockedIn')}
           >
             <AlertTriangle size={11} color={colors.red} />
-            <Text style={[styles.badgeLateText, { color: colors.red }]}>Non pointé</Text>
+            <Text style={[styles.badgeLateText, { color: colors.red }]}>{t('menage.statusNotClockedIn')}</Text>
           </View>
         ) : null}
       </View>

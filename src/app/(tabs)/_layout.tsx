@@ -42,7 +42,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="logements"
         options={{
-          title: 'Logements',
+          title: t('tabs.logements'),
           tabBarIcon: ({ color }) => <Home size={IconSize.lg} color={color} />,
         }}
       />
@@ -53,7 +53,7 @@ export default function TabsLayout() {
           // list/calendar en haut à droite), à la fois pour prestataire et
           // admin. On masque cet onglet — la route reste accessible
           // directement via /(tabs)/calendar (réutilisée depuis Dispos).
-          title: 'Calendrier',
+          title: t('tabs.calendar'),
           tabBarIcon: ({ color }) => <CalendarDays size={IconSize.lg} color={color} />,
           href: null,
         }}
@@ -61,7 +61,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="collaborateurs"
         options={{
-          title: 'Équipe',
+          title: t('tabs.team'),
           tabBarIcon: ({ color }) => <Users size={IconSize.lg} color={color} />,
           // Masqué pour clients ET prestataires : seul l'admin gère l'équipe.
           href: isPrestataire ? null : '/(tabs)/collaborateurs',
@@ -70,7 +70,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="mes-disponibilites"
         options={{
-          title: 'Calendrier',
+          title: t('tabs.calendar'),
           tabBarIcon: ({ color }) => <CalendarDays size={IconSize.lg} color={color} />,
           // Vue calendrier (mois) pour tout le monde sauf client. La liste
           // dispo "Présent/Absent" du presta vit maintenant dans l'onglet
@@ -87,7 +87,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profil"
         options={{
-          title: 'Profil',
+          title: t('tabs.profile'),
           tabBarIcon: ({ color }) => <UserCircle size={IconSize.lg} color={color} />,
         }}
       />

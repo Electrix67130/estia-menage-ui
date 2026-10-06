@@ -4,6 +4,7 @@ import { Check, CheckCheck, Square } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTranslation } from '@/contexts/I18nContext';
 import { useMenageCheck, useToggleItem, useToggleSection, useToggleAll } from '@/api/hooks/useMenageCheck';
 
 interface Props {
@@ -26,6 +27,7 @@ export const SECTION_ICONS: Record<string, string> = {
 export default function MenageCheckList({ menageId, readonly }: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const { data: tree, isLoading } = useMenageCheck(menageId);
   const toggleMutation = useToggleItem(menageId);
   const toggleSection = useToggleSection(menageId);
@@ -43,7 +45,7 @@ export default function MenageCheckList({ menageId, readonly }: Props) {
   if (!tree || tree.length === 0) {
     return (
       <View style={styles.loading}>
-        <Text style={{ color: colors.mutedText }}>Aucune checklist générée.</Text>
+        <Text style={{ color: colors.mutedText }}>{t('checklist.empty')}</Text>
       </View>
     );
   }
@@ -62,7 +64,7 @@ export default function MenageCheckList({ menageId, readonly }: Props) {
         >
           <CheckCheck size={IconSize.sm} color={colors.primary} />
           <Text style={[styles.bulkAllText, { color: colors.primary }]}>
-            {allDone ? 'Tout décocher' : 'Tout cocher'}
+            {allDone ? t('checklist.uncheckAll') : t('checklist.checkAll')}
           </Text>
         </TouchableOpacity>
       ) : null}
@@ -86,7 +88,7 @@ export default function MenageCheckList({ menageId, readonly }: Props) {
                   onPress={() => toggleSection.mutate({ sectionId: section.id, validated: !sectionAllDone })}
                   disabled={bulkPending}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  accessibilityLabel={sectionAllDone ? 'Décocher la section' : 'Cocher toute la section'}
+                  accessibilityLabel={sectionAllDone ? t('checklist.uncheckSection') : t('checklist.checkSection')}
                 >
                   {sectionAllDone ? (
                     <Square size={IconSize.sm} color={colors.text2} />

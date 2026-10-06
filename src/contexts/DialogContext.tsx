@@ -10,6 +10,7 @@ import {
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTranslation } from '@/contexts/I18nContext';
 
 /**
  * Provider de modals confirm/alert au niveau racine de l'app, à utiliser
@@ -114,6 +115,7 @@ function DialogModal({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const visible = !!pending;
   // Snapshot des opts au moment d'ouvrir pour éviter un flash visuel pendant
   // que la modal se ferme (l'animation de close lit encore les props).
@@ -127,10 +129,10 @@ function DialogModal({
   const isConfirm = snapshot.kind === 'confirm';
   const isDestructive = isConfirm && (snapshot.opts as ConfirmOptions).destructive;
   const confirmLabel = isConfirm
-    ? (snapshot.opts as ConfirmOptions).confirmLabel ?? 'Confirmer'
-    : (snapshot.opts as AlertOptions).buttonLabel ?? 'OK';
+    ? (snapshot.opts as ConfirmOptions).confirmLabel ?? t('common.confirm')
+    : (snapshot.opts as AlertOptions).buttonLabel ?? t('common.ok');
   const cancelLabel = isConfirm
-    ? (snapshot.opts as ConfirmOptions).cancelLabel ?? 'Annuler'
+    ? (snapshot.opts as ConfirmOptions).cancelLabel ?? t('common.cancel')
     : null;
 
   return (

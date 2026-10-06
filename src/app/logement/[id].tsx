@@ -41,6 +41,8 @@ import ImageView from 'react-native-image-viewing';
 import { useLogementPhotos } from '@/api/hooks/usePhotos';
 import { openMaps } from '@/lib/contact-links';
 import { formatQtyUnit } from '@/lib/unit-fr';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 import {
   useLogementRooms,
   useCreateRoom,
@@ -59,20 +61,20 @@ import {
 } from '@/api/hooks/useConsommables';
 
 /** Types de pièce sélectionnables (piscine/jacuzzi gérés via les équipements du logement). */
-const ROOM_KINDS: { value: RoomKind; label: string }[] = [
-  { value: 'chambre', label: 'Chambre' },
-  { value: 'salle_de_bain', label: 'Salle de bain' },
-  { value: 'wc', label: 'WC' },
-  { value: 'cuisine', label: 'Cuisine' },
-  { value: 'salon', label: 'Salon' },
-  { value: 'salle_a_manger', label: 'Salle à manger' },
-  { value: 'bureau', label: 'Bureau' },
-  { value: 'entree', label: 'Entrée' },
-  { value: 'couloir', label: 'Couloir' },
-  { value: 'exterieur', label: 'Extérieur' },
-  { value: 'cave', label: 'Cave' },
-  { value: 'buanderie', label: 'Buanderie' },
-  { value: 'autre', label: 'Autre' },
+const ROOM_KINDS: { value: RoomKind; labelKey: TranslationKeys }[] = [
+  { value: 'chambre', labelKey: 'logement.roomKind.chambre' },
+  { value: 'salle_de_bain', labelKey: 'logement.roomKind.salle_de_bain' },
+  { value: 'wc', labelKey: 'logement.roomKind.wc' },
+  { value: 'cuisine', labelKey: 'logement.roomKind.cuisine' },
+  { value: 'salon', labelKey: 'logement.roomKind.salon' },
+  { value: 'salle_a_manger', labelKey: 'logement.roomKind.salle_a_manger' },
+  { value: 'bureau', labelKey: 'logement.roomKind.bureau' },
+  { value: 'entree', labelKey: 'logement.roomKind.entree' },
+  { value: 'couloir', labelKey: 'logement.roomKind.couloir' },
+  { value: 'exterieur', labelKey: 'logement.roomKind.exterieur' },
+  { value: 'cave', labelKey: 'logement.roomKind.cave' },
+  { value: 'buanderie', labelKey: 'logement.roomKind.buanderie' },
+  { value: 'autre', labelKey: 'logement.roomKind.autre' },
 ];
 
 export default function LogementDetailScreen() {
@@ -80,6 +82,7 @@ export default function LogementDetailScreen() {
   const colors = Colors[colorScheme];
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { t, tp } = useTranslation();
   const { data: logement, isLoading } = useLogement(id);
   const deleteMutation = useDeleteLogement();
   const unarchiveMutation = useUnarchiveLogement();
@@ -112,7 +115,7 @@ export default function LogementDetailScreen() {
         },
       });
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Upload impossible' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('logement.uploadFailed') });
     } finally {
       setCoverUploading(false);
     }
@@ -138,10 +141,9 @@ export default function LogementDetailScreen() {
 
   const handleDelete = async () => {
     const ok = await dialog.confirm({
-      title: 'Archiver le logement ?',
-      message:
-        'Le logement sera archivé, ainsi que TOUTES les prestations qui le concernent (ménages, check-in, check-out) et ses consommables.',
-      confirmLabel: 'Archiver',
+      title: t('logement.archiveConfirmTitle'),
+      message: t('logement.archiveConfirmBody'),
+      confirmLabel: t('menage.archive'),
       destructive: true,
     });
     if (!ok) return;
@@ -149,43 +151,36 @@ export default function LogementDetailScreen() {
       const res = await deleteMutation.mutateAsync(id!);
       const n = res?.archived_menages ?? 0;
       void dialog.alert({
-        title: 'Logement archivé',
-        message:
-          n > 0
-            ? `${n} prestation${n > 1 ? 's' : ''} ${n > 1 ? 'ont' : 'a'} aussi été archivée${n > 1 ? 's' : ''}.`
-            : 'Le logement a été archivé.',
+        title: t('logement.archivedTitle'),
+        message: n > 0 ? tp('logement.archivedWithMenages', n) : t('logement.archivedBody'),
       });
       router.back();
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Archivage impossible',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('logement.archiveFailed'),
       });
     }
   };
 
   const handleUnarchive = async () => {
     const ok = await dialog.confirm({
-      title: 'Restaurer le logement ?',
-      message:
-        'Le logement et les prestations/consommables archivés avec lui seront réactivés.',
-      confirmLabel: 'Restaurer',
+      title: t('logement.unarchiveConfirmTitle'),
+      message: t('logement.unarchiveConfirmBody'),
+      confirmLabel: t('logement.restore'),
     });
     if (!ok) return;
     try {
       const res = await unarchiveMutation.mutateAsync(id!);
       const n = res?.unarchived_menages ?? 0;
       void dialog.alert({
-        title: 'Logement restauré',
-        message:
-          n > 0
-            ? `${n} prestation${n > 1 ? 's' : ''} ${n > 1 ? 'ont' : 'a'} aussi été restaurée${n > 1 ? 's' : ''}.`
-            : 'Le logement a été restauré.',
+        title: t('logement.restoredTitle'),
+        message: n > 0 ? tp('logement.restoredWithMenages', n) : t('logement.restoredBody'),
       });
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Restauration impossible',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('logement.unarchiveFailed'),
       });
     }
   };
@@ -204,7 +199,7 @@ export default function LogementDetailScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loading}>
-          <Text style={{ color: colors.mutedText }}>Logement introuvable</Text>
+          <Text style={{ color: colors.mutedText }}>{t('logement.notFound')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -217,7 +212,7 @@ export default function LogementDetailScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('common.back')}
         >
           <ArrowLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
@@ -229,24 +224,24 @@ export default function LogementDetailScreen() {
             logement.archived_at ? (
               <TouchableOpacity
                 onPress={handleUnarchive}
-                accessibilityLabel="Restaurer le logement"
+                accessibilityLabel={t('logement.restoreA11y')}
                 style={[styles.headerCta, { backgroundColor: colors.primary }]}
                 disabled={unarchiveMutation.isPending}
               >
                 <RotateCcw size={IconSize.sm} color="#FFFFFF" />
-                <Text style={styles.headerCtaText}>Restaurer</Text>
+                <Text style={styles.headerCtaText}>{t('logement.restore')}</Text>
               </TouchableOpacity>
             ) : (
               <>
                 <TouchableOpacity
                   onPress={() => router.push(`/menage/create?logement_id=${id}`)}
-                  accessibilityLabel="Nouveau ménage"
+                  accessibilityLabel={t('menage.create')}
                   style={[styles.headerCta, { backgroundColor: colors.primary }]}
                 >
                   <Plus size={IconSize.sm} color="#FFFFFF" />
-                  <Text style={styles.headerCtaText}>Ménage</Text>
+                  <Text style={styles.headerCtaText}>{t('prestationType.menage')}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleDelete} accessibilityLabel="Supprimer">
+                <TouchableOpacity onPress={handleDelete} accessibilityLabel={t('menage.archive')}>
                   <Trash2 size={IconSize.md} color={colors.red} />
                 </TouchableOpacity>
               </>
@@ -269,7 +264,7 @@ export default function LogementDetailScreen() {
               <View style={styles.coverPlaceholder}>
                 <Camera size={IconSize.xl} color={colors.text2} />
                 <Text style={{ color: colors.text2, fontSize: FontSize.sm }}>
-                  Ajouter une photo de couverture
+                  {t('logement.addCoverPhoto')}
                 </Text>
               </View>
             )}
@@ -309,7 +304,7 @@ export default function LogementDetailScreen() {
 
         {isAdmin ? <LogementInfoForm logementId={logement.id} /> : null}
 
-        <Text style={[styles.section, { color: colors.text2 }]}>PIÈCES</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('logement.rooms.section').toUpperCase()}</Text>
         <RoomsSection
           logementId={logement.id}
           isAdmin={isAdmin}
@@ -323,7 +318,7 @@ export default function LogementDetailScreen() {
 
         {isAdmin ? (
           <>
-            <Text style={[styles.section, { color: colors.text2 }]}>CONSOMMABLES</Text>
+            <Text style={[styles.section, { color: colors.text2 }]}>{t('consommables.section').toUpperCase()}</Text>
             <ConsommablesSection logementId={logement.id} />
           </>
         ) : null}
@@ -335,7 +330,7 @@ export default function LogementDetailScreen() {
 
         {!isAdmin && logement.notes ? (
           <>
-            <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
+            <Text style={[styles.section, { color: colors.text2 }]}>{t('logement.sectionNotes').toUpperCase()}</Text>
             <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={{ color: colors.text }}>{logement.notes}</Text>
             </View>
@@ -354,7 +349,7 @@ export default function LogementDetailScreen() {
           <LogementMembersSection logementId={logement.id} isAdmin={isAdmin} role="prestataire" />
         ) : null}
 
-        <Text style={[styles.section, { color: colors.text2 }]}>CHECKLIST PERSONNALISÉE</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('logement.sectionChecklist').toUpperCase()}</Text>
         <CheckTemplateEditor logementId={logement.id} isAdmin={isAdmin} />
 
         {isAdmin ? <LogementExternalCalendarsSection logementId={logement.id} /> : null}
@@ -389,6 +384,7 @@ function RoomsSection({
 }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const rooms = useLogementRooms(logementId);
   const list = rooms.data ?? [];
 
@@ -425,7 +421,7 @@ function RoomsSection({
           style={[styles.roomsEmpty, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
           <Text style={{ color: colors.mutedText, textAlign: 'center' }}>
-            {isAdmin ? 'Aucune pièce. Ajoute-en une.' : 'Aucune pièce.'}
+            {isAdmin ? t('logement.roomsEmptyAdmin') : t('logement.roomsEmpty')}
           </Text>
         </View>
       ) : (
@@ -476,10 +472,10 @@ function RoomsSection({
           style={[styles.addRoomBtn, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}
           onPress={onAdd}
           accessibilityRole="button"
-          accessibilityLabel="Ajouter une pièce"
+          accessibilityLabel={t('logement.addRoom')}
         >
           <Plus size={IconSize.sm} color={colors.primary} />
-          <Text style={[styles.addRoomText, { color: colors.primary }]}>Ajouter une pièce</Text>
+          <Text style={[styles.addRoomText, { color: colors.primary }]}>{t('logement.addRoom')}</Text>
         </TouchableOpacity>
       ) : null}
 
@@ -512,6 +508,7 @@ function RoomEditModal({
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
+  const { t } = useTranslation();
   const createRoom = useCreateRoom(logementId);
   const updateRoom = useUpdateRoom(logementId);
   const deleteRoom = useDeleteRoom(logementId);
@@ -543,7 +540,7 @@ function RoomEditModal({
       );
       setPhotoUrl(uploaded.url);
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Upload impossible' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('logement.uploadFailed') });
     } finally {
       setUploading(false);
     }
@@ -551,11 +548,11 @@ function RoomEditModal({
 
   const handleSave = async () => {
     if (!kind) {
-      void dialog.alert({ title: 'Type requis', message: 'Choisis un type de pièce.' });
+      void dialog.alert({ title: t('logement.roomTypeRequiredTitle'), message: t('logement.roomTypeRequiredBody') });
       return;
     }
     if (kind === 'autre' && !name.trim()) {
-      void dialog.alert({ title: 'Nom requis', message: 'Donne un nom à la pièce.' });
+      void dialog.alert({ title: t('logement.roomNameRequiredTitle'), message: t('logement.roomNameRequiredBody') });
       return;
     }
     // On retire un éventuel token de signature (`?t=...`) de l'URL avant de la
@@ -572,16 +569,16 @@ function RoomEditModal({
       }
       onClose();
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Enregistrement impossible' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('common.saveFailed') });
     }
   };
 
   const handleDelete = async () => {
     if (!room) return;
     const ok = await dialog.confirm({
-      title: 'Supprimer la pièce ?',
-      message: `« ${room.name} » sera supprimée.`,
-      confirmLabel: 'Supprimer',
+      title: t('logement.deleteRoomTitle'),
+      message: t('logement.deleteRoomBody', { name: room.name }),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -589,7 +586,7 @@ function RoomEditModal({
       await deleteRoom.mutateAsync(room.id);
       onClose();
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Suppression impossible' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('common.deleteFailed') });
     }
   };
 
@@ -609,10 +606,10 @@ function RoomEditModal({
         >
           <SheetHandle gesture={swipe.gesture} />
           <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.sm }]}>
-            {room ? 'Modifier la pièce' : 'Nouvelle pièce'}
+            {room ? t('logement.editRoom') : t('logement.newRoom')}
           </Text>
 
-          <Text style={[styles.modalLabel, { color: colors.text2 }]}>Type de pièce</Text>
+          <Text style={[styles.modalLabel, { color: colors.text2 }]}>{t('logement.roomType')}</Text>
           <View style={styles.kindWrap}>
             {ROOM_KINDS.map((k) => {
               const active = kind === k.value;
@@ -625,10 +622,10 @@ function RoomEditModal({
                   ]}
                   onPress={() => setKind(k.value)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Type : ${k.label}`}
+                  accessibilityLabel={t('logement.roomTypeA11y', { type: t(k.labelKey) })}
                 >
                   <Text style={{ color: active ? '#FFFFFF' : colors.text, fontSize: FontSize.sm, fontWeight: FontWeight.medium }}>
-                    {k.label}
+                    {t(k.labelKey)}
                   </Text>
                 </TouchableOpacity>
               );
@@ -637,18 +634,18 @@ function RoomEditModal({
 
           {kind === 'autre' ? (
             <>
-              <Text style={[styles.modalLabel, { color: colors.text2 }]}>Nom de la pièce</Text>
+              <Text style={[styles.modalLabel, { color: colors.text2 }]}>{t('logement.roomName')}</Text>
               <TextInput
                 style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
                 value={name}
                 onChangeText={setName}
-                placeholder="Ex. Salle de jeux"
+                placeholder={t('logement.roomNamePlaceholder')}
                 placeholderTextColor={colors.placeholder}
               />
             </>
           ) : null}
 
-          <Text style={[styles.modalLabel, { color: colors.text2 }]}>Photo de couverture</Text>
+          <Text style={[styles.modalLabel, { color: colors.text2 }]}>{t('logement.coverPhoto')}</Text>
           <TouchableOpacity
             style={[styles.coverPicker, { borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             onPress={handlePickPhoto}
@@ -660,7 +657,7 @@ function RoomEditModal({
             ) : (
               <View style={styles.coverPickerPlaceholder}>
                 <ImageIcon size={IconSize.lg} color={colors.text2} />
-                <Text style={{ color: colors.text2, fontSize: FontSize.sm }}>Choisir une photo</Text>
+                <Text style={{ color: colors.text2, fontSize: FontSize.sm }}>{t('logement.choosePhoto')}</Text>
               </View>
             )}
             {uploading ? (
@@ -670,8 +667,8 @@ function RoomEditModal({
             ) : null}
           </TouchableOpacity>
           {photoUrl && !uploading ? (
-            <TouchableOpacity onPress={() => setPhotoUrl(null)} accessibilityLabel="Retirer la photo">
-              <Text style={{ color: colors.red, fontSize: FontSize.sm, textAlign: 'center' }}>Retirer la photo</Text>
+            <TouchableOpacity onPress={() => setPhotoUrl(null)} accessibilityLabel={t('logement.removePhoto')}>
+              <Text style={{ color: colors.red, fontSize: FontSize.sm, textAlign: 'center' }}>{t('logement.removePhoto')}</Text>
             </TouchableOpacity>
           ) : null}
 
@@ -683,7 +680,7 @@ function RoomEditModal({
             {saving ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.modalSubmitText}>Enregistrer</Text>
+              <Text style={styles.modalSubmitText}>{t('common.save')}</Text>
             )}
           </TouchableOpacity>
 
@@ -695,7 +692,7 @@ function RoomEditModal({
             >
               <Trash size={IconSize.sm} color={colors.red} />
               <Text style={{ color: colors.red, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
-                Supprimer la pièce
+                {t('logement.deleteRoom')}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -708,6 +705,7 @@ function RoomEditModal({
 function ConsommablesSection({ logementId }: { logementId: string }) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const { data, isLoading } = useLogementConsommables(logementId);
   const [modal, setModal] = useState<{ mode: 'create' } | { mode: 'edit'; item: ConsommableLine } | null>(null);
   const list = data ?? [];
@@ -725,9 +723,9 @@ function ConsommablesSection({ logementId }: { logementId: string }) {
       {list.map((c) => {
         const badge =
           c.qty === null
-            ? { text: 'jamais relevé', color: colors.text2 }
+            ? { text: t('consommables.neverCounted'), color: colors.text2 }
             : c.needs_restock
-              ? { text: `${formatQtyUnit(c.qty, c.unit)} · à racheter`, color: colors.red }
+              ? { text: t('consommables.restock', { qty: formatQtyUnit(c.qty, c.unit) }), color: colors.red }
               : { text: formatQtyUnit(c.qty, c.unit), color: colors.primary };
         return (
           <TouchableOpacity
@@ -739,7 +737,7 @@ function ConsommablesSection({ logementId }: { logementId: string }) {
             <View style={{ flex: 1 }}>
               <Text style={{ color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.medium }}>{c.label}</Text>
               <Text style={{ color: colors.text2, fontSize: FontSize.sm }}>
-                Seuil : {formatQtyUnit(c.seuil_alerte, c.unit)}
+                {t('consommables.threshold', { qty: formatQtyUnit(c.seuil_alerte, c.unit) })}
               </Text>
             </View>
             <Text style={{ color: badge.color, fontSize: FontSize.sm, fontWeight: FontWeight.semibold }}>{badge.text}</Text>
@@ -751,7 +749,7 @@ function ConsommablesSection({ logementId }: { logementId: string }) {
         onPress={() => setModal({ mode: 'create' })}
       >
         <Plus size={IconSize.sm} color={colors.primary} />
-        <Text style={[styles.addRoomText, { color: colors.primary }]}>Ajouter un consommable</Text>
+        <Text style={[styles.addRoomText, { color: colors.primary }]}>{t('consommables.add')}</Text>
       </TouchableOpacity>
 
       {modal ? (
@@ -778,6 +776,7 @@ function ConsommableEditModal({
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
+  const { t } = useTranslation();
   const create = useCreateConsommable(logementId);
   const update = useUpdateConsommable(logementId);
   const remove = useDeleteConsommable(logementId);
@@ -795,12 +794,12 @@ function ConsommableEditModal({
 
   const handleSave = async () => {
     if (!label.trim()) {
-      void dialog.alert({ title: 'Nom requis', message: 'Donne un nom au consommable.' });
+      void dialog.alert({ title: t('consommables.nameRequiredTitle'), message: t('consommables.nameRequiredBody') });
       return;
     }
     const seuilNum = parseInt(seuil, 10);
     if (Number.isNaN(seuilNum) || seuilNum < 0) {
-      void dialog.alert({ title: 'Seuil invalide', message: 'Le seuil doit être un entier positif.' });
+      void dialog.alert({ title: t('consommables.thresholdInvalidTitle'), message: t('consommables.thresholdInvalidBody') });
       return;
     }
     const body = { label: label.trim(), unit: unit.trim() || null, seuil_alerte: seuilNum };
@@ -820,16 +819,16 @@ function ConsommableEditModal({
       }
       onClose();
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Enregistrement impossible' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('common.saveFailed') });
     }
   };
 
   const handleDelete = async () => {
     if (!item) return;
     const ok = await dialog.confirm({
-      title: 'Supprimer le consommable ?',
-      message: `« ${item.label} » sera supprimé.`,
-      confirmLabel: 'Supprimer',
+      title: t('consommables.deleteTitle'),
+      message: t('consommables.deleteBody', { name: item.label }),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -837,7 +836,7 @@ function ConsommableEditModal({
       await remove.mutateAsync(item.logement_consommable_id);
       onClose();
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Suppression impossible' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('common.deleteFailed') });
     }
   };
 
@@ -855,28 +854,28 @@ function ConsommableEditModal({
         >
           <SheetHandle gesture={swipe.gesture} />
           <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.sm }]}>
-            {item ? 'Modifier le consommable' : 'Nouveau consommable'}
+            {item ? t('consommables.edit') : t('consommables.new')}
           </Text>
 
-          <Text style={[styles.modalLabel, { color: colors.text2 }]}>Nom</Text>
+          <Text style={[styles.modalLabel, { color: colors.text2 }]}>{t('consommables.name')}</Text>
           <TextInput
             style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={label}
             onChangeText={setLabel}
-            placeholder="Ex. Papier toilette"
+            placeholder={t('consommables.namePlaceholder')}
             placeholderTextColor={colors.placeholder}
           />
 
-          <Text style={[styles.modalLabel, { color: colors.text2 }]}>Unité (optionnel)</Text>
+          <Text style={[styles.modalLabel, { color: colors.text2 }]}>{t('consommables.unit')}</Text>
           <TextInput
             style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={unit}
             onChangeText={setUnit}
-            placeholder="Ex. rouleaux"
+            placeholder={t('consommables.unitPlaceholder')}
             placeholderTextColor={colors.placeholder}
           />
 
-          <Text style={[styles.modalLabel, { color: colors.text2 }]}>Seuil d&apos;alerte</Text>
+          <Text style={[styles.modalLabel, { color: colors.text2 }]}>{t('consommables.alertThreshold')}</Text>
           <TextInput
             style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={seuil}
@@ -888,12 +887,12 @@ function ConsommableEditModal({
 
           {item ? (
             <>
-              <Text style={[styles.modalLabel, { color: colors.text2 }]}>Stock actuel</Text>
+              <Text style={[styles.modalLabel, { color: colors.text2 }]}>{t('consommables.currentStock')}</Text>
               <TextInput
                 style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
                 value={qty}
                 onChangeText={setQty}
-                placeholder={item.qty === null ? 'Initialiser le stock' : '0'}
+                placeholder={item.qty === null ? t('consommables.initStock') : '0'}
                 placeholderTextColor={colors.placeholder}
                 keyboardType="number-pad"
               />
@@ -905,7 +904,7 @@ function ConsommableEditModal({
             onPress={handleSave}
             disabled={saving}
           >
-            {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modalSubmitText}>Enregistrer</Text>}
+            {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.modalSubmitText}>{t('common.save')}</Text>}
           </TouchableOpacity>
 
           {item ? (
@@ -916,7 +915,7 @@ function ConsommableEditModal({
             >
               <Trash size={IconSize.sm} color={colors.red} />
               <Text style={{ color: colors.red, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
-                Supprimer le consommable
+                {t('consommables.delete')}
               </Text>
             </TouchableOpacity>
           ) : null}

@@ -1,4 +1,5 @@
 import { getAccessToken, MAX_429_RETRIES, retryDelayMs, sleep } from './client';
+import { translate } from '@/i18n/runtime';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
 const API_KEY = process.env.EXPO_PUBLIC_API_KEY || 'change-me-in-production';
@@ -47,7 +48,7 @@ async function doUpload(fileUri: string, fileName: string, mimeType?: string): P
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.message || 'Upload failed');
+    throw new Error(err.message || translate('upload.failed'));
   }
 
   return response.json();

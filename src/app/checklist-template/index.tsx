@@ -7,6 +7,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
 import {
   useChecklistTemplates,
   useDeleteChecklistTemplate,
@@ -18,21 +19,22 @@ export default function ChecklistTemplateListScreen() {
   const colors = Colors[colorScheme];
   const router = useRouter();
   const dialog = useDialog();
+  const { t, tp } = useTranslation();
   const { data, isLoading, isRefetching, refetch } = useChecklistTemplates();
   const remove = useDeleteChecklistTemplate();
 
   const handleDelete = async (tpl: ChecklistTemplateListItem) => {
     const ok = await dialog.confirm({
-      title: 'Supprimer le modèle ?',
-      message: `"${tpl.name}" sera supprimé. Les logements déjà créés ne sont pas affectés.`,
-      confirmLabel: 'Supprimer',
+      title: t('templates.deleteConfirmTitle'),
+      message: t('templates.deleteBody', { name: tpl.name }),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
     try {
       await remove.mutateAsync(tpl.id);
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('checklist.failed') });
     }
   };
 
@@ -42,7 +44,7 @@ export default function ChecklistTemplateListScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <ArrowLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Modèles de checklist</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('templates.listTitle')}</Text>
         <View style={{ width: IconSize.lg }} />
       </View>
 
@@ -59,7 +61,7 @@ export default function ChecklistTemplateListScreen() {
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={colors.primary} />}
           ListEmptyComponent={
             <Text style={{ color: colors.mutedText, textAlign: 'center', marginTop: Spacing.xl }}>
-              Aucun modèle. Appuyez sur + pour en créer un.
+              {t('templates.listEmpty')}
             </Text>
           }
           renderItem={({ item }) => (
@@ -74,7 +76,7 @@ export default function ChecklistTemplateListScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
                 <Text style={[styles.sub, { color: colors.mutedText }]}>
-                  {item.section_count} section{item.section_count > 1 ? 's' : ''}
+                  {tp('templates.sectionCount', item.section_count)}
                 </Text>
               </View>
               <Pencil size={IconSize.sm} color={colors.text2} />
@@ -93,7 +95,7 @@ export default function ChecklistTemplateListScreen() {
       <TouchableOpacity
         style={[styles.fab, { backgroundColor: colors.primary }, Shadow.lg]}
         onPress={() => router.push('/checklist-template/create')}
-        accessibilityLabel="Créer un modèle"
+        accessibilityLabel={t('templates.createA11y')}
       >
         <Plus size={IconSize.xl} color="#FFFFFF" />
       </TouchableOpacity>

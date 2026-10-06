@@ -7,6 +7,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useCitySearch, CitySuggestion } from '@/hooks/useCitySearch';
 import { useAddressSearch, AddressSuggestion } from '@/hooks/useAddressSearch';
 import { useKeyboardScroll } from './KeyboardAwareScroll';
+import { useTranslation } from '@/contexts/I18nContext';
 
 const DROPDOWN_CLEARANCE = 240;
 
@@ -27,6 +28,7 @@ const CityAutocomplete: React.FC<Props> = ({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const ks = useKeyboardScroll();
+  const { t } = useTranslation();
   const [cityFocused, setCityFocused] = useState(false);
   const [addressFocused, setAddressFocused] = useState(false);
   const [selectedCityCode, setSelectedCityCode] = useState('');
@@ -59,7 +61,7 @@ const CityAutocomplete: React.FC<Props> = ({
       {/* Row 1: City + Postal code */}
       <View style={styles.row}>
         <View style={[styles.cityField, { zIndex: 20 }]}>
-          <Text style={[styles.label, { color: colors.text }]}>Ville</Text>
+          <Text style={[styles.label, { color: colors.text }]}>{t('menage.city')}</Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
             placeholder="Nancy"
@@ -71,18 +73,18 @@ const CityAutocomplete: React.FC<Props> = ({
               ks?.scrollToInput((e.nativeEvent as unknown as { target: number }).target, DROPDOWN_CLEARANCE);
             }}
             onBlur={() => setTimeout(() => setCityFocused(false), 200)}
-            accessibilityLabel="Ville"
+            accessibilityLabel={t('menage.city')}
           />
         </View>
         <View style={styles.cpField}>
-          <Text style={[styles.label, { color: colors.text }]}>Code postal</Text>
+          <Text style={[styles.label, { color: colors.text }]}>{t('menage.postalCode')}</Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
             placeholder="54000"
             placeholderTextColor={colors.placeholder}
             value={postalCode}
             editable={false}
-            accessibilityLabel="Code postal"
+            accessibilityLabel={t('menage.postalCode')}
           />
         </View>
       </View>
@@ -112,7 +114,7 @@ const CityAutocomplete: React.FC<Props> = ({
       {/* Row 2: Address (shown after city is selected) */}
       {!!postalCode && (
         <View style={{ zIndex: 10 }}>
-          <Text style={[styles.label, { color: colors.text }]}>Adresse</Text>
+          <Text style={[styles.label, { color: colors.text }]}>{t('menage.address')}</Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
             placeholder="12 Rue de la Paix"
@@ -124,7 +126,7 @@ const CityAutocomplete: React.FC<Props> = ({
               ks?.scrollToInput((e.nativeEvent as unknown as { target: number }).target, DROPDOWN_CLEARANCE);
             }}
             onBlur={() => setTimeout(() => setAddressFocused(false), 200)}
-            accessibilityLabel="Adresse"
+            accessibilityLabel={t('menage.address')}
           />
 
           {/* Address suggestions dropdown */}

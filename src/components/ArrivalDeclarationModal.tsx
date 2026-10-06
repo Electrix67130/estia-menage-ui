@@ -20,6 +20,7 @@ import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/const
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
 
 export interface ArrivalDeclaration {
   rating: number;
@@ -38,8 +39,8 @@ export default function ArrivalDeclarationModal({
   onClose,
   onSubmit,
   initial,
-  title = 'Arrivée sur place',
-  submitLabel = 'Démarrer le ménage',
+  title,
+  submitLabel,
   requireDegradationPhoto = true,
 }: {
   visible: boolean;
@@ -56,6 +57,7 @@ export default function ArrivalDeclarationModal({
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const { t, tp } = useTranslation();
   const insets = useSafeAreaInsets();
   const [rating, setRating] = useState(initial?.rating ?? 0);
   const [hasDegradation, setHasDegradation] = useState(initial?.hasDegradation ?? false);
@@ -80,7 +82,7 @@ export default function ArrivalDeclarationModal({
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      void dialog.alert({ title: 'Accès refusé', message: 'Autorise l’accès dans les réglages.' });
+      void dialog.alert({ title: t('declaration.accessDenied'), message: t('declaration.accessDeniedBody') });
       return;
     }
     const result = useCamera
@@ -94,16 +96,16 @@ export default function ArrivalDeclarationModal({
 
   const handleSubmit = () => {
     if (rating < 1) {
-      setError('Note les voyageurs (1 à 5 étoiles) avant de démarrer.');
+      setError(t('declaration.ratingRequired'));
       return;
     }
     if (hasDegradation) {
       if (!note.trim()) {
-        setError('Décris la dégradation constatée.');
+        setError(t('declaration.describeDamage'));
         return;
       }
       if (requireDegradationPhoto && assets.length === 0) {
-        setError('Ajoute au moins une photo de la dégradation.');
+        setError(t('declaration.photoRequired'));
         return;
       }
     }
@@ -126,16 +128,16 @@ export default function ArrivalDeclarationModal({
             <View style={[styles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{title ?? t('declaration.title')}</Text>
 
-            <Text style={[styles.label, { color: colors.text2 }]}>NOTE DES VOYAGEURS</Text>
+            <Text style={[styles.label, { color: colors.text2 }]}>{t('declaration.ratingLabel')}</Text>
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((n) => (
                 <TouchableOpacity
                   key={n}
                   onPress={() => { setRating(n); setError(''); }}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  accessibilityLabel={`${n} étoile${n > 1 ? 's' : ''}`}
+                  accessibilityLabel={tp('declaration.stars', n)}
                 >
                   <Star
                     size={34}
@@ -157,10 +159,10 @@ export default function ArrivalDeclarationModal({
               <AlertTriangle size={IconSize.md} color={hasDegradation ? colors.red : colors.text2} />
               <View style={{ flex: 1 }}>
                 <Text style={{ color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.medium }}>
-                  Dégradation constatée
+                  {t('declaration.damageTitle')}
                 </Text>
                 <Text style={{ color: colors.mutedText, fontSize: FontSize.xs, marginTop: 2 }}>
-                  Coche si le logement présente des dommages à ton arrivée.
+                  {t('declaration.damageHint')}
                 </Text>
               </View>
               <View
@@ -177,7 +179,7 @@ export default function ArrivalDeclarationModal({
 
             {hasDegradation ? (
               <>
-                <Text style={[styles.label, { color: colors.text2 }]}>DESCRIPTION</Text>
+                <Text style={[styles.label, { color: colors.text2 }]}>{t('declaration.descriptionLabel')}</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -185,12 +187,12 @@ export default function ArrivalDeclarationModal({
                   ]}
                   value={note}
                   onChangeText={(t) => { setNote(t); setError(''); }}
-                  placeholder="Ex : tache sur le canapé, vaisselle cassée…"
+                  placeholder={t('declaration.descriptionPlaceholder')}
                   placeholderTextColor={colors.placeholder}
                   multiline
                 />
 
-                <Text style={[styles.label, { color: colors.text2 }]}>PHOTOS DE LA DÉGRADATION</Text>
+                <Text style={[styles.label, { color: colors.text2 }]}>{t('declaration.photosLabel')}</Text>
                 <View style={styles.photosRow}>
                   {assets.map((a, i) => (
                     <View key={`${a.uri}-${i}`} style={styles.thumbWrap}>
@@ -210,14 +212,14 @@ export default function ArrivalDeclarationModal({
                     onPress={() => pickPhoto(true)}
                   >
                     <Camera size={IconSize.sm} color={colors.primary} />
-                    <Text style={{ color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.medium }}>Caméra</Text>
+                    <Text style={{ color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.medium }}>{t('photos.camera')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.photoBtn, { borderColor: colors.primary }]}
                     onPress={() => pickPhoto(false)}
                   >
                     <ImagePlus size={IconSize.sm} color={colors.primary} />
-                    <Text style={{ color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.medium }}>Galerie</Text>
+                    <Text style={{ color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.medium }}>{t('photos.gallery')}</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -237,7 +239,7 @@ export default function ArrivalDeclarationModal({
               {submitting ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.submitText}>{submitLabel}</Text>
+                <Text style={styles.submitText}>{submitLabel ?? t('declaration.submit')}</Text>
               )}
             </TouchableOpacity>
           </ScrollView>

@@ -32,6 +32,7 @@ interface RoomCounterProps {
 function RoomCounter({ label, value, onChange }: RoomCounterProps) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   return (
     <View style={[counterStyles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Text style={[counterStyles.label, { color: colors.text }]}>{label}</Text>
@@ -39,7 +40,7 @@ function RoomCounter({ label, value, onChange }: RoomCounterProps) {
         <TouchableOpacity
           style={[counterStyles.btn, { borderColor: colors.border }]}
           onPress={() => onChange(Math.max(0, value - 1))}
-          accessibilityLabel={`Diminuer ${label}`}
+          accessibilityLabel={t('logementForm.decrease', { label })}
         >
           <Text style={{ color: colors.text, fontSize: FontSize.lg }}>−</Text>
         </TouchableOpacity>
@@ -47,7 +48,7 @@ function RoomCounter({ label, value, onChange }: RoomCounterProps) {
         <TouchableOpacity
           style={[counterStyles.btn, { borderColor: colors.border }]}
           onPress={() => onChange(value + 1)}
-          accessibilityLabel={`Augmenter ${label}`}
+          accessibilityLabel={t('logementForm.increase', { label })}
         >
           <Text style={{ color: colors.text, fontSize: FontSize.lg }}>+</Text>
         </TouchableOpacity>
@@ -82,7 +83,7 @@ export default function CreateLogementScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
-  const { t: tr } = useTranslation();
+  const { t } = useTranslation();
   const createMutation = useCreateLogement();
   const clientsQuery = useClients();
   const checklistTemplatesQuery = useChecklistTemplates();
@@ -123,7 +124,7 @@ export default function CreateLogementScreen() {
   const handleSubmit = async () => {
     setError('');
     if (!name.trim()) {
-      setError('Nom du logement requis.');
+      setError(t('logementForm.nameRequired'));
       return;
     }
     const parseMoneyOrUndef = (s: string): number | undefined => {
@@ -181,7 +182,7 @@ export default function CreateLogementScreen() {
       }
       router.replace(`/logement/${logement.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la création.');
+      setError(err instanceof Error ? err.message : t('logementForm.createFailed'));
     }
   };
 
@@ -192,32 +193,32 @@ export default function CreateLogementScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('common.back')}
         >
           <ArrowLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Nouveau logement</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{t('logement.new')}</Text>
         <View style={{ width: IconSize.lg }} />
       </View>
 
       <KeyboardAwareScroll contentContainerStyle={styles.body}>
-        <Text style={[styles.section, { color: colors.text2 }]}>INFOS</Text>
-        <LabeledField label="Nom du logement *">
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('logementForm.sectionInfo').toUpperCase()}</Text>
+        <LabeledField label={t('logementForm.nameLabel')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={name}
             onChangeText={setName}
-            placeholder="Ex. Studio Paris 11e"
+            placeholder={t('logementForm.namePlaceholder')}
             placeholderTextColor={colors.placeholder}
           />
         </LabeledField>
 
-        <LabeledField label="Surface (m²)">
+        <LabeledField label={t('logementForm.surface')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={surfaceM2}
             onChangeText={setSurfaceM2}
-            placeholder="ex. 65"
+            placeholder={t('logementForm.example', { value: 65 })}
             placeholderTextColor={colors.placeholder}
             keyboardType="number-pad"
           />
@@ -242,7 +243,7 @@ export default function CreateLogementScreen() {
           }}
         />
 
-        <Text style={[styles.section, { color: colors.text2 }]}>CLIENT (FACTURATION)</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('logementForm.sectionClient').toUpperCase()}</Text>
         <TouchableOpacity
           style={[
             styles.optionRow,
@@ -269,9 +270,9 @@ export default function CreateLogementScreen() {
             {clientId
               ? (() => {
                   const c = (clientsQuery.data?.data ?? []).find((x) => x.id === clientId);
-                  return c ? clientDisplayName(c) : 'Client sélectionné';
+                  return c ? clientDisplayName(c) : t('logementForm.clientSelected');
                 })()
-              : 'Aucun client — appuyer pour en choisir un'}
+              : t('logementForm.noClientPick')}
           </Text>
           <ChevronRight size={IconSize.sm} color={colors.text2} />
         </TouchableOpacity>
@@ -300,29 +301,29 @@ export default function CreateLogementScreen() {
           }}
         />
 
-        <Text style={[styles.section, { color: colors.text2 }]}>{tr('beds.section').toUpperCase()}</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('beds.section').toUpperCase()}</Text>
         <Text style={{ color: colors.text2, fontSize: FontSize.sm, marginBottom: Spacing.sm }}>
-          {tr('beds.hintLogement')}
+          {t('beds.hintLogement')}
         </Text>
-        <RoomCounter label={tr('beds.simple')} value={nLitSimple} onChange={setNLitSimple} />
-        <RoomCounter label={tr('beds.double')} value={nLitDouble} onChange={setNLitDouble} />
-        <RoomCounter label={tr('beds.sofa')} value={nCanapeLit} onChange={setNCanapeLit} />
-        <RoomCounter label={tr('beds.extra')} value={nLitAppoint} onChange={setNLitAppoint} />
-        <RoomCounter label={tr('beds.crib')} value={nLitParapluie} onChange={setNLitParapluie} />
+        <RoomCounter label={t('beds.simple')} value={nLitSimple} onChange={setNLitSimple} />
+        <RoomCounter label={t('beds.double')} value={nLitDouble} onChange={setNLitDouble} />
+        <RoomCounter label={t('beds.sofa')} value={nCanapeLit} onChange={setNCanapeLit} />
+        <RoomCounter label={t('beds.extra')} value={nLitAppoint} onChange={setNLitAppoint} />
+        <RoomCounter label={t('beds.crib')} value={nLitParapluie} onChange={setNLitParapluie} />
 
-        <Text style={[styles.section, { color: colors.text2 }]}>CODE BOÎTE À CLEF</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('logementForm.sectionKeySafe').toUpperCase()}</Text>
         <SecretCodeField
           value={keySafeCode}
           onChangeText={setKeySafeCode}
-          placeholder="Ex : 1234"
+          placeholder={t('logementForm.keySafePlaceholder')}
         />
 
-        <Text style={[styles.section, { color: colors.text2 }]}>COULEUR (CALENDRIER)</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('logementForm.sectionColor').toUpperCase()}</Text>
         <ColorPicker label="" value={color} onChange={setColor} />
 
         {(checklistTemplatesQuery.data ?? []).length > 0 ? (
           <>
-            <Text style={[styles.section, { color: colors.text2 }]}>MODÈLE DE CHECKLIST</Text>
+            <Text style={[styles.section, { color: colors.text2 }]}>{t('logementForm.sectionChecklistTemplate').toUpperCase()}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.sm }}>
               <TouchableOpacity
                 style={[
@@ -335,7 +336,7 @@ export default function CreateLogementScreen() {
                 onPress={() => setChecklistTemplateId('')}
               >
                 <Text style={{ color: checklistTemplateId === '' ? '#FFFFFF' : colors.text, fontSize: FontSize.sm }}>
-                  Aucun
+                  {t('common.none')}
                 </Text>
               </TouchableOpacity>
               {(checklistTemplatesQuery.data ?? []).map((tpl) => {
@@ -362,16 +363,16 @@ export default function CreateLogementScreen() {
           </>
         ) : null}
 
-        <Text style={[styles.section, { color: colors.text2 }]}>VALEURS PAR DÉFAUT DU MÉNAGE</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('logementForm.sectionDefaults').toUpperCase()}</Text>
         <DurationPickerField
-          label="Durée par défaut"
+          label={t('logementForm.defaultDuration')}
           value={defDuration}
           onChange={setDefDuration}
         />
         <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
           <View style={{ flex: 1 }}>
             <TimePickerField
-              label="Début"
+              label={t('menage.startDate')}
               value={defHoraireDebut}
               onChange={setDefHoraireDebut}
               placeholder="--:--"
@@ -379,24 +380,24 @@ export default function CreateLogementScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <TimePickerField
-              label="Fin"
+              label={t('menage.endDate')}
               value={defHoraireFin}
               onChange={setDefHoraireFin}
               placeholder="--:--"
             />
           </View>
         </View>
-        <LabeledField label="Prix client HT (€)">
+        <LabeledField label={t('menage.fields.clientPriceHt')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={defClientPrice}
             onChangeText={setDefClientPrice}
-            placeholder="ex. 80"
+            placeholder={t('logementForm.example', { value: 80 })}
             placeholderTextColor={colors.placeholder}
             keyboardType="decimal-pad"
           />
         </LabeledField>
-        <LabeledField label="TVA (%)">
+        <LabeledField label={t('menage.fields.clientVatRate')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={defClientVat}
@@ -406,18 +407,18 @@ export default function CreateLogementScreen() {
             keyboardType="decimal-pad"
           />
         </LabeledField>
-        <LabeledField label="Prix prestataire (€)">
+        <LabeledField label={t('menage.fields.providerPrice')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={defProviderPrice}
             onChangeText={setDefProviderPrice}
-            placeholder="ex. 50"
+            placeholder={t('logementForm.example', { value: 50 })}
             placeholderTextColor={colors.placeholder}
             keyboardType="decimal-pad"
           />
         </LabeledField>
         <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Linge inclus par défaut</Text>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{t('logementForm.laundryDefault')}</Text>
           <Switch
             value={defLaundryIncluded}
             onValueChange={setDefLaundryIncluded}
@@ -426,22 +427,22 @@ export default function CreateLogementScreen() {
         </View>
         {defLaundryIncluded ? (
           <>
-            <LabeledField label="Prix linge — client HT (€)">
+            <LabeledField label={t('logementForm.laundryClient')}>
               <AutoScrollInput
                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={defLaundryClient}
                 onChangeText={setDefLaundryClient}
-                placeholder="ex. 15"
+                placeholder={t('logementForm.example', { value: 15 })}
                 placeholderTextColor={colors.placeholder}
                 keyboardType="decimal-pad"
               />
             </LabeledField>
-            <LabeledField label="Prix linge — prestataire (€)">
+            <LabeledField label={t('logementForm.laundryProvider')}>
               <AutoScrollInput
                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={defLaundryProvider}
                 onChangeText={setDefLaundryProvider}
-                placeholder="ex. 10"
+                placeholder={t('logementForm.example', { value: 10 })}
                 placeholderTextColor={colors.placeholder}
                 keyboardType="decimal-pad"
               />
@@ -449,9 +450,9 @@ export default function CreateLogementScreen() {
           </>
         ) : null}
 
-        <Text style={[styles.section, { color: colors.text2 }]}>ÉQUIPEMENTS</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('logementForm.sectionEquipements').toUpperCase()}</Text>
         <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Piscine</Text>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{t('logementForm.pool')}</Text>
           <Switch
             value={hasPool}
             onValueChange={setHasPool}
@@ -459,7 +460,7 @@ export default function CreateLogementScreen() {
           />
         </View>
         <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={{ color: colors.text, fontSize: FontSize.md }}>Jacuzzi</Text>
+          <Text style={{ color: colors.text, fontSize: FontSize.md }}>{t('logementForm.jacuzzi')}</Text>
           <Switch
             value={hasJacuzzi}
             onValueChange={setHasJacuzzi}
@@ -467,7 +468,7 @@ export default function CreateLogementScreen() {
           />
         </View>
 
-        <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
+        <Text style={[styles.section, { color: colors.text2 }]}>{t('logement.sectionNotes').toUpperCase()}</Text>
         <AutoScrollInput
           style={[
             styles.input,
@@ -475,7 +476,7 @@ export default function CreateLogementScreen() {
           ]}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Code interphone, instructions particulières…"
+          placeholder={t('logementForm.notesPlaceholder')}
           placeholderTextColor={colors.placeholder}
           multiline
         />
@@ -488,7 +489,7 @@ export default function CreateLogementScreen() {
           disabled={createMutation.isPending}
         >
           <Save size={IconSize.md} color="#FFFFFF" />
-          <Text style={styles.submitText}>{createMutation.isPending ? 'Création…' : 'Créer le logement'}</Text>
+          <Text style={styles.submitText}>{createMutation.isPending ? t('logementForm.creating') : t('logementForm.create')}</Text>
         </TouchableOpacity>
       </KeyboardAwareScroll>
     </SafeAreaView>

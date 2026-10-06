@@ -5,6 +5,8 @@
  * (`stale_before` côté API), étiquetée « Non traitée ». Pas de clôture
  * automatique : c'est l'admin qui valide ou annule, à l'unité ou en lot.
  */
+import { getIntlLocale, translate } from '@/i18n/runtime';
+
 export const PAST_WINDOW_DAYS = 30;
 
 /** Date locale au format YYYY-MM-DD (pas `toISOString`, qui bascule en UTC le soir). */
@@ -29,15 +31,17 @@ export interface DaySection<T> {
   data: T[];
 }
 
-const DAY_FMT = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 function dayLabel(iso: string): string {
-  const s = DAY_FMT.format(new Date(`${iso}T12:00:00`));
+  const s = new Intl.DateTimeFormat(getIntlLocale(), { weekday: 'short', day: 'numeric', month: 'short' }).format(
+    new Date(`${iso}T12:00:00`),
+  );
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /**
  * Regroupe des éléments datés (`date_prevue`) par jour, du plus proche au plus
- * lointain, avec des titres relatifs pour aujourd'hui et demain. Les éléments
+ * lointain, avec des titres relatifs pour aujourd'hui et demain (langue courante
+ * de l'app — l'appelant mémorise avec `locale` en dépendance). Les éléments
  * antérieurs à `todayYmd` sont ignorés : le passé a sa propre vue.
  */
 export function groupByDay<T extends { date_prevue: string; horaire_prevu?: string | null }>(
@@ -59,8 +63,8 @@ export function groupByDay<T extends { date_prevue: string; horaire_prevu?: stri
       const data = (byDay.get(d) ?? [])
         .slice()
         .sort((a, b) => (a.horaire_prevu ?? '99').localeCompare(b.horaire_prevu ?? '99'));
-      if (d === todayYmd) return { key: d, title: "Aujourd'hui", subtitle: dayLabel(d), isToday: true, data };
-      if (d === tomorrow) return { key: d, title: 'Demain', subtitle: dayLabel(d), isToday: false, data };
+      if (d === todayYmd) return { key: d, title: translate('common.today'), subtitle: dayLabel(d), isToday: true, data };
+      if (d === tomorrow) return { key: d, title: translate('common.tomorrow'), subtitle: dayLabel(d), isToday: false, data };
       return { key: d, title: dayLabel(d), isToday: false, data };
     });
 }

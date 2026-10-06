@@ -19,6 +19,7 @@ import { useClients, useClient, useCreateClient, clientDisplayName } from '@/api
 import { useUpdateLogement } from '@/api/hooks/useLogements';
 import CreateClientModal from '@/components/CreateClientModal';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
 
 interface Props {
   logementId: string;
@@ -36,6 +37,7 @@ const LogementClientSection: React.FC<Props> = ({ logementId, currentClientId, i
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const { t, tp } = useTranslation();
   // L'annuaire complet ne sert qu'au picker admin ; un non-admin ne charge que
   // la fiche du client rattaché à CE logement (et seulement s'il a la
   // permission `can_view_clients`, l'API filtrant le reste).
@@ -86,7 +88,7 @@ const LogementClientSection: React.FC<Props> = ({ logementId, currentClientId, i
       setSearch('');
       setOpen(false);
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('common.unknownError') });
     }
   };
 
@@ -96,13 +98,13 @@ const LogementClientSection: React.FC<Props> = ({ logementId, currentClientId, i
       setSearch('');
       setOpen(false);
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('common.unknownError') });
     }
   };
 
   return (
     <View style={styles.wrap}>
-      <Text style={[styles.label, { color: colors.text2 }]}>CLIENT (FACTURATION)</Text>
+      <Text style={[styles.label, { color: colors.text2 }]}>{t('logementForm.sectionClient').toUpperCase()}</Text>
       <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={{ flex: 1 }}>
           {current ? (
@@ -116,7 +118,7 @@ const LogementClientSection: React.FC<Props> = ({ logementId, currentClientId, i
             </>
           ) : (
             <Text style={{ color: colors.mutedText, fontSize: FontSize.md, fontStyle: 'italic' }}>
-              Aucun client rattaché
+              {t('logementClient.none')}
             </Text>
           )}
         </View>
@@ -126,7 +128,7 @@ const LogementClientSection: React.FC<Props> = ({ logementId, currentClientId, i
             onPress={openModal}
           >
             <UserCog size={IconSize.sm} color="#FFFFFF" />
-            <Text style={styles.changeBtnText}>{current ? 'Changer' : 'Affecter'}</Text>
+            <Text style={styles.changeBtnText}>{current ? t('logementClient.change') : t('logementClient.assign')}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -140,13 +142,15 @@ const LogementClientSection: React.FC<Props> = ({ logementId, currentClientId, i
             </View>
             <View style={sheetStyles.header}>
               <View style={{ flex: 1 }}>
-                <Text style={[sheetStyles.title, { color: colors.text }]}>Choisir un client</Text>
+                <Text style={[sheetStyles.title, { color: colors.text }]}>{t('logementClient.pickTitle')}</Text>
                 <Text style={{ color: colors.mutedText, fontSize: FontSize.xs, marginTop: 2 }}>
                   {clients.isLoading || clients.isFetching
-                    ? 'Chargement…'
+                    ? t('common.loading')
                     : clients.error
-                      ? `Erreur: ${clients.error instanceof Error ? clients.error.message : 'inconnue'}`
-                      : `${entries.length} client${entries.length > 1 ? 's' : ''} disponible${entries.length > 1 ? 's' : ''}`}
+                      ? clients.error instanceof Error
+                        ? t('logementClient.error', { message: clients.error.message })
+                        : t('common.unknownError')
+                      : tp('logementClient.available', entries.length)}
                 </Text>
               </View>
             </View>
@@ -160,7 +164,7 @@ const LogementClientSection: React.FC<Props> = ({ logementId, currentClientId, i
               <Search size={16} color={colors.placeholder} />
               <TextInput
                 style={[sheetStyles.searchInput, { color: colors.text }]}
-                placeholder="Rechercher un client…"
+                placeholder={t('logementClient.searchPlaceholder')}
                 placeholderTextColor={colors.placeholder}
                 value={search}
                 onChangeText={setSearch}
@@ -181,7 +185,7 @@ const LogementClientSection: React.FC<Props> = ({ logementId, currentClientId, i
             >
               <Plus size={IconSize.sm} color={colors.primary} />
               <Text style={{ color: colors.primary, fontWeight: FontWeight.semibold }}>
-                Nouveau client…
+                {t('logementClient.newClient')}
               </Text>
             </TouchableOpacity>
 
@@ -207,15 +211,13 @@ const LogementClientSection: React.FC<Props> = ({ logementId, currentClientId, i
                     onPress={unassign}
                   >
                     <Text style={{ color: colors.text, fontStyle: 'italic' }}>
-                      — Aucun (désassigner) —
+                      {t('logementClient.unassign')}
                     </Text>
                   </TouchableOpacity>
                 }
                 ListEmptyComponent={
                   <Text style={[sheetStyles.empty, { color: colors.mutedText }]}>
-                    {search
-                      ? 'Aucun résultat.'
-                      : "Aucun client dans ton équipe. Invite quelqu'un avec le rôle Client depuis l'onglet Équipe."}
+                    {search ? t('logementClient.noResults') : t('logementClient.emptyTeam')}
                   </Text>
                 }
                 renderItem={({ item: e }) => {

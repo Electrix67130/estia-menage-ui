@@ -16,6 +16,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import { useCreateClient, type CreateClientInput, type Client } from '@/api/hooks/useClients';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
 
 interface Props {
   visible: boolean;
@@ -27,6 +28,7 @@ const CreateClientModal: React.FC<Props> = ({ visible, onClose, onCreated }) => 
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const { t } = useTranslation();
   const create = useCreateClient();
   const [form, setForm] = useState<CreateClientInput>({ country: 'FR' });
   const animatedModalStyle = useKeyboardAwareModalStyle({ visible, maxHeightRatio: 0.9 });
@@ -35,7 +37,7 @@ const CreateClientModal: React.FC<Props> = ({ visible, onClose, onCreated }) => 
 
   const handleSubmit = async () => {
     if (!form.first_name?.trim() && !form.last_name?.trim() && !form.company_name?.trim()) {
-      void dialog.alert({ title: 'Erreur', message: 'Au moins un nom (personne ou entreprise) est requis.' });
+      void dialog.alert({ title: t('common.error'), message: t('client.nameRequired') });
       return;
     }
     try {
@@ -44,7 +46,7 @@ const CreateClientModal: React.FC<Props> = ({ visible, onClose, onCreated }) => 
       onClose();
       setForm({ country: 'FR' });
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('common.unknownError') });
     }
   };
 
@@ -56,24 +58,24 @@ const CreateClientModal: React.FC<Props> = ({ visible, onClose, onCreated }) => 
         >
           <Pressable onPress={(e) => e.stopPropagation()}>
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.title, { color: colors.text }]}>Nouveau client</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{t('client.new')}</Text>
           </View>
 
           <ScrollView style={styles.body} contentContainerStyle={{ gap: Spacing.sm, paddingBottom: Spacing.xxl }}>
-            <Text style={[styles.section, { color: colors.text2 }]}>IDENTITÉ</Text>
+            <Text style={[styles.section, { color: colors.text2 }]}>{t('client.sectionIdentity')}</Text>
             <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
               <TextInput
                 style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={form.first_name ?? ''}
                 onChangeText={(v) => set('first_name', v)}
-                placeholder="Prénom"
+                placeholder={t('auth.firstName')}
                 placeholderTextColor={colors.placeholder}
               />
               <TextInput
                 style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={form.last_name ?? ''}
                 onChangeText={(v) => set('last_name', v)}
-                placeholder="Nom"
+                placeholder={t('auth.lastName')}
                 placeholderTextColor={colors.placeholder}
               />
             </View>
@@ -81,16 +83,16 @@ const CreateClientModal: React.FC<Props> = ({ visible, onClose, onCreated }) => 
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
               value={form.company_name ?? ''}
               onChangeText={(v) => set('company_name', v)}
-              placeholder="Entreprise (si pro)"
+              placeholder={t('client.companyIfPro')}
               placeholderTextColor={colors.placeholder}
             />
 
-            <Text style={[styles.section, { color: colors.text2 }]}>CONTACT</Text>
+            <Text style={[styles.section, { color: colors.text2 }]}>{t('client.sectionContact')}</Text>
             <TextInput
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
               value={form.email ?? ''}
               onChangeText={(v) => set('email', v)}
-              placeholder="Email"
+              placeholder={t('auth.email')}
               placeholderTextColor={colors.placeholder}
               keyboardType="email-address"
               autoCapitalize="none"
@@ -99,17 +101,17 @@ const CreateClientModal: React.FC<Props> = ({ visible, onClose, onCreated }) => 
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
               value={form.phone ?? ''}
               onChangeText={(v) => set('phone', v)}
-              placeholder="Téléphone"
+              placeholder={t('auth.phone')}
               placeholderTextColor={colors.placeholder}
               keyboardType="phone-pad"
             />
 
-            <Text style={[styles.section, { color: colors.text2 }]}>FACTURATION</Text>
+            <Text style={[styles.section, { color: colors.text2 }]}>{t('client.sectionBilling')}</Text>
             <TextInput
               style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
               value={form.billing_address ?? ''}
               onChangeText={(v) => set('billing_address', v)}
-              placeholder="Adresse"
+              placeholder={t('legal.streetAddress')}
               placeholderTextColor={colors.placeholder}
             />
             <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
@@ -117,7 +119,7 @@ const CreateClientModal: React.FC<Props> = ({ visible, onClose, onCreated }) => 
                 style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={form.postal_code ?? ''}
                 onChangeText={(v) => set('postal_code', v)}
-                placeholder="CP"
+                placeholder={t('client.postalCodeShort')}
                 placeholderTextColor={colors.placeholder}
                 keyboardType="number-pad"
               />
@@ -125,7 +127,7 @@ const CreateClientModal: React.FC<Props> = ({ visible, onClose, onCreated }) => 
                 style={[styles.input, { flex: 2, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={form.city ?? ''}
                 onChangeText={(v) => set('city', v)}
-                placeholder="Ville"
+                placeholder={t('legal.city')}
                 placeholderTextColor={colors.placeholder}
               />
             </View>
@@ -134,7 +136,7 @@ const CreateClientModal: React.FC<Props> = ({ visible, onClose, onCreated }) => 
                 style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={form.siret ?? ''}
                 onChangeText={(v) => set('siret', v)}
-                placeholder="SIRET"
+                placeholder={t('legal.siret')}
                 placeholderTextColor={colors.placeholder}
                 maxLength={14}
               />
@@ -142,7 +144,7 @@ const CreateClientModal: React.FC<Props> = ({ visible, onClose, onCreated }) => 
                 style={[styles.input, { flex: 1, color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={form.vat_number ?? ''}
                 onChangeText={(v) => set('vat_number', v)}
-                placeholder="N° TVA"
+                placeholder={t('client.vatNumber')}
                 placeholderTextColor={colors.placeholder}
               />
             </View>
@@ -153,7 +155,7 @@ const CreateClientModal: React.FC<Props> = ({ visible, onClose, onCreated }) => 
               disabled={create.isPending}
             >
               <Save size={IconSize.md} color="#FFFFFF" />
-              <Text style={styles.submitText}>{create.isPending ? 'Création…' : 'Créer le client'}</Text>
+              <Text style={styles.submitText}>{create.isPending ? t('client.creating') : t('client.create')}</Text>
             </TouchableOpacity>
           </ScrollView>
           </Pressable>

@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '@/constants/Colors';
-import { Spacing, FontSize } from '@/constants/Layout';
+import { Spacing } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { useTranslation } from '@/contexts/I18nContext';
 
 interface Props {
   menageId?: string;
@@ -19,10 +20,11 @@ interface Props {
 export default function TeamManager(_props: Props) {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   return (
     <View style={styles.center}>
       <Text style={{ color: colors.mutedText, textAlign: 'center', padding: Spacing.lg }}>
-        Gestion des membres du logement — à implémenter en Phase M5.
+        {t('teamManager.placeholder')}
       </Text>
     </View>
   );

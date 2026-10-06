@@ -5,6 +5,8 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import WheelPicker from './WheelPicker';
+import { useTranslation } from '@/contexts/I18nContext';
+import { translate } from '@/i18n/runtime';
 
 interface Props {
   label: string;
@@ -20,9 +22,10 @@ interface Props {
 function formatLabel(mins: number): string {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  if (h === 0) return `${m} min`;
-  if (m === 0) return `${h} h`;
-  return `${h} h ${String(m).padStart(2, '0')}`;
+  const hUnit = translate('common.hoursShort');
+  if (h === 0) return `${m} ${translate('common.minutesShort')}`;
+  if (m === 0) return `${h} ${hUnit}`;
+  return `${h} ${hUnit} ${String(m).padStart(2, '0')}`;
 }
 
 const DurationPickerField: React.FC<Props> = ({
@@ -34,6 +37,7 @@ const DurationPickerField: React.FC<Props> = ({
 }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
 
   const hourItems = useMemo(
@@ -69,7 +73,7 @@ const DurationPickerField: React.FC<Props> = ({
         accessibilityLabel={label}
       >
         <Text style={[styles.fieldText, { color: numericValue !== null ? colors.text : colors.placeholder }]}>
-          {numericValue !== null ? formatLabel(numericValue) : 'Non définie'}
+          {numericValue !== null ? formatLabel(numericValue) : t('picker.notSet')}
         </Text>
         <Timer size={IconSize.md} color={colors.mutedText} />
       </TouchableOpacity>
@@ -78,15 +82,15 @@ const DurationPickerField: React.FC<Props> = ({
         <View style={styles.overlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpen(false)} />
           <View style={[styles.modal, { backgroundColor: colors.surface }, Shadow.lg]}>
-            <Text style={[styles.title, { color: colors.text }]}>Durée estimée</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{t('menage.fields.dureeEstimee')}</Text>
             <View style={styles.wheelsRow}>
               <View style={styles.col}>
                 <WheelPicker items={hourItems} selectedIndex={hIdx} onChange={setHIdx} width={70} />
-                <Text style={[styles.unit, { color: colors.mutedText }]}>h</Text>
+                <Text style={[styles.unit, { color: colors.mutedText }]}>{t('common.hoursShort')}</Text>
               </View>
               <View style={styles.col}>
                 <WheelPicker items={minuteItems} selectedIndex={mIdx} onChange={setMIdx} width={70} />
-                <Text style={[styles.unit, { color: colors.mutedText }]}>min</Text>
+                <Text style={[styles.unit, { color: colors.mutedText }]}>{t('common.minutesShort')}</Text>
               </View>
             </View>
             <View style={styles.footer}>
@@ -98,7 +102,7 @@ const DurationPickerField: React.FC<Props> = ({
                   }}
                   style={[styles.btn, { backgroundColor: colors.itemBackground }]}
                 >
-                  <Text style={{ color: colors.text, fontWeight: FontWeight.medium }}>Effacer</Text>
+                  <Text style={{ color: colors.text, fontWeight: FontWeight.medium }}>{t('picker.clear')}</Text>
                 </TouchableOpacity>
               ) : null}
               <TouchableOpacity
@@ -109,7 +113,7 @@ const DurationPickerField: React.FC<Props> = ({
                 }}
                 style={[styles.btn, { backgroundColor: colors.primary, flex: 1 }]}
               >
-                <Text style={{ color: '#FFFFFF', fontWeight: FontWeight.semibold }}>Valider</Text>
+                <Text style={{ color: '#FFFFFF', fontWeight: FontWeight.semibold }}>{t('common.validate')}</Text>
               </TouchableOpacity>
             </View>
           </View>

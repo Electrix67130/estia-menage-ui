@@ -15,6 +15,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useDialog } from '@/contexts/DialogContext';
+import { useTranslation } from '@/contexts/I18nContext';
 import {
   useLogementOptions,
   useMenageOptions,
@@ -38,6 +39,7 @@ interface Props {
 const MenageOptionsSection: React.FC<Props> = ({ menageId, logementId, isAdmin }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
   const list = useMenageOptions(menageId);
   const [picking, setPicking] = useState(false);
 
@@ -47,7 +49,7 @@ const MenageOptionsSection: React.FC<Props> = ({ menageId, logementId, isAdmin }
   return (
     <View style={styles.wrap}>
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text2 }]}>OPTIONS CHOISIES</Text>
+        <Text style={[styles.title, { color: colors.text2 }]}>{t('menageOptions.sectionTitle')}</Text>
         {isAdmin ? (
           <TouchableOpacity
             style={[styles.editBtn, { borderColor: colors.border }]}
@@ -55,7 +57,7 @@ const MenageOptionsSection: React.FC<Props> = ({ menageId, logementId, isAdmin }
           >
             <Pencil size={IconSize.sm} color={colors.primary} />
             <Text style={{ color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.medium }}>
-              Modifier
+              {t('common.edit')}
             </Text>
           </TouchableOpacity>
         ) : null}
@@ -68,7 +70,7 @@ const MenageOptionsSection: React.FC<Props> = ({ menageId, logementId, isAdmin }
       ) : items.length === 0 ? (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={{ color: colors.mutedText, textAlign: 'center' }}>
-            Aucune option. « Modifier » pour cocher un pack proposé sur le logement.
+            {t('menageOptions.empty')}
           </Text>
         </View>
       ) : (
@@ -126,6 +128,7 @@ function OptionsPickerModal({
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const dialog = useDialog();
+  const { t } = useTranslation();
   const options = useLogementOptions(logementId);
   const save = useSetMenageOptions(menageId);
   const [checked, setChecked] = useState<string[]>(selected.map((s) => s.logement_option_id));
@@ -139,8 +142,8 @@ function OptionsPickerModal({
       onClose();
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Enregistrement impossible',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.saveFailed'),
       });
     }
   };
@@ -161,17 +164,16 @@ function OptionsPickerModal({
           <View style={sheetStyles.handle}>
             <View style={[sheetStyles.handleBar, { backgroundColor: colors.border }]} />
           </View>
-          <Text style={[sheetStyles.title, { color: colors.text }]}>Options choisies</Text>
+          <Text style={[sheetStyles.title, { color: colors.text }]}>{t('menageOptions.pickerTitle')}</Text>
           <Text style={[sheetStyles.hint, { color: colors.mutedText }]}>
-            Coche les options retenues par le client.
+            {t('menageOptions.pickerHint')}
           </Text>
 
           {options.isLoading ? (
             <ActivityIndicator color={colors.primary} style={{ marginVertical: Spacing.lg }} />
           ) : items.length === 0 ? (
             <Text style={{ color: colors.mutedText, marginVertical: Spacing.lg }}>
-              Aucune option configurée sur ce logement. Ajoute-les d&apos;abord sur la fiche
-              logement, section « Options ».
+              {t('menageOptions.noneConfigured')}
             </Text>
           ) : (
             <ScrollView style={{ maxHeight: 400 }}>
@@ -224,7 +226,8 @@ function OptionsPickerModal({
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text style={sheetStyles.submitText}>
-                Enregistrer{checked.length > 0 ? ` (${checked.length})` : ''}
+                {t('common.save')}
+                {checked.length > 0 ? ` (${checked.length})` : ''}
               </Text>
             )}
           </TouchableOpacity>

@@ -6,6 +6,7 @@ import { FontSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useLogements } from '@/api/hooks/useLogements';
 import type { Logement } from '@/api/types';
+import { useTranslation } from '@/contexts/I18nContext';
 
 /**
  * Vue carte des **logements** de l'org. On affiche un marker par logement
@@ -35,6 +36,7 @@ const MenageMap: React.FC<Props> = ({ onLogementPress, onMenagePress }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const logementsQuery = useLogements({ limit: 500 });
+  const { t } = useTranslation();
 
   const handlePress = onLogementPress ?? onMenagePress;
 
@@ -72,6 +74,7 @@ const MenageMap: React.FC<Props> = ({ onLogementPress, onMenagePress }) => {
 
   const markersJs = useMemo(() => {
     const color = '#D97706'; // primary brand color
+    const openLabel = t('menageMap.openProperty').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
     return mappable
       .map((m) => {
         const esc = (s: string) =>
@@ -89,12 +92,12 @@ const MenageMap: React.FC<Props> = ({ onLogementPress, onMenagePress }) => {
             });
             L.marker([${m.lat}, ${m.lng}], {icon: icon})
               .addTo(map)
-              .bindPopup('<div style="font-family:-apple-system,sans-serif;min-width:180px;"><b>${name}</b><br/><span style="color:#78716C;font-size:12px;">${addr}</span><br/><button onclick="window.ReactNativeWebView.postMessage(\\'${m.id}\\')" style="margin-top:6px;background:${color};color:#fff;border:none;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;width:100%;">Ouvrir le logement →</button></div>');
+              .bindPopup('<div style="font-family:-apple-system,sans-serif;min-width:180px;"><b>${name}</b><br/><span style="color:#78716C;font-size:12px;">${addr}</span><br/><button onclick="window.ReactNativeWebView.postMessage(\\'${m.id}\\')" style="margin-top:6px;background:${color};color:#fff;border:none;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;width:100%;">${openLabel}</button></div>');
           })();
         `;
       })
       .join('\n');
-  }, [mappable]);
+  }, [mappable, t]);
 
   const html = `
     <!DOCTYPE html>
@@ -132,9 +135,7 @@ const MenageMap: React.FC<Props> = ({ onLogementPress, onMenagePress }) => {
   if (mappable.length === 0) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <Text style={[styles.emptyText, { color: colors.mutedText }]}>
-          Aucun logement avec des coordonnées GPS.
-        </Text>
+        <Text style={[styles.emptyText, { color: colors.mutedText }]}>{t('menageMap.empty')}</Text>
       </View>
     );
   }

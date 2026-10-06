@@ -15,6 +15,7 @@ import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
+import { useTranslation } from '@/contexts/I18nContext';
 
 export interface FilterOption {
   id: string;
@@ -44,11 +45,14 @@ const FilterPickerSheet: React.FC<Props> = ({
   selectedId,
   onSelect,
   onClose,
-  searchPlaceholder = 'Rechercher…',
-  allLabel = 'Tous',
+  searchPlaceholder: searchPlaceholderProp,
+  allLabel: allLabelProp,
 }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const { t } = useTranslation();
+  const searchPlaceholder = searchPlaceholderProp ?? t('search.placeholderEllipsis');
+  const allLabel = allLabelProp ?? t('common.all');
   const [search, setSearch] = useState('');
   const animatedModalStyle = useKeyboardAwareModalStyle({ visible });
 
@@ -90,7 +94,7 @@ const FilterPickerSheet: React.FC<Props> = ({
             style={styles.flatList}
             contentContainerStyle={styles.list}
             ItemSeparatorComponent={() => <View style={{ height: 1, backgroundColor: colors.border }} />}
-            ListEmptyComponent={<Text style={[styles.empty, { color: colors.mutedText }]}>Aucun résultat.</Text>}
+            ListEmptyComponent={<Text style={[styles.empty, { color: colors.mutedText }]}>{t('search.noResults')}</Text>}
             renderItem={({ item }) => {
               const isSelected = item.id === selectedId;
               return (

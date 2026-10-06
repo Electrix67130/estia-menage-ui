@@ -1,3 +1,5 @@
+import { translate } from '@/i18n/runtime';
+
 // --------------- Pagination ---------------
 
 export interface PaginationParams {
@@ -192,16 +194,13 @@ export type MenageStatus = 'a_venir' | 'en_cours' | 'termine' | 'valide' | 'annu
 /** Type de prestation d'un ménage. `menage` = nettoyage classique (défaut). */
 export type PrestationType = 'menage' | 'check_in' | 'check_out';
 
-/** Libellé du type de prestation pour affichage (badge). */
+/**
+ * Libellé du type de prestation pour affichage (badge), dans la langue courante.
+ * Dans un composant, préférer `t(\`prestationType.${type}\`)` pour suivre le
+ * changement de langue sans dépendance implicite.
+ */
 export function prestationTypeLabel(type?: PrestationType | null): string {
-  switch (type) {
-    case 'check_in':
-      return 'Check-in';
-    case 'check_out':
-      return 'Check-out';
-    default:
-      return 'Ménage';
-  }
+  return translate(`prestationType.${type ?? 'menage'}`);
 }
 
 /**
@@ -227,7 +226,7 @@ export function menagePrestataireLabel(m: {
   prestataire_first_name?: string | null;
   prestataire_last_name?: string | null;
 }): string {
-  if (!m.prestataire_user_id) return 'Non assigné';
+  if (!m.prestataire_user_id) return translate('common.unassigned');
   return [m.prestataire_first_name, m.prestataire_last_name].filter(Boolean).join(' ') || '—';
 }
 
@@ -239,7 +238,7 @@ export function menageLogementLabel(m: {
   return (
     m.logement_name ||
     [m.logement_address, m.logement_city].filter(Boolean).join(' ') ||
-    'Logement inconnu'
+    translate('menage.unknownLogement')
   );
 }
 
@@ -315,19 +314,44 @@ export interface Menage {
   has_pending_reschedule?: boolean;
   /** Calculé côté API : jour passé + aucun pointage + statut a_venir. */
   needs_attention?: boolean;
+  /** Votes des prestataires sur une prestation non affectée (GET /menages) :
+   *  nb de « présent », nb d'« absent », et nb de membres `prestataire` du
+   *  logement (= qui peut répondre). Alimentent le badge « Qui est dispo ? ». */
+  present_count?: number;
+  absent_count?: number;
+  member_prestataire_count?: number;
+}
+
+/** Filtre de disponibilité (`GET /menages?availability=`) : au moins un
+ *  « présent » / que des « absent » / aucune réponse. */
+export type MenageAvailability = 'available' | 'unavailable' | 'no_response';
+
+/** Prestataire proposable sur une prestation (`GET /menages/:id/eligible-prestataires`). */
+export interface EligiblePrestataire {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  avatar_url: string | null;
+  /** Membre `prestataire` du logement (sinon : « ponctuel », remplacement). */
+  is_member: boolean;
+  /** Son vote Présent/Absent sur cette prestation, null s'il n'a pas répondu. */
+  response_status: 'present' | 'absent' | null;
+  responded_at: string | null;
 }
 
 /** Libellé d'origine d'un ménage pour affichage (badge). */
 export function menageSourceLabel(externalSource?: string | null): string {
-  if (!externalSource) return 'Manuel';
+  if (!externalSource) return translate('source.manual');
   const provider = externalSource.replace(/^cal_/, '');
+  // Noms propres : pas de traduction.
   const map: Record<string, string> = {
     airbnb: 'Airbnb',
     booking: 'Booking',
     vrbo: 'Vrbo',
     ical: 'iCal',
   };
-  return map[provider] ?? 'Externe';
+  return map[provider] ?? translate('source.external');
 }
 
 export interface CreateMenageInput {

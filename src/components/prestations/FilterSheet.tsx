@@ -6,14 +6,27 @@ import { Spacing, Radius, FontSize, FontWeight } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import FilterPickerSheet, { type FilterOption } from '@/components/FilterPickerSheet';
 import SheetHandle from '@/components/SheetHandle';
-import { prestationTypeLabel, prestationTypeColorKey, type PrestationType } from '@/api/types';
+import { prestationTypeColorKey, type MenageAvailability, type PrestationType } from '@/api/types';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 
 export interface PrestationFilters {
   type: string;
   logement: string;
   presta: string;
   creator: string;
+  /** Admin : '' | 'available' | 'unavailable' | 'no_response' (votes Présent/Absent). */
+  availability: MenageAvailability | '';
 }
+
+export const EMPTY_PRESTATION_FILTERS: PrestationFilters = { type: '', logement: '', presta: '', creator: '', availability: '' };
+
+const AVAILABILITIES: { id: MenageAvailability | ''; label: TranslationKeys; colorKey: 'primary' | 'green' | 'red' | 'text2' }[] = [
+  { id: '', label: 'filterSheet.allF', colorKey: 'primary' },
+  { id: 'available', label: 'dispo.someoneAvailable', colorKey: 'green' },
+  { id: 'unavailable', label: 'dispo.nobodyAvailable', colorKey: 'red' },
+  { id: 'no_response', label: 'dispo.noResponse', colorKey: 'text2' },
+];
 
 interface Props {
   visible: boolean;
@@ -33,7 +46,7 @@ const TYPES: PrestationType[] = ['menage', 'check_in', 'check_out'];
 
 /** Nombre de filtres posés (pour la pastille sur l'icône). */
 export function countActiveFilters(f: PrestationFilters): number {
-  return [f.type, f.logement, f.presta, f.creator].filter(Boolean).length;
+  return [f.type, f.logement, f.presta, f.creator, f.availability].filter(Boolean).length;
 }
 
 /**
@@ -52,6 +65,7 @@ export default function FilterSheet({
   isAdmin,
 }: Props) {
   const colors = Colors[useColorScheme()];
+  const { t, tp } = useTranslation();
   const [picker, setPicker] = useState<null | 'logement' | 'presta' | 'creator'>(null);
   const labelOf = (opts: FilterOption[], id: string, all: string) => (id ? opts.find((o) => o.id === id)?.label ?? all : all);
   const isEmpty = countActiveFilters(filters) === 0;
@@ -75,60 +89,84 @@ export default function FilterSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Fermer les filtres" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('filterSheet.closeA11y')} />
       <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
         <SheetHandle />
         <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>Filtres</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{t('common.filters')}</Text>
           <TouchableOpacity
-            onPress={() => onChange({ type: '', logement: '', presta: '', creator: '' })}
+            onPress={() => onChange(EMPTY_PRESTATION_FILTERS)}
             disabled={isEmpty}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={[styles.reset, { color: isEmpty ? colors.mutedText : colors.primary }]}>Réinitialiser</Text>
+            <Text style={[styles.reset, { color: isEmpty ? colors.mutedText : colors.primary }]}>{t('common.reset')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.field}>
-          <Text style={[styles.fieldLabel, { color: colors.text2 }]}>Type</Text>
+          <Text style={[styles.fieldLabel, { color: colors.text2 }]}>{t('filterSheet.type')}</Text>
           <View style={styles.typeRow}>
             {[
-              { id: '', label: 'Tous', color: colors.primary },
-              ...TYPES.map((t) => ({ id: t, label: prestationTypeLabel(t), color: colors[prestationTypeColorKey(t)] })),
-            ].map((t) => {
-              const active = filters.type === t.id;
+              { id: '', label: t('common.all'), color: colors.primary },
+              ...TYPES.map((ty) => ({ id: ty, label: t(`prestationType.${ty}` as TranslationKeys), color: colors[prestationTypeColorKey(ty)] })),
+            ].map((ty) => {
+              const active = filters.type === ty.id;
               return (
                 <TouchableOpacity
-                  key={t.id || 'all'}
+                  key={ty.id || 'all'}
                   style={[
                     styles.typeChip,
-                    { backgroundColor: active ? t.color + '20' : colors.itemBackground, borderColor: active ? t.color : colors.border },
+                    { backgroundColor: active ? ty.color + '20' : colors.itemBackground, borderColor: active ? ty.color : colors.border },
                   ]}
-                  onPress={() => onChange({ ...filters, type: t.id })}
+                  onPress={() => onChange({ ...filters, type: ty.id })}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
                 >
-                  <Text style={[styles.typeChipText, { color: active ? t.color : colors.text2 }]}>{t.label}</Text>
+                  <Text style={[styles.typeChipText, { color: active ? ty.color : colors.text2 }]}>{ty.label}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
         </View>
 
-        {row('Logement', labelOf(logementOptions, filters.logement, 'Tous les logements'), !!filters.logement, () => setPicker('logement'))}
-        {isAdmin ? row('Prestataire', labelOf(prestaOptions, filters.presta, 'Tous les prestataires'), !!filters.presta, () => setPicker('presta')) : null}
-        {isAdmin ? row('Source', labelOf(creatorOptions, filters.creator, 'Toutes (Airbnb, Booking, manuel…)'), !!filters.creator, () => setPicker('creator')) : null}
+        {row(t('filterSheet.logement'), labelOf(logementOptions, filters.logement, t('filterSheet.allLogements')), !!filters.logement, () => setPicker('logement'))}
+        {isAdmin ? row(t('menage.fields.prestataire'), labelOf(prestaOptions, filters.presta, t('filterSheet.allPrestataires')), !!filters.presta, () => setPicker('presta')) : null}
+        {isAdmin ? row(t('filterSheet.source'), labelOf(creatorOptions, filters.creator, t('filterSheet.allSources')), !!filters.creator, () => setPicker('creator')) : null}
+
+        {isAdmin ? (
+          <View style={styles.field}>
+            <Text style={[styles.fieldLabel, { color: colors.text2 }]}>{t('filterSheet.availability')}</Text>
+            <View style={styles.chipWrap}>
+              {AVAILABILITIES.map((a) => {
+                const active = filters.availability === a.id;
+                const color = colors[a.colorKey];
+                return (
+                  <TouchableOpacity
+                    key={a.id || 'all'}
+                    style={[
+                      styles.chip,
+                      { backgroundColor: active ? color + '20' : colors.itemBackground, borderColor: active ? color : colors.border },
+                    ]}
+                    onPress={() => onChange({ ...filters, availability: a.id })}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                  >
+                    <Text style={[styles.typeChipText, { color: active ? color : colors.text2 }]}>{t(a.label)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
 
         <TouchableOpacity style={[styles.apply, { backgroundColor: colors.primary }]} onPress={onClose} accessibilityRole="button">
-          <Text style={styles.applyText}>
-            Voir {resultCount} prestation{resultCount > 1 ? 's' : ''}
-          </Text>
+          <Text style={styles.applyText}>{tp('filterSheet.showResults', resultCount)}</Text>
         </TouchableOpacity>
 
         {/* Pickers rendus DANS la feuille (modale imbriquée) pour rester au-dessus. */}
         <FilterPickerSheet
           visible={picker === 'logement'}
-          title="Filtrer par logement"
+          title={t('filterSheet.byLogement')}
           options={logementOptions}
           selectedId={filters.logement}
           onSelect={(id) => {
@@ -136,11 +174,11 @@ export default function FilterSheet({
             setPicker(null);
           }}
           onClose={() => setPicker(null)}
-          searchPlaceholder="Rechercher un logement…"
+          searchPlaceholder={t('filterSheet.searchLogement')}
         />
         <FilterPickerSheet
           visible={picker === 'presta'}
-          title="Filtrer par prestataire"
+          title={t('filterSheet.byPrestataire')}
           options={prestaOptions}
           selectedId={filters.presta}
           onSelect={(id) => {
@@ -148,11 +186,11 @@ export default function FilterSheet({
             setPicker(null);
           }}
           onClose={() => setPicker(null)}
-          searchPlaceholder="Rechercher un prestataire…"
+          searchPlaceholder={t('filterSheet.searchPrestataire')}
         />
         <FilterPickerSheet
           visible={picker === 'creator'}
-          title="Filtrer par source"
+          title={t('filterSheet.bySource')}
           options={creatorOptions}
           selectedId={filters.creator}
           onSelect={(id) => {
@@ -160,7 +198,7 @@ export default function FilterSheet({
             setPicker(null);
           }}
           onClose={() => setPicker(null)}
-          searchPlaceholder="Rechercher une source…"
+          searchPlaceholder={t('filterSheet.searchSource')}
         />
       </View>
     </Modal>
@@ -184,6 +222,8 @@ const styles = StyleSheet.create({
   typeRow: { flexDirection: 'row', gap: Spacing.sm },
   typeChip: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1 },
   typeChipText: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  chip: { paddingHorizontal: Spacing.md, paddingVertical: 8, borderRadius: Radius.pill, borderWidth: 1 },
   select: {
     flexDirection: 'row',
     alignItems: 'center',

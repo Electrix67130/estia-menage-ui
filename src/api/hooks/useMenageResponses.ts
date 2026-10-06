@@ -80,6 +80,22 @@ export function useOverrideMenageResponse(menageId: string) {
   });
 }
 
+/**
+ * Admin only : push « indique ta disponibilité » aux membres prestataires du
+ * logement qui n'ont pas encore voté sur cette prestation. Renvoie le nombre
+ * de prestataires relancés (0 = tout le monde a déjà répondu).
+ */
+export function useRelanceMenage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (menageId: string) =>
+      apiFetch<{ sent: number }>(`/menages/${menageId}/relance`, { method: 'POST' }),
+    onSuccess: (_data, menageId) => {
+      qc.invalidateQueries({ queryKey: ['menage-eligible-prestataires', menageId] });
+    },
+  });
+}
+
 export function useMyUpcomingMenages(params?: {
   from?: string;
   to?: string;
@@ -112,23 +128,30 @@ export function useMyUpcomingMenages(params?: {
  */
 export function useRespondToMenageOptimistic(params?: { from?: string; to?: string }) {
   const qc = useQueryClient();
+  // Préfixe de clé : `useMyUpcomingMenages` range la liste sous
+  // ['my-upcoming-menages', from, to, mode]. On agit sur toutes les listes qui
+  // partagent ce préfixe (correspondance partielle) plutôt que sur une clé
+  // exacte — avant, le 4e élément (`mode`) manquait, `getQueryData` ne trouvait
+  // rien et le tap Présent/Absent n'apparaissait qu'après le refetch.
   const queryKey = ['my-upcoming-menages', params?.from ?? null, params?.to ?? null];
+  type Snapshot = [readonly unknown[], MyUpcomingMenage[] | undefined][];
   return useMutation({
     mutationFn: ({ menageId, status }: { menageId: string; status: MenageResponseStatus }) =>
       apiFetch(`/menages/${menageId}/responses`, { method: 'POST', body: { status } }),
     onMutate: async ({ menageId, status }) => {
       await qc.cancelQueries({ queryKey });
-      const previous = qc.getQueryData<MyUpcomingMenage[]>(queryKey);
-      if (previous) {
+      const previous: Snapshot = qc.getQueriesData<MyUpcomingMenage[]>({ queryKey });
+      for (const [key, list] of previous) {
+        if (!list) continue;
         qc.setQueryData<MyUpcomingMenage[]>(
-          queryKey,
-          previous.map((m) => (m.id === menageId ? { ...m, my_response: status } : m)),
+          key,
+          list.map((m) => (m.id === menageId ? { ...m, my_response: status } : m)),
         );
       }
       return { previous };
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(queryKey, ctx.previous);
+      for (const [key, list] of ctx?.previous ?? []) qc.setQueryData(key, list);
     },
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey });

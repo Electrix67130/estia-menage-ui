@@ -7,11 +7,13 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import {
   menageLogementLabel,
   menagePrestataireLabel,
-  prestationTypeLabel,
   prestationTypeColorKey,
   type Menage,
 } from '@/api/types';
+import { useTranslation } from '@/contexts/I18nContext';
+import type { TranslationKeys } from '@/i18n/translations';
 import { formatDateFr, formatDurationMin } from '@/lib/date-fr';
+import DispoBadge, { dispoState } from '@/components/prestations/DispoBadge';
 
 interface Props {
   menage: Menage;
@@ -19,6 +21,11 @@ interface Props {
   onLongPress?: (menage: Menage) => void;
   /** Tap sur « Affecter » (non assigné). Par défaut, ouvre la fiche. */
   onAssign?: (menage: Menage) => void;
+  /** Tap sur « Relancer » (non assigné, aucune réponse) : push aux membres sans vote. */
+  onRelance?: (menage: Menage) => void;
+  /** Admin : affiche le badge « Qui est dispo ? » (votes Présent/Absent) sur
+   *  une prestation non affectée, avec « Affecter » ou « Relancer » à droite. */
+  showDispo?: boolean;
   selected?: boolean;
   unread?: number;
   /** Affiche la date (vue « À traiter », où les cartes ne sont pas groupées par jour). */
@@ -41,6 +48,8 @@ const PlanningCard: React.FC<Props> = ({
   onPress,
   onLongPress,
   onAssign,
+  onRelance,
+  showDispo = false,
   selected,
   unread = 0,
   showDate = false,
@@ -49,6 +58,7 @@ const PlanningCard: React.FC<Props> = ({
   actions,
 }) => {
   const colors = Colors[useColorScheme()];
+  const { t } = useTranslation();
   const start = menage.horaire_prevu ? menage.horaire_prevu.slice(0, 5) : null;
   const end = menage.horaire_fin_prevu ? menage.horaire_fin_prevu.slice(0, 5) : null;
   const duration = menage.duree_estimee_min ? formatDurationMin(menage.duree_estimee_min) : null;
@@ -58,6 +68,34 @@ const PlanningCard: React.FC<Props> = ({
   const initials = assigned
     ? [menage.prestataire_first_name?.[0], menage.prestataire_last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
     : '';
+  // Sans réponse ET au moins un membre à relancer → « Relancer » ; sinon « Affecter ».
+  const canRelance =
+    !assigned && showDispo && dispoState(menage) === 'no_response' && (menage.member_prestataire_count ?? 0) > 0;
+
+  const assignButton = (
+    <TouchableOpacity
+      style={[styles.assignBtn, { borderColor: colors.primary }]}
+      onPress={() => (onAssign ? onAssign(menage) : onPress(menage.id))}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      accessibilityRole="button"
+      accessibilityLabel={t('planning.assignA11y')}
+    >
+      <Plus size={12} color={colors.primary} />
+      <Text style={[styles.assignText, { color: colors.primary }]}>{t('planning.assign')}</Text>
+    </TouchableOpacity>
+  );
+  const relanceButton = (
+    <TouchableOpacity
+      style={[styles.assignBtn, { borderColor: colors.text2, borderStyle: 'solid' }]}
+      onPress={() => (onRelance ? onRelance(menage) : onPress(menage.id))}
+      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+      accessibilityRole="button"
+      accessibilityLabel={t('planning.relanceA11y')}
+    >
+      <Bell size={12} color={colors.text2} />
+      <Text style={[styles.assignText, { color: colors.text2 }]}>{t('planning.relance')}</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <TouchableOpacity
@@ -110,7 +148,7 @@ const PlanningCard: React.FC<Props> = ({
               </Text>
             </View>
             <View style={[styles.typeBadge, { backgroundColor: typeColor + '20' }]}>
-              <Text style={[styles.typeBadgeText, { color: typeColor }]}>{prestationTypeLabel(menage.prestation_type)}</Text>
+              <Text style={[styles.typeBadgeText, { color: typeColor }]}>{t(`prestationType.${menage.prestation_type ?? 'menage'}` as TranslationKeys)}</Text>
             </View>
           </View>
 
@@ -121,20 +159,13 @@ const PlanningCard: React.FC<Props> = ({
                   <Text style={[styles.avatarText, { color: menage.logement_color ?? colors.primary }]}>{initials}</Text>
                 </View>
                 <Text style={[styles.whoText, { color: colors.text2 }]} numberOfLines={1}>
-                  {menagePrestataireLabel(menage)}
+                  {assigned ? menagePrestataireLabel(menage) : t('common.unassigned')}
                 </Text>
               </View>
+            ) : showDispo ? (
+              <DispoBadge menage={menage} colors={colors} />
             ) : (
-              <TouchableOpacity
-                style={[styles.assignBtn, { borderColor: colors.primary }]}
-                onPress={() => (onAssign ? onAssign(menage) : onPress(menage.id))}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                accessibilityRole="button"
-                accessibilityLabel="Affecter un prestataire"
-              >
-                <Plus size={12} color={colors.primary} />
-                <Text style={[styles.assignText, { color: colors.primary }]}>Affecter</Text>
-              </TouchableOpacity>
+              assignButton
             )}
             <View style={styles.badges}>
               {unread > 0 ? (
@@ -144,26 +175,27 @@ const PlanningCard: React.FC<Props> = ({
                 </View>
               ) : null}
               {menage.has_pending_reschedule ? (
-                <View style={[styles.pill, { backgroundColor: colors.statusEnCours + '25' }]} accessibilityLabel="Demande de changement en attente">
+                <View style={[styles.pill, { backgroundColor: colors.statusEnCours + '25' }]} accessibilityLabel={t('planning.pendingRescheduleA11y')}>
                   <Clock size={11} color={colors.statusEnCours} />
                 </View>
               ) : null}
               {late ? (
                 <View style={[styles.pill, { backgroundColor: colors.red + '20' }]}>
                   <AlertTriangle size={11} color={colors.red} />
-                  <Text style={[styles.pillText, { color: colors.red }]}>Non pointé</Text>
+                  <Text style={[styles.pillText, { color: colors.red }]}>{t('menage.statusNotClockedIn')}</Text>
                 </View>
               ) : menage.status === 'en_cours' ? (
                 <View style={[styles.pill, { backgroundColor: colors.statusEnCours + '20' }]}>
                   <Play size={11} color={colors.statusEnCours} />
-                  <Text style={[styles.pillText, { color: colors.statusEnCours }]}>En cours</Text>
+                  <Text style={[styles.pillText, { color: colors.statusEnCours }]}>{t('menage.statusInProgress')}</Text>
                 </View>
               ) : menage.status === 'termine' ? (
                 <View style={[styles.pill, { backgroundColor: colors.statusTermine + '20' }]}>
                   <ClipboardCheck size={11} color={colors.statusTermine} />
-                  <Text style={[styles.pillText, { color: colors.statusTermine }]}>À valider</Text>
+                  <Text style={[styles.pillText, { color: colors.statusTermine }]}>{t('menage.statusToValidate')}</Text>
                 </View>
               ) : null}
+              {!assigned && showDispo ? (canRelance ? relanceButton : assignButton) : null}
             </View>
           </View>
 

@@ -13,10 +13,13 @@ import { useMenages, menageHooks, useValidateReport } from '@/api/hooks/useMenag
 import { useLogements } from '@/api/hooks/useLogements';
 import { useAllUsers } from '@/api/hooks/useLogementMembers';
 import { useMyRescheduleRequests, useDecideReschedule } from '@/api/hooks/useReschedule';
+import { useRelanceMenage } from '@/api/hooks/useMenageResponses';
 import { useTranslation } from '@/contexts/I18nContext';
 import SearchBar from '@/components/SearchBar';
 import { type FilterOption } from '@/components/FilterPickerSheet';
 import PlanningCard from '@/components/prestations/PlanningCard';
+import { dispoState } from '@/components/prestations/DispoBadge';
+import AssignPrestataireModal from '@/components/AssignPrestataireModal';
 import SegmentedTabs from '@/components/prestations/SegmentedTabs';
 import FilterSheet, { countActiveFilters, type PrestationFilters } from '@/components/prestations/FilterSheet';
 import HistoriqueList from '@/components/HistoriqueList';
@@ -25,7 +28,7 @@ import MenageMap from '@/components/MenageMap';
 import { useAuth } from '@/contexts/AuthContext';
 import AppHeader from '@/components/AppHeader';
 import PrestaUpcomingList from '@/components/PrestaUpcomingList';
-import { menageLogementLabel, menageSourceLabel, type Menage, type RescheduleRequest } from '@/api/types';
+import { menageLogementLabel, menageSourceLabel, type Menage, type MenageAvailability, type RescheduleRequest } from '@/api/types';
 import { formatDateFr } from '@/lib/date-fr';
 import { groupByDay, ymdLocal } from '@/lib/prestations';
 
@@ -70,9 +73,11 @@ type TodoItem =
   | { kind: 'reschedule'; id: string; r: RescheduleRequest; m: Menage | undefined };
 
 interface TodoSection {
-  key: 'validate' | 'late' | 'unassigned' | 'reschedule';
+  key: 'validate' | 'late' | 'available' | 'unavailable' | 'reschedule';
   title: string;
   color: string;
+  /** Sous-titre d'en-tête : l'action attendue (« à affecter », « à relancer »). */
+  hint?: string;
   data: TodoItem[];
 }
 
@@ -80,7 +85,7 @@ function AdminMenagesScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, tp, locale } = useTranslation();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const dialog = useDialog();
@@ -97,15 +102,23 @@ function AdminMenagesScreen() {
   const [logementFilter, setLogementFilter] = usePersistedState('menages.filter.logement', '');
   const [prestaFilter, setPrestaFilter] = usePersistedState('menages.filter.presta', '');
   const [creatorFilter, setCreatorFilter] = usePersistedState('menages.filter.creator', '');
-  const filters: PrestationFilters = { type: typeFilter, logement: logementFilter, presta: prestaFilter, creator: creatorFilter };
+  const [availabilityFilter, setAvailabilityFilter] = usePersistedState<MenageAvailability | ''>('menages.filter.availability', '');
+  const filters: PrestationFilters = {
+    type: typeFilter,
+    logement: logementFilter,
+    presta: prestaFilter,
+    creator: creatorFilter,
+    availability: isAdmin ? availabilityFilter : '',
+  };
   const setFilters = useCallback(
     (f: PrestationFilters) => {
       setTypeFilter(f.type);
       setLogementFilter(f.logement);
       setPrestaFilter(f.presta);
       setCreatorFilter(f.creator);
+      setAvailabilityFilter(f.availability);
     },
-    [setTypeFilter, setLogementFilter, setPrestaFilter, setCreatorFilter],
+    [setTypeFilter, setLogementFilter, setPrestaFilter, setCreatorFilter, setAvailabilityFilter],
   );
   const filterCount = countActiveFilters(filters);
   const activeFilterCount = filterCount + (searchQuery.trim() ? 1 : 0);
@@ -113,7 +126,8 @@ function AdminMenagesScreen() {
 
   // Une seule requête : toute la worklist active (non clôturée). Planning et
   // À traiter s'en déduisent côté client ; les clôturées vivent dans l'Historique.
-  const menagesQuery = useMenages({ closed: false, limit: 200 });
+  // Le filtre « Disponibilité » (votes Présent/Absent) est appliqué par l'API.
+  const menagesQuery = useMenages({ closed: false, limit: 200, availability: filters.availability || undefined });
   const pendingReschedules = useMyRescheduleRequests('pending');
   const logementsQuery = useLogements({ limit: 500 });
   const usersQuery = useAllUsers();
@@ -134,6 +148,8 @@ function AdminMenagesScreen() {
       if (q && !menageLogementLabel(m).toLowerCase().includes(q)) return false;
       if (typeFilter && m.prestation_type !== typeFilter) return false;
       if (logementFilter && m.logement_id !== logementFilter) return false;
+      // « Qui est dispo ? » ne concerne que les prestations encore sans prestataire.
+      if (filters.availability && m.prestataire_user_id) return false;
       if (prestaFilter) {
         if (prestaFilter === '__unassigned__') {
           if (m.prestataire_user_id) return false;
@@ -154,10 +170,13 @@ function AdminMenagesScreen() {
       }
       return true;
     });
-  }, [menagesQuery.data, searchQuery, typeFilter, logementFilter, prestaFilter, creatorFilter]);
+  }, [menagesQuery.data, searchQuery, typeFilter, logementFilter, prestaFilter, creatorFilter, filters.availability]);
 
   // ---- Planning : par jour, à partir d'aujourd'hui.
-  const planning = useMemo(() => groupByDay(filtered, todayYmd), [filtered, todayYmd]);
+  // `groupByDay` lit la langue courante hors React : `locale` en dépendance pour
+  // recalculer les titres (Aujourd'hui / Demain / jour) au changement de langue.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const planning = useMemo(() => groupByDay(filtered, todayYmd), [filtered, todayYmd, locale]);
   const planningCount = planning.reduce((n, s) => n + s.data.length, 0);
   const summary = useMemo(() => {
     const today = filtered.filter((m) => m.date_prevue.slice(0, 10) === todayYmd);
@@ -179,25 +198,43 @@ function AdminMenagesScreen() {
     const unassigned = filtered.filter(
       (m) => m.status === 'a_venir' && !m.needs_attention && m.date_prevue.slice(0, 10) >= todayYmd && !m.prestataire_user_id,
     );
+    // Sans prestataire, scindé d'après les votes : quelqu'un s'est dit dispo
+    // (→ affecter) / personne, ou pas de réponse (→ relancer).
+    const available = unassigned.filter((m) => dispoState(m) === 'available');
+    const unavailable = unassigned.filter((m) => dispoState(m) !== 'available');
     // Les demandes respectent les filtres courants via la prestation concernée
     // (une demande sur une prestation inconnue de la worklist reste visible).
     const reschedules = (pendingReschedules.data?.data ?? []).filter((r) => !byId.has(r.menage_id) || shown.has(r.menage_id));
     const sections: TodoSection[] = [];
     if (toValidate.length)
-      sections.push({ key: 'validate', title: 'À valider', color: colors.statusTermine, data: toValidate.map((m) => ({ kind: 'menage', id: m.id, m })) });
+      sections.push({ key: 'validate', title: t('menage.statusToValidate'), color: colors.statusTermine, data: toValidate.map((m) => ({ kind: 'menage', id: m.id, m })) });
     if (late.length)
-      sections.push({ key: 'late', title: late.length > 1 ? 'Non pointées' : 'Non pointée', color: colors.red, data: late.map((m) => ({ kind: 'menage', id: m.id, m })) });
-    if (unassigned.length)
-      sections.push({ key: 'unassigned', title: 'Sans prestataire', color: colors.primary, data: unassigned.map((m) => ({ kind: 'menage', id: m.id, m })) });
+      sections.push({ key: 'late', title: tp('todo.late', late.length), color: colors.red, data: late.map((m) => ({ kind: 'menage', id: m.id, m })) });
+    if (available.length)
+      sections.push({
+        key: 'available',
+        title: t('todo.someoneAvailable'),
+        color: colors.green,
+        hint: t('todo.hintAssign'),
+        data: available.map((m) => ({ kind: 'menage', id: m.id, m })),
+      });
+    if (unavailable.length)
+      sections.push({
+        key: 'unavailable',
+        title: t('dispo.nobodyAvailable'),
+        color: colors.red,
+        hint: t('todo.hintRelance'),
+        data: unavailable.map((m) => ({ kind: 'menage', id: m.id, m })),
+      });
     if (reschedules.length)
       sections.push({
         key: 'reschedule',
-        title: reschedules.length > 1 ? 'Demandes de report' : 'Demande de report',
+        title: tp('todo.reschedule', reschedules.length),
         color: colors.statusEnCours,
         data: reschedules.map((r) => ({ kind: 'reschedule', id: `r-${r.id}`, r, m: byId.get(r.menage_id) })),
       });
     return sections;
-  }, [filtered, menagesQuery.data, pendingReschedules.data, todayYmd, colors]);
+  }, [filtered, menagesQuery.data, pendingReschedules.data, todayYmd, colors, t, tp]);
   const todoCount = todo.reduce((n, s) => n + s.data.length, 0);
 
   // ---- Options des filtres.
@@ -207,10 +244,10 @@ function AdminMenagesScreen() {
   );
   const prestaOptions: FilterOption[] = useMemo(
     () => [
-      { id: '__unassigned__', label: 'Non assigné' },
+      { id: '__unassigned__', label: t('common.unassigned') },
       ...allUsers.filter((u) => u.role === 'prestataire').map((u) => ({ id: u.id, label: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email })),
     ],
-    [allUsers],
+    [allUsers, t],
   );
   const creatorOptions: FilterOption[] = useMemo(() => {
     const menages = menagesQuery.data?.data ?? [];
@@ -223,18 +260,37 @@ function AdminMenagesScreen() {
       if (m.created_by) userIds.add(m.created_by);
     }
     const out: FilterOption[] = [];
-    if (hasManual) out.push({ id: 'src:manual', label: 'Manuel' });
+    if (hasManual) out.push({ id: 'src:manual', label: t('source.manual') });
     for (const s of Array.from(sources).sort()) out.push({ id: `src:${s}`, label: menageSourceLabel(s) });
     for (const id of userIds) out.push({ id: `user:${id}`, label: userLabel(id) });
     return out;
-  }, [menagesQuery.data, userLabel]);
+  }, [menagesQuery.data, userLabel, t]);
 
   // ---- Mutations.
   const deleteMutation = menageHooks.useRemove();
   const updateMutation = menageHooks.useUpdate();
   const validateMutation = useValidateReport();
   const decide = useDecideReschedule();
+  const relance = useRelanceMenage();
   const bulkPending = deleteMutation.isPending || updateMutation.isPending || validateMutation.isPending;
+
+  // ---- « Qui est dispo ? » : affecter depuis la liste, relancer les sans-réponse.
+  const [assignMenageId, setAssignMenageId] = useState<string | null>(null);
+  const handleAssign = useCallback((m: Menage) => setAssignMenageId(m.id), []);
+  const handleRelance = useCallback(
+    async (m: Menage) => {
+      try {
+        const res = await relance.mutateAsync(m.id);
+        void dialog.alert({
+          title: t('prestations.relanceTitle'),
+          message: res.sent > 0 ? tp('prestations.relanceSent', res.sent) : t('prestations.relanceAllAnswered'),
+        });
+      } catch (err) {
+        void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('prestations.relanceFailed') });
+      }
+    },
+    [relance, dialog, t, tp],
+  );
 
   // ---- Sélection multiple (appui long ; admin).
   const [selectionMode, setSelectionMode] = useState(false);
@@ -275,25 +331,23 @@ function AdminMenagesScreen() {
   const validateMany = useCallback(
     async (ids: string[], ignored = 0) => {
       if (ids.length === 0) {
-        void dialog.alert({ title: 'Rien à valider', message: 'Seules les prestations terminées (rapport rendu) peuvent être validées.' });
+        void dialog.alert({ title: t('prestations.nothingToValidate'), message: t('prestations.nothingToValidateHint') });
         return;
       }
       const ok = await dialog.confirm({
-        title: `Valider ${ids.length} prestation${ids.length > 1 ? 's' : ''} ?`,
-        message:
-          `Elles passeront en « validée » au prix prévu et rejoindront l'Historique.` +
-          (ignored > 0 ? ` ${ignored} sélectionnée${ignored > 1 ? 's' : ''} non terminée${ignored > 1 ? 's' : ''} sera ignorée.` : ''),
-        confirmLabel: 'Valider',
+        title: tp('prestations.validateConfirmTitle', ids.length),
+        message: t('prestations.validateConfirmBody') + (ignored > 0 ? ` ${tp('prestations.validateIgnored', ignored)}` : ''),
+        confirmLabel: t('common.validate'),
       });
       if (!ok) return;
       try {
         await Promise.all(ids.map((id) => validateMutation.mutateAsync({ id })));
         exitSelection();
       } catch (err) {
-        void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Validation partielle' });
+        void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('prestations.validatePartial') });
       }
     },
-    [dialog, validateMutation, exitSelection],
+    [dialog, validateMutation, exitSelection, t, tp],
   );
   const handleBulkValidate = useCallback(() => {
     const ids = selectedMenages.filter((m) => m.status === 'termine').map((m) => m.id);
@@ -308,9 +362,9 @@ function AdminMenagesScreen() {
     const ids = selectedMenages.filter((m) => m.status !== 'annule').map((m) => m.id);
     if (ids.length === 0) return;
     const ok = await dialog.confirm({
-      title: `Annuler ${ids.length} prestation${ids.length > 1 ? 's' : ''} ?`,
-      message: 'Elles passeront en « annulée » et rejoindront l’Historique (retrouvables, pas supprimées). Les prestataires affectés seront prévenus.',
-      confirmLabel: 'Annuler les prestations',
+      title: tp('prestations.cancelConfirmTitle', ids.length),
+      message: t('prestations.cancelConfirmBody'),
+      confirmLabel: t('prestations.cancelConfirmLabel'),
       destructive: true,
     });
     if (!ok) return;
@@ -318,17 +372,17 @@ function AdminMenagesScreen() {
       await Promise.all(ids.map((id) => updateMutation.mutateAsync({ id, body: { status: 'annule' } })));
       exitSelection();
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Annulation partielle' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('prestations.cancelPartial') });
     }
-  }, [selectedMenages, updateMutation, exitSelection, dialog]);
+  }, [selectedMenages, updateMutation, exitSelection, dialog, t, tp]);
 
   const handleBulkDelete = useCallback(async () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     const ok = await dialog.confirm({
-      title: `Supprimer ${ids.length} prestation${ids.length > 1 ? 's' : ''} ?`,
-      message: 'Action irréversible : toutes leurs données (photos, documents, étapes…) seront supprimées.',
-      confirmLabel: 'Supprimer',
+      title: tp('prestations.deleteConfirmTitle', ids.length),
+      message: t('prestations.deleteConfirmBody'),
+      confirmLabel: t('common.delete'),
       destructive: true,
     });
     if (!ok) return;
@@ -336,19 +390,19 @@ function AdminMenagesScreen() {
       await Promise.all(ids.map((id) => deleteMutation.mutateAsync(id)));
       exitSelection();
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Suppression partielle' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('prestations.deletePartial') });
     }
-  }, [selectedIds, deleteMutation, exitSelection, dialog]);
+  }, [selectedIds, deleteMutation, exitSelection, dialog, t, tp]);
 
   const handleDecide = useCallback(
     async (r: RescheduleRequest, decision: 'approved' | 'rejected') => {
       try {
         await decide.mutateAsync({ id: r.id, decision, apply_to_menage: decision === 'approved' });
       } catch (err) {
-        void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+        void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('prestations.failed') });
       }
     },
-    [decide, dialog],
+    [decide, dialog, t],
   );
 
   const refetchMenages = menagesQuery.refetch;
@@ -397,11 +451,14 @@ function AdminMenagesScreen() {
           menage={item}
           onPress={handleMenagePress}
           onLongPress={isAdmin ? handleMenageLongPress : undefined}
+          onAssign={isAdmin ? handleAssign : undefined}
+          onRelance={isAdmin ? handleRelance : undefined}
+          showDispo={isAdmin}
           selected={selectedIds.has(item.id)}
           unread={unreadByMenage[item.id] ?? 0}
         />,
       ),
-    [wrapSelectable, handleMenagePress, handleMenageLongPress, isAdmin, selectedIds, unreadByMenage],
+    [wrapSelectable, handleMenagePress, handleMenageLongPress, handleAssign, handleRelance, isAdmin, selectedIds, unreadByMenage],
   );
 
   const renderPlanningHeader = useCallback(
@@ -412,7 +469,7 @@ function AdminMenagesScreen() {
         <View style={{ flex: 1 }} />
         {section.isToday && summary.today > 0 ? (
           <Text style={[styles.sectionSubtitle, { color: colors.text2 }]}>
-            {summary.todayDone} / {summary.today} terminée{summary.today > 1 ? 's' : ''}
+            {tp('planning.doneCount', summary.today, { done: summary.todayDone })}
           </Text>
         ) : null}
         <View style={[styles.sectionCount, { backgroundColor: section.isToday ? colors.primary : colors.lightItemBackground }]}>
@@ -420,19 +477,21 @@ function AdminMenagesScreen() {
         </View>
       </View>
     ),
-    [colors, summary],
+    [colors, summary, tp],
   );
 
   const renderTodoItem = useCallback(
     ({ item, section }: { item: TodoItem; section: TodoSection }) => {
       if (item.kind === 'reschedule') {
         const { r, m } = item;
-        const proposed = `${formatDateFr(r.proposed_date.slice(0, 10), 'weekdayShort')}${r.proposed_time ? ` à ${r.proposed_time.slice(0, 5)}` : ''}`;
-        const note = `${userLabel(r.requested_by)} propose ${proposed}${r.reason ? ` · « ${r.reason} »` : ''}`;
+        const proposedDate = formatDateFr(r.proposed_date.slice(0, 10), 'weekdayShort');
+        const proposed = r.proposed_time ? t('todo.proposedAt', { date: proposedDate, time: r.proposed_time.slice(0, 5) }) : proposedDate;
+        const who = userLabel(r.requested_by);
+        const note = r.reason ? t('todo.proposesWithReason', { who, proposed, reason: r.reason }) : t('todo.proposes', { who, proposed });
         const actions = (
           <>
             <TouchableOpacity style={[styles.actionBtn, { borderColor: colors.border }]} onPress={() => handleDecide(r, 'rejected')} disabled={decide.isPending}>
-              <Text style={[styles.actionBtnText, { color: colors.text2 }]}>Refuser</Text>
+              <Text style={[styles.actionBtnText, { color: colors.text2 }]}>{t('todo.refuse')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.statusEnCours, borderColor: colors.statusEnCours }]}
@@ -440,7 +499,7 @@ function AdminMenagesScreen() {
               disabled={decide.isPending}
             >
               <Check size={13} color="#FFFFFF" />
-              <Text style={[styles.actionBtnText, { color: '#FFFFFF' }]}>Accepter</Text>
+              <Text style={[styles.actionBtnText, { color: '#FFFFFF' }]}>{t('todo.accept')}</Text>
             </TouchableOpacity>
           </>
         );
@@ -460,9 +519,9 @@ function AdminMenagesScreen() {
       const m = item.m;
       let note: string | undefined;
       if (section.key === 'validate') {
-        note = m.departed_at ? `Terminé le ${formatDateFr(m.departed_at, 'dayShortTime')}` : 'Rapport rendu';
+        note = m.departed_at ? t('todo.doneAt', { date: formatDateFr(m.departed_at, 'dayShortTime') }) : t('todo.reportSubmitted');
       } else if (section.key === 'late') {
-        note = 'Jour passé sans pointage · ouvre la fiche pour corriger les heures ou annuler';
+        note = t('todo.lateNote');
       }
       return wrapSelectable(
         m.id,
@@ -470,6 +529,9 @@ function AdminMenagesScreen() {
           menage={m}
           onPress={handleMenagePress}
           onLongPress={isAdmin ? handleMenageLongPress : undefined}
+          onAssign={isAdmin ? handleAssign : undefined}
+          onRelance={isAdmin ? handleRelance : undefined}
+          showDispo={isAdmin}
           selected={selectedIds.has(m.id)}
           unread={unreadByMenage[m.id] ?? 0}
           showDate
@@ -478,7 +540,7 @@ function AdminMenagesScreen() {
         />,
       );
     },
-    [wrapSelectable, handleMenagePress, handleMenageLongPress, isAdmin, selectedIds, unreadByMenage, userLabel, handleDecide, decide.isPending, colors, router],
+    [wrapSelectable, handleMenagePress, handleMenageLongPress, handleAssign, handleRelance, isAdmin, selectedIds, unreadByMenage, userLabel, handleDecide, decide.isPending, colors, router, t],
   );
 
   const renderTodoHeader = useCallback(
@@ -488,6 +550,7 @@ function AdminMenagesScreen() {
         <View style={[styles.sectionCount, { backgroundColor: section.color + '20' }]}>
           <Text style={[styles.sectionCountText, { color: section.color }]}>{section.data.length}</Text>
         </View>
+        {section.hint ? <Text style={[styles.sectionSubtitle, { color: colors.text2 }]}>{section.hint}</Text> : null}
         <View style={{ flex: 1 }} />
         {section.key === 'validate' && isAdmin && !selectionMode ? (
           <TouchableOpacity
@@ -497,17 +560,21 @@ function AdminMenagesScreen() {
             accessibilityRole="button"
           >
             <CheckCheck size={13} color="#FFFFFF" />
-            <Text style={styles.headerActionText}>Tout valider</Text>
+            <Text style={styles.headerActionText}>{t('todo.validateAll')}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
     ),
-    [colors, isAdmin, selectionMode, handleValidateAll, validateMutation.isPending],
+    [colors, isAdmin, selectionMode, handleValidateAll, validateMutation.isPending, t],
   );
 
   const isLoading = menagesQuery.isLoading;
   const isRefetching = menagesQuery.isRefetching || pendingReschedules.isRefetching;
   const refreshControl = <RefreshControl refreshing={isRefetching} onRefresh={refetchAll} tintColor={colors.primary} colors={[colors.primary]} />;
+
+  // Phrase avec lien inséré : la clé garde `{link}` en place, on la scinde au rendu
+  // pour que l'ordre des mots reste celui de chaque langue.
+  const [footerBefore, footerAfter] = t('todo.footerOlder').split('{link}');
 
   const renderEmpty = (title: string, hint: string) => (
     <View style={styles.emptyContainer}>
@@ -529,7 +596,7 @@ function AdminMenagesScreen() {
                 if (searchOpen) setSearchQuery('');
               }}
               accessibilityRole="button"
-              accessibilityLabel="Rechercher"
+              accessibilityLabel={t('common.search')}
             >
               <Search size={IconSize.md} color={searchOpen ? '#FFFFFF' : colors.text2} />
             </TouchableOpacity>
@@ -537,7 +604,7 @@ function AdminMenagesScreen() {
               style={[styles.iconBtn, { backgroundColor: colors.itemBackground }]}
               onPress={() => setFilterOpen(true)}
               accessibilityRole="button"
-              accessibilityLabel={`Filtres${filterCount ? ` (${filterCount})` : ''}`}
+              accessibilityLabel={filterCount ? t('prestations.filtersWithCount', { count: filterCount }) : t('common.filters')}
             >
               <SlidersHorizontal size={IconSize.md} color={filterCount ? colors.primary : colors.text2} />
               {filterCount ? (
@@ -551,7 +618,7 @@ function AdminMenagesScreen() {
                 style={[styles.iconBtn, { backgroundColor: viewMode === 'map' ? colors.primary : colors.itemBackground }]}
                 onPress={() => setViewMode(viewMode === 'map' ? 'list' : 'map')}
                 accessibilityRole="button"
-                accessibilityLabel={viewMode === 'map' ? 'Vue liste' : 'Vue carte'}
+                accessibilityLabel={viewMode === 'map' ? t('planning.viewList') : t('planning.viewMap')}
               >
                 {viewMode === 'map' ? <List size={IconSize.md} color="#FFFFFF" /> : <MapIcon size={IconSize.md} color={colors.text2} />}
               </TouchableOpacity>
@@ -563,9 +630,9 @@ function AdminMenagesScreen() {
       <View style={styles.controls}>
         <SegmentedTabs
           segments={[
-            { key: 'planning', label: 'Planning' },
-            { key: 'todo', label: 'À traiter', badge: todoCount },
-            { key: 'history', label: 'Historique' },
+            { key: 'planning', label: t('prestations.segPlanning') },
+            { key: 'todo', label: t('prestations.segTodo'), badge: todoCount },
+            { key: 'history', label: t('historique.title') },
           ]}
           value={view}
           onChange={(v) => {
@@ -583,37 +650,37 @@ function AdminMenagesScreen() {
           exiting={FadeOutUp.duration(180)}
           style={[styles.selectionBar, { backgroundColor: colors.primary + '15', borderBottomColor: colors.primary }]}
         >
-          <TouchableOpacity onPress={exitSelection} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityLabel="Annuler la sélection">
+          <TouchableOpacity onPress={exitSelection} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} accessibilityLabel={t('prestations.cancelSelectionA11y')}>
             <X size={IconSize.lg} color={colors.text} />
           </TouchableOpacity>
           <Animated.Text key={`count-${selectedIds.size}`} entering={FadeInDown.duration(140)} style={[styles.selectionCount, { color: colors.text }]}>
-            {selectedIds.size} sélectionné{selectedIds.size > 1 ? 's' : ''}
+            {tp('common.selectedCount', selectedIds.size)}
           </Animated.Text>
           <TouchableOpacity
             style={[styles.selectionAction, { backgroundColor: validableCount === 0 ? colors.itemBackground : colors.statusValide }]}
             onPress={handleBulkValidate}
             disabled={selectedIds.size === 0 || bulkPending}
-            accessibilityLabel={`Valider la sélection (${validableCount})`}
+            accessibilityLabel={t('prestations.validateSelectionA11y', { count: validableCount })}
           >
             <CheckCheck size={IconSize.sm} color={validableCount === 0 ? colors.mutedText : '#FFFFFF'} />
             <Text style={[styles.selectionActionText, { color: validableCount === 0 ? colors.mutedText : '#FFFFFF' }]}>
-              Valider{validableCount > 0 ? ` ${validableCount}` : ''}
+              {validableCount > 0 ? t('prestations.validateCount', { count: validableCount }) : t('common.validate')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.selectionAction, { backgroundColor: selectedIds.size === 0 ? colors.itemBackground : colors.statusEnCours }]}
             onPress={handleBulkCancel}
             disabled={selectedIds.size === 0 || bulkPending}
-            accessibilityLabel="Annuler la sélection"
+            accessibilityLabel={t('prestations.cancelSelectionA11y')}
           >
             <Ban size={IconSize.sm} color={selectedIds.size === 0 ? colors.mutedText : '#FFFFFF'} />
-            <Text style={[styles.selectionActionText, { color: selectedIds.size === 0 ? colors.mutedText : '#FFFFFF' }]}>Annuler</Text>
+            <Text style={[styles.selectionActionText, { color: selectedIds.size === 0 ? colors.mutedText : '#FFFFFF' }]}>{t('common.cancel')}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.selectionAction, { backgroundColor: selectedIds.size === 0 ? colors.itemBackground : colors.red }]}
             onPress={handleBulkDelete}
             disabled={selectedIds.size === 0 || bulkPending}
-            accessibilityLabel="Supprimer la sélection"
+            accessibilityLabel={t('prestations.deleteSelectionA11y')}
           >
             <Trash2 size={IconSize.sm} color={selectedIds.size === 0 ? colors.mutedText : '#FFFFFF'} />
           </TouchableOpacity>
@@ -631,6 +698,10 @@ function AdminMenagesScreen() {
         resultCount={view === 'todo' ? todoCount : planningCount}
         isAdmin={isAdmin}
       />
+
+      {isAdmin ? (
+        <AssignPrestataireModal visible={!!assignMenageId} menageId={assignMenageId ?? ''} onClose={() => setAssignMenageId(null)} />
+      ) : null}
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
@@ -651,12 +722,12 @@ function AdminMenagesScreen() {
           ListHeaderComponent={
             <View style={[styles.summary, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               {[
-                { n: summary.today, label: "aujourd'hui", color: colors.text },
-                { n: summary.enCours, label: 'en cours', color: colors.statusEnCours },
-                { n: summary.unassigned, label: summary.unassigned > 1 ? 'non assignées' : 'non assignée', color: colors.primary },
-                { n: summary.late, label: summary.late > 1 ? 'non pointées' : 'non pointée', color: colors.red },
+                { key: 'today', n: summary.today, label: t('planning.summaryToday'), color: colors.text },
+                { key: 'enCours', n: summary.enCours, label: t('planning.summaryInProgress'), color: colors.statusEnCours },
+                { key: 'unassigned', n: summary.unassigned, label: tp('planning.summaryUnassigned', summary.unassigned), color: colors.primary },
+                { key: 'late', n: summary.late, label: tp('planning.summaryLate', summary.late), color: colors.red },
               ].map((s) => (
-                <View key={s.label} style={styles.summaryCell}>
+                <View key={s.key} style={styles.summaryCell}>
                   <Text style={[styles.summaryNum, { color: s.n > 0 ? s.color : colors.mutedText }]}>{s.n}</Text>
                   <Text style={[styles.summaryLabel, { color: colors.text2 }]} numberOfLines={1}>
                     {s.label}
@@ -666,8 +737,8 @@ function AdminMenagesScreen() {
             </View>
           }
           ListEmptyComponent={renderEmpty(
-            activeFilterCount ? 'Aucune prestation pour ces filtres' : 'Rien de prévu',
-            activeFilterCount ? 'Élargis les filtres ou la recherche.' : 'Les prestations à venir apparaîtront ici, jour par jour.',
+            activeFilterCount ? t('planning.emptyFiltered') : t('planning.empty'),
+            activeFilterCount ? t('planning.emptyFilteredHint') : t('planning.emptyHint'),
           )}
           contentContainerStyle={[styles.list, { flexGrow: 1 }]}
           ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
@@ -683,13 +754,14 @@ function AdminMenagesScreen() {
           renderItem={renderTodoItem}
           renderSectionHeader={renderTodoHeader}
           stickySectionHeadersEnabled
-          ListEmptyComponent={renderEmpty('Tout est à jour', 'Rien à valider, rien en retard, personne à affecter, aucune demande en attente.')}
+          ListEmptyComponent={renderEmpty(t('todo.empty'), t('todo.emptyHint'))}
           ListFooterComponent={
             todo.length ? (
               <TouchableOpacity style={styles.pastFooter} onPress={() => setView('history')} accessibilityRole="link">
                 <Text style={[styles.pastFooterText, { color: colors.mutedText }]}>
-                  Les prestations passées non traitées depuis plus longtemps sont dans{' '}
-                  <Text style={{ color: colors.primary, fontWeight: FontWeight.semibold }}>l’Historique</Text>.
+                  {footerBefore}
+                  <Text style={{ color: colors.primary, fontWeight: FontWeight.semibold }}>{t('todo.footerOlderLink')}</Text>
+                  {footerAfter}
                 </Text>
               </TouchableOpacity>
             ) : null

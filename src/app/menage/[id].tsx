@@ -43,7 +43,7 @@ import {
   Info,
 } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
-import { Spacing, Radius, FontSize, FontWeight, Shadow, IconSize } from '@/constants/Layout';
+import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useTranslation } from '@/contexts/I18nContext';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
@@ -51,7 +51,7 @@ import { useSwipeToClose } from '@/hooks/useSwipeToClose';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import SheetHandle from '@/components/SheetHandle';
 import { useQueryClient } from '@tanstack/react-query';
-import { menageHooks, useArrival, useDeparture, useUpdateDeclaration, useValidateReport, useArchiveMenage, useEligiblePrestataires, useUpdateMenage, findCachedMenage } from '@/api/hooks/useMenages';
+import { menageHooks, useArrival, useDeparture, useUpdateDeclaration, useValidateReport, useArchiveMenage, useUpdateMenage, findCachedMenage } from '@/api/hooks/useMenages';
 import {
   useMenagePrestataires,
   useSetMenagePrestataires,
@@ -65,9 +65,11 @@ import {
 import { useCreateRescheduleRequest } from '@/api/hooks/useReschedule';
 import { useLogement } from '@/api/hooks/useLogements';
 import { useLogementCodes } from '@/api/hooks/useLogementCodes';
+import AssignPrestataireModal from '@/components/AssignPrestataireModal';
 import MenageEquipementsSection from '@/components/MenageEquipementsSection';
 import MenageOptionsSection from '@/components/MenageOptionsSection';
 import LogementReferencePhotos from '@/components/LogementReferencePhotos';
+import { LazyLoadScope, useLazyScrollHandler } from '@/components/LazyImage';
 import { useMarkTabViewed, useUnreadCounts } from '@/api/hooks/useMenageViews';
 import {
   useMenageConsommables,
@@ -99,23 +101,36 @@ import ArrivalDeclarationModal, { type ArrivalDeclaration } from '@/components/A
 import { uploadFile } from '@/api/upload';
 import { optimizeImage } from '@/utils/optimizeImage';
 import { haversineMeters, formatDistance, POINTAGE_DISTANCE_WARN_M } from '@/lib/geo-distance';
-import { prestationTypeLabel, prestationTypeColorKey } from '@/api/types';
+import { prestationTypeColorKey } from '@/api/types';
+import type { TranslationKeys } from '@/i18n/translations';
 import type { Menage, Logement, MenageStatus, UpdateMenageInput, Photo } from '@/api/types';
 
 const TABS = [
-  { key: 'infos', label: 'Infos', icon: Info },
-  { key: 'check', label: 'Check', icon: ListChecks },
-  { key: 'photos', label: 'Photos', icon: Camera },
-  { key: 'comments', label: 'Discussion', icon: MessageSquare },
-] as const;
+  { key: 'infos', label: 'menageDetail.tabInfos', icon: Info },
+  { key: 'check', label: 'menageDetail.tabCheck', icon: ListChecks },
+  { key: 'photos', label: 'menageDetail.tabPhotos', icon: Camera },
+  { key: 'comments', label: 'menageDetail.tabComments', icon: MessageSquare },
+] as const satisfies readonly { key: string; label: TranslationKeys; icon: unknown }[];
 
 type TabKey = (typeof TABS)[number]['key'];
 
-/** "14/07 à 09:32" — heure locale, pour le bandeau « pointage en attente ». */
-function formatShortDateTime(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} à ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/**
+ * ScrollView de l'onglet Infos : relaie le scroll au `LazyLoadScope` pour que
+ * les vignettes (photos de référence du logement…) ne se chargent qu'en
+ * arrivant à l'écran, au lieu de toutes partir à l'ouverture de la fiche.
+ */
+function InfosScrollView({ children }: { children: React.ReactNode }) {
+  const onScroll = useLazyScrollHandler();
+  return (
+    <ScrollView
+      contentContainerStyle={{ paddingTop: Spacing.md, paddingBottom: Spacing.xl }}
+      showsVerticalScrollIndicator={false}
+      onScroll={onScroll}
+      scrollEventThrottle={100}
+    >
+      {children}
+    </ScrollView>
+  );
 }
 
 /** Grille de vignettes pour le récap de validation (dégradations / photos ménage). */
@@ -150,6 +165,7 @@ export default function MenageDetailScreen() {
   const isAdmin = user?.role === 'admin';
   const isPrestataire = menage?.prestataire_user_id === user?.id;
   const dialog = useDialog();
+  const { t } = useTranslation();
 
   const arrivalMutation = useArrival();
   const updateDeclarationMutation = useUpdateDeclaration();
@@ -245,11 +261,12 @@ export default function MenageDetailScreen() {
     }) => Promise<unknown>,
   ) => {
     const ok = await dialog.confirm({
-      title: kind === 'arrival' ? "Pointer l'arrivée ?" : 'Pointer le départ ?',
+      title: kind === 'arrival' ? t('pointage.confirmArrivalTitle') : t('pointage.confirmDepartureTitle'),
       message:
-        'Une photo géolocalisée va être prise pour confirmer ta présence sur place. ' +
-        (kind === 'arrival' ? 'Le statut passera à "en cours".' : 'Le statut passera à "terminé".'),
-      confirmLabel: 'Prendre la photo',
+        t('pointage.geoPhotoIntro') +
+        ' ' +
+        (kind === 'arrival' ? t('pointage.statusWillBeInProgress') : t('pointage.statusWillBeDone')),
+      confirmLabel: t('pointage.takePhoto'),
     });
     if (!ok) return false;
     // iOS ne présente pas deux modals natifs en même temps : on attend que la
@@ -273,10 +290,8 @@ export default function MenageDetailScreen() {
           photo: { uri: localUri, width, height },
         });
         void dialog.alert({
-          title: 'Hors ligne — pointage en attente',
-          message:
-            (kind === 'arrival' ? "L'arrivée" : 'Le départ') +
-            " sera envoyé(e) automatiquement au retour du réseau, à l'heure de maintenant.",
+          title: t('pointage.offlinePendingTitle'),
+          message: kind === 'arrival' ? t('pointage.offlineArrivalQueuedNow') : t('pointage.offlineDepartureQueuedNow'),
         });
         return true;
       }
@@ -292,12 +307,12 @@ export default function MenageDetailScreen() {
     } catch (err) {
       if (err instanceof GeoPhotoError) {
         if (err.code === 'cancelled') return false;
-        void dialog.alert({ title: 'Pointage impossible', message: err.message });
+        void dialog.alert({ title: t('pointage.failedTitle'), message: err.message });
         return false;
       }
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Échec du pointage',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('pointage.failed'),
       });
       return false;
     }
@@ -313,9 +328,9 @@ export default function MenageDetailScreen() {
   const handleArrival = async () => {
     if (isCheckInOut) {
       const ok = await dialog.confirm({
-        title: menage?.prestation_type === 'check_in' ? "Pointer l'arrivée du voyageur ?" : "Pointer l'arrivée ?",
-        message: 'Le statut passera à « en cours ».',
-        confirmLabel: 'Confirmer',
+        title: menage?.prestation_type === 'check_in' ? t('pointage.confirmGuestArrivalTitle') : t('pointage.confirmArrivalTitle'),
+        message: t('pointage.statusWillBeInProgress'),
+        confirmLabel: t('common.confirm'),
       });
       if (!ok) return;
       if (!onlineManager.isOnline()) {
@@ -328,22 +343,22 @@ export default function MenageDetailScreen() {
           lng: null,
         });
         void dialog.alert({
-          title: 'Hors ligne — pointage en attente',
-          message: "L'arrivée sera envoyée automatiquement au retour du réseau.",
+          title: t('pointage.offlinePendingTitle'),
+          message: t('pointage.offlineArrivalQueued'),
         });
         return;
       }
       try {
         await arrivalMutation.mutateAsync({ id: id! });
       } catch (err) {
-        void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec du pointage' });
+        void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('pointage.failed') });
       }
       return;
     }
     const ok = await dialog.confirm({
-      title: "Pointer l'arrivée ?",
-      message: 'Une photo géolocalisée va être prise pour confirmer ta présence sur place.',
-      confirmLabel: 'Prendre la photo',
+      title: t('pointage.confirmArrivalTitle'),
+      message: t('pointage.geoPhotoIntro'),
+      confirmLabel: t('pointage.takePhoto'),
     });
     if (!ok) return;
     await new Promise((r) => setTimeout(r, 650));
@@ -373,10 +388,10 @@ export default function MenageDetailScreen() {
       });
     } catch (err) {
       if (err instanceof GeoPhotoError) {
-        if (err.code !== 'cancelled') void dialog.alert({ title: 'Pointage impossible', message: err.message });
+        if (err.code !== 'cancelled') void dialog.alert({ title: t('pointage.failedTitle'), message: err.message });
         return;
       }
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec du pointage' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('pointage.failed') });
     }
   };
 
@@ -412,15 +427,15 @@ export default function MenageDetailScreen() {
         setArrivalProof(null);
         arrivalUploadRef.current = null;
         void dialog.alert({
-          title: 'Hors ligne — arrivée en attente',
-          message: "L'arrivée sera envoyée automatiquement au retour du réseau, à l'heure de maintenant.",
+          title: t('pointage.offlineArrivalPendingTitle'),
+          message: t('pointage.offlineArrivalQueuedNow'),
         });
         return;
       }
       // Récupère l'upload lancé en fond à la capture (souvent déjà terminé).
       const up = arrivalUploadRef.current ? await arrivalUploadRef.current : null;
       if (!up || up.error || !up.url) {
-        throw up?.error instanceof Error ? up.error : new Error("Échec de l'envoi de la photo");
+        throw up?.error instanceof Error ? up.error : new Error(t('pointage.photoUploadFailed'));
       }
       const photo_url = up.url;
       let degradation_photos: { url: string; file_size?: number; mime_type?: string }[] | undefined;
@@ -446,7 +461,7 @@ export default function MenageDetailScreen() {
       setArrivalProof(null);
       arrivalUploadRef.current = null;
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec du pointage' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('pointage.failed') });
     } finally {
       setArrivalSubmitting(false);
     }
@@ -472,7 +487,7 @@ export default function MenageDetailScreen() {
       });
       setShowEditDecl(false);
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec de la mise à jour' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('menageDetail.updateFailed') });
     } finally {
       setEditDeclSubmitting(false);
     }
@@ -481,9 +496,9 @@ export default function MenageDetailScreen() {
   const handleDeparture = async () => {
     if (isCheckInOut) {
       const ok = await dialog.confirm({
-        title: 'Pointer le départ ?',
-        message: 'Le statut passera à « terminé ».',
-        confirmLabel: 'Confirmer',
+        title: t('pointage.confirmDepartureTitle'),
+        message: t('pointage.statusWillBeDone'),
+        confirmLabel: t('common.confirm'),
       });
       if (!ok) return;
       if (!onlineManager.isOnline()) {
@@ -496,15 +511,15 @@ export default function MenageDetailScreen() {
           lng: null,
         });
         void dialog.alert({
-          title: 'Hors ligne — pointage en attente',
-          message: 'Le départ sera envoyé automatiquement au retour du réseau.',
+          title: t('pointage.offlinePendingTitle'),
+          message: t('pointage.offlineDepartureQueued'),
         });
         return;
       }
       try {
         await departureMutation.mutateAsync({ id: id! });
       } catch (err) {
-        void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec du pointage' });
+        void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('pointage.failed') });
       }
       return;
     }
@@ -526,7 +541,7 @@ export default function MenageDetailScreen() {
       setShowValidateModal(false);
       setOverridePrice('');
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Validation impossible' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('menageDetail.validateFailed') });
     }
   };
 
@@ -544,7 +559,7 @@ export default function MenageDetailScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loading}>
-          <Text style={{ color: colors.mutedText }}>Ménage introuvable</Text>
+          <Text style={{ color: colors.mutedText }}>{t('menage.edit.notFound')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -562,7 +577,7 @@ export default function MenageDetailScreen() {
 
   const handleSubmitReschedule = () => {
     if (!proposedDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-      void dialog.alert({ title: 'Date invalide', message: 'Format attendu : AAAA-MM-JJ' });
+      void dialog.alert({ title: t('menageDetail.invalidDateTitle'), message: t('menageDetail.invalidDateFormat') });
       return;
     }
     rescheduleMutation.mutate(
@@ -578,11 +593,11 @@ export default function MenageDetailScreen() {
           setProposedDate('');
           setProposedTime('');
           setRescheduleReason('');
-          void dialog.alert({ title: 'Demande envoyée', message: 'L\'administrateur sera notifié.' });
+          void dialog.alert({ title: t('menageDetail.rescheduleSentTitle'), message: t('menageDetail.rescheduleSentBody') });
         },
         onError: (err: unknown) => {
-          const msg = err instanceof Error ? err.message : 'Erreur';
-          void dialog.alert({ title: 'Erreur', message: msg });
+          const msg = err instanceof Error ? err.message : t('common.error');
+          void dialog.alert({ title: t('common.error'), message: msg });
         },
       },
     );
@@ -601,13 +616,13 @@ export default function MenageDetailScreen() {
           onPress={() => router.back()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           accessibilityRole="button"
-          accessibilityLabel="Retour"
+          accessibilityLabel={t('common.back')}
         >
           <ArrowLeft size={IconSize.lg} color={colors.text} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
-            {logement?.name || 'Ménage'}
+            {logement?.name || t('prestationType.menage')}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
             <Text style={[styles.dateText, { color: colors.text2 }]}>{date}</Text>
@@ -616,7 +631,7 @@ export default function MenageDetailScreen() {
               return (
                 <View style={[styles.typeBadge, { backgroundColor: typeColor + '20' }]}>
                   <Text style={[styles.typeBadgeText, { color: typeColor }]}>
-                    {prestationTypeLabel(menage.prestation_type)}
+                    {t(`prestationType.${menage.prestation_type ?? 'menage'}` as TranslationKeys)}
                   </Text>
                 </View>
               );
@@ -624,7 +639,7 @@ export default function MenageDetailScreen() {
             {menage.date_locked ? (
               <View style={[styles.lockPill, { backgroundColor: colors.statusEnCours + '25' }]}>
                 <Lock size={14} color={colors.statusEnCours} />
-                <Text style={[styles.lockText, { color: colors.statusEnCours }]}>Verrouillée</Text>
+                <Text style={[styles.lockText, { color: colors.statusEnCours }]}>{t('menageDetail.locked')}</Text>
               </View>
             ) : null}
           </View>
@@ -634,7 +649,7 @@ export default function MenageDetailScreen() {
             <TouchableOpacity
               onPress={() => setIsEditing(true)}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              accessibilityLabel="Modifier"
+              accessibilityLabel={t('common.edit')}
             >
               <Pencil size={IconSize.md} color={colors.text} />
             </TouchableOpacity>
@@ -646,16 +661,15 @@ export default function MenageDetailScreen() {
                 const ok = await dialog.confirm(
                   isAuto
                     ? {
-                        title: 'Retirer cette prestation ?',
-                        message:
-                          'Créée automatiquement (calendrier). Elle sera retirée et ne réapparaîtra plus, même après synchronisation. Tu pourras la remettre depuis le dashboard (Historique).',
-                        confirmLabel: 'Retirer',
+                        title: t('menageDetail.removeAutoTitle'),
+                        message: t('menageDetail.removeAutoBody'),
+                        confirmLabel: t('common.remove'),
                         destructive: true,
                       }
                     : {
-                        title: 'Supprimer ce ménage ?',
-                        message: 'Action irréversible (photos, checklist, commentaires perdus).',
-                        confirmLabel: 'Supprimer',
+                        title: t('menageDetail.deleteTitle'),
+                        message: t('menageDetail.deleteBody'),
+                        confirmLabel: t('common.delete'),
                         destructive: true,
                       },
                 );
@@ -665,13 +679,13 @@ export default function MenageDetailScreen() {
                   router.back();
                 } catch (err) {
                   void dialog.alert({
-                    title: 'Erreur',
-                    message: err instanceof Error ? err.message : 'Échec',
+                    title: t('common.error'),
+                    message: err instanceof Error ? err.message : t('menageDetail.failed'),
                   });
                 }
               }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              accessibilityLabel="Retirer ou supprimer"
+              accessibilityLabel={t('menageDetail.removeOrDelete')}
             >
               <Trash2 size={IconSize.md} color={colors.red} />
             </TouchableOpacity>
@@ -710,17 +724,17 @@ export default function MenageDetailScreen() {
             const handleSetReferent = (userId: string, name: string) => {
               void (async () => {
                 const ok = await dialog.confirm({
-                  title: 'Définir comme référent ?',
-                  message: `${name} deviendra le prestataire référent de cette prestation.`,
-                  confirmLabel: 'Définir référent',
+                  title: t('menageDetail.setReferentTitle'),
+                  message: t('menageDetail.setReferentBody', { name }),
+                  confirmLabel: t('menageDetail.setReferent'),
                 });
                 if (!ok) return;
                 try {
                   await setReferent.mutateAsync(userId);
                 } catch (err) {
                   void dialog.alert({
-                    title: 'Erreur',
-                    message: err instanceof Error ? err.message : 'Échec de la mise à jour',
+                    title: t('common.error'),
+                    message: err instanceof Error ? err.message : t('menageDetail.updateFailed'),
                   });
                 }
               })();
@@ -731,12 +745,12 @@ export default function MenageDetailScreen() {
               const fallbackName = menage.prestataire_user_id
                 ? [menage.prestataire_first_name, menage.prestataire_last_name]
                     .filter(Boolean)
-                    .join(' ') || 'Affecté'
+                    .join(' ') || t('menageDetail.assigned')
                 : null;
               return (
                 <>
                   <Text style={[styles.prestataireLabel, { color: colors.text2 }]}>
-                    PRESTATAIRE
+                    {t('menage.fields.prestataire').toUpperCase()}
                   </Text>
                   {fallbackName ? (
                     <Text style={[styles.prestataireName, { color: colors.text }]}>
@@ -744,7 +758,7 @@ export default function MenageDetailScreen() {
                     </Text>
                   ) : (
                     <View style={styles.prestataireUnassignedBadge}>
-                      <Text style={styles.prestataireUnassignedText}>NON ASSIGNÉ</Text>
+                      <Text style={styles.prestataireUnassignedText}>{t('common.unassigned').toUpperCase()}</Text>
                     </View>
                   )}
                 </>
@@ -754,7 +768,7 @@ export default function MenageDetailScreen() {
             return (
               <>
                 <Text style={[styles.prestataireLabel, { color: colors.text2 }]}>
-                  {list.length > 1 ? 'PRESTATAIRES' : 'PRESTATAIRE'}
+                  {(list.length > 1 ? t('menageDetail.providers') : t('menage.fields.prestataire')).toUpperCase()}
                 </Text>
                 {list.map((p) => {
                   const n = [p.first_name, p.last_name].filter(Boolean).join(' ') || '—';
@@ -766,7 +780,7 @@ export default function MenageDetailScreen() {
                           style={[styles.referentBadge, { backgroundColor: colors.primary + '20' }]}
                         >
                           <Text style={[styles.referentBadgeText, { color: colors.primary }]}>
-                            Référent
+                            {t('menageDetail.referent')}
                           </Text>
                         </View>
                       ) : canEditReferent ? (
@@ -777,7 +791,7 @@ export default function MenageDetailScreen() {
                           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                         >
                           <Text style={[styles.referentActionText, { color: colors.primary }]}>
-                            Définir référent
+                            {t('menageDetail.setReferent')}
                           </Text>
                         </TouchableOpacity>
                       ) : null}
@@ -792,10 +806,10 @@ export default function MenageDetailScreen() {
           <TouchableOpacity
             style={[styles.assignBtn, { backgroundColor: colors.primary }]}
             onPress={() => setShowAssignModal(true)}
-            accessibilityLabel="Affecter un prestataire"
+            accessibilityLabel={t('menageDetail.assignProvider')}
           >
             <Text style={styles.assignBtnText}>
-              {menage.prestataire_user_id ? 'Changer' : 'Affecter'}
+              {menage.prestataire_user_id ? t('menageDetail.change') : t('menageDetail.assign')}
             </Text>
           </TouchableOpacity>
         ) : null}
@@ -815,14 +829,12 @@ export default function MenageDetailScreen() {
           ]}
         >
           <Text style={[styles.pendingPointageTitle, { color: colors.text }]}>
-            {pendingPointage.kind === 'arrival' ? '⏳ Arrivée en attente d’envoi' : '⏳ Départ en attente d’envoi'}
+            {pendingPointage.kind === 'arrival' ? t('pointage.pendingArrivalTitle') : t('pointage.pendingDepartureTitle')}
           </Text>
           <Text style={[styles.pendingPointageSub, { color: colors.mutedText }]}>
             {pendingPointage.status === 'error'
-              ? "L'envoi a échoué plusieurs fois. Il sera retenté au prochain retour du réseau."
-              : 'Enregistré à ' +
-                formatShortDateTime(pendingPointage.at) +
-                '. Sera envoyé automatiquement dès le retour du réseau.'}
+              ? t('pointage.pendingErrorBody')
+              : t('pointage.pendingRecordedAt', { datetime: formatDateFr(pendingPointage.at, 'dayShortTime') })}
           </Text>
         </View>
       ) : null}
@@ -836,7 +848,7 @@ export default function MenageDetailScreen() {
             disabled={arrivalMutation.isPending}
           >
             <Play size={IconSize.md} color="#FFFFFF" />
-            <Text style={styles.actionText}>Pointer l&apos;arrivée</Text>
+            <Text style={styles.actionText}>{t('pointage.arrivalButton')}</Text>
           </TouchableOpacity>
         ) : null}
         {canDepart ? (
@@ -846,7 +858,7 @@ export default function MenageDetailScreen() {
             disabled={departureMutation.isPending}
           >
             <Square size={IconSize.md} color="#FFFFFF" />
-            <Text style={styles.actionText}>Pointer le départ</Text>
+            <Text style={styles.actionText}>{t('pointage.departureButton')}</Text>
           </TouchableOpacity>
         ) : null}
         {hasConsommables && (isPrestataire || isAdmin) ? (
@@ -856,7 +868,7 @@ export default function MenageDetailScreen() {
           >
             <PackageCheck size={IconSize.md} color={colors.primary} />
             <Text style={[styles.actionText, { color: colors.primary }]}>
-              Relevé des consommables
+              {t('menageDetail.consumablesReading')}
             </Text>
           </TouchableOpacity>
         ) : null}
@@ -866,7 +878,7 @@ export default function MenageDetailScreen() {
             onPress={() => setShowValidateModal(true)}
           >
             <CheckCircle2 size={IconSize.md} color="#FFFFFF" />
-            <Text style={styles.actionText}>Valider le rapport</Text>
+            <Text style={styles.actionText}>{t('report.validateButton')}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -893,7 +905,7 @@ export default function MenageDetailScreen() {
                 ) : null}
               </View>
               <Text style={[styles.tabLabel, { color: isActive ? colors.primary : colors.text2 }]}>
-                {tab.label}
+                {t(tab.label)}
               </Text>
             </TouchableOpacity>
           );
@@ -904,12 +916,10 @@ export default function MenageDetailScreen() {
 
       {/* Content */}
       <View style={{ flex: 1 }}>
-        <ErrorBoundary key={activeTab} label="cet onglet">
+        <ErrorBoundary key={activeTab} label={t('menageDetail.errorBoundaryLabel')}>
         {activeTab === 'infos' && (
-          <ScrollView
-            contentContainerStyle={{ paddingTop: Spacing.md, paddingBottom: Spacing.xl }}
-            showsVerticalScrollIndicator={false}
-          >
+          <LazyLoadScope>
+          <InfosScrollView>
             {!isCheckInOut && (menage.arrived_at || menage.departed_at) ? (
               <PointageSection menage={menage} colors={colors} />
             ) : null}
@@ -935,7 +945,8 @@ export default function MenageDetailScreen() {
               logementId={menage.logement_id}
               isAdmin={isAdmin}
             />
-          </ScrollView>
+          </InfosScrollView>
+          </LazyLoadScope>
         )}
         {activeTab === 'check' && <MenageCheckList menageId={id!} readonly={menage.status === 'valide'} />}
         {activeTab === 'photos' && !isCheckInOut && <PhotoGallery menageId={id!} readonly={menage.status === 'valide'} />}
@@ -983,7 +994,7 @@ export default function MenageDetailScreen() {
               ]}
             >
               <SheetHandle gesture={validateSwipe.gesture} />
-              <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.sm }]}>Valider le rapport</Text>
+              <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.sm }]}>{t('report.validateButton')}</Text>
             <ScrollView
               style={{ maxHeight: 400 }}
               contentContainerStyle={{ gap: Spacing.md, paddingBottom: Spacing.sm }}
@@ -998,7 +1009,7 @@ export default function MenageDetailScreen() {
                   <View style={{ gap: Spacing.md }}>
                     {/* Note voyageurs */}
                     <View style={styles.recapRow}>
-                      <Text style={[styles.recapLabel, { color: colors.text2 }]}>Note voyageurs</Text>
+                      <Text style={[styles.recapLabel, { color: colors.text2 }]}>{t('report.travelerRating')}</Text>
                       {rating != null ? (
                         <Text style={{ color: '#F59E0B', fontWeight: FontWeight.semibold }}>
                           {'★'.repeat(rating)}
@@ -1006,7 +1017,7 @@ export default function MenageDetailScreen() {
                           <Text style={{ color: colors.text2 }}>{`  ${rating}/5`}</Text>
                         </Text>
                       ) : (
-                        <Text style={{ color: colors.mutedText }}>non renseignée</Text>
+                        <Text style={{ color: colors.mutedText }}>{t('report.ratingNotProvided')}</Text>
                       )}
                     </View>
 
@@ -1023,7 +1034,7 @@ export default function MenageDetailScreen() {
                       <View style={styles.recapBoxHead}>
                         <AlertTriangle size={14} color={menage.has_degradation ? '#E11D48' : colors.text2} />
                         <Text style={[styles.recapBoxTitle, { color: menage.has_degradation ? '#E11D48' : colors.text2 }]}>
-                          {`Dégradations${menage.has_degradation ? ` · ${deg.length}` : ''}`}
+                          {menage.has_degradation ? t('report.degradationsCount', { count: deg.length }) : t('report.degradations')}
                         </Text>
                       </View>
                       {menage.has_degradation ? (
@@ -1034,33 +1045,33 @@ export default function MenageDetailScreen() {
                           {deg.length > 0 ? (
                             <ReportPhotoGrid photos={deg} colors={colors} />
                           ) : (
-                            <Text style={{ color: colors.mutedText, marginTop: 4 }}>Aucune photo jointe.</Text>
+                            <Text style={{ color: colors.mutedText, marginTop: 4 }}>{t('report.noPhotoAttached')}</Text>
                           )}
                         </>
                       ) : (
-                        <Text style={{ color: '#10B981', marginTop: 4 }}>Aucune dégradation signalée.</Text>
+                        <Text style={{ color: '#10B981', marginTop: 4 }}>{t('report.noDegradation')}</Text>
                       )}
                     </View>
 
                     {/* Photos du ménage */}
                     <View style={[styles.recapBox, { borderColor: colors.border, backgroundColor: colors.itemBackground }]}>
                       <Text style={[styles.recapBoxTitle, { color: colors.text2 }]}>
-                        {`Photos du ménage · ${menagePhotos.length}`}
+                        {t('report.cleaningPhotos', { count: menagePhotos.length })}
                       </Text>
                       {menagePhotos.length > 0 ? (
                         <ReportPhotoGrid photos={menagePhotos} colors={colors} />
                       ) : (
-                        <Text style={{ color: colors.mutedText, marginTop: 4 }}>Aucune photo.</Text>
+                        <Text style={{ color: colors.mutedText, marginTop: 4 }}>{t('report.noPhoto')}</Text>
                       )}
                     </View>
 
                     {/* Prix */}
                     <View>
                       <Text style={{ color: colors.text2, marginBottom: Spacing.sm }}>
-                        Prix prévu : {menage.prix_prevu ?? '—'} €
+                        {t('report.plannedPrice', { price: menage.prix_prevu ?? '—' })}
                       </Text>
                       <Text style={[styles.label, { color: colors.text2 }]}>
-                        Prix final (laisser vide pour garder le prix prévu)
+                        {t('report.finalPriceLabel')}
                       </Text>
                       <TextInput
                         style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
@@ -1082,7 +1093,7 @@ export default function MenageDetailScreen() {
             >
               <CheckCircle2 size={IconSize.md} color="#FFFFFF" />
               <Text style={styles.submitText}>
-                {validateMutation.isPending ? 'Validation…' : 'Valider'}
+                {validateMutation.isPending ? t('report.validating') : t('common.validate')}
               </Text>
             </TouchableOpacity>
             </Animated.View>
@@ -1113,19 +1124,19 @@ export default function MenageDetailScreen() {
               showsVerticalScrollIndicator={false}
             >
               <Text style={[styles.modalTitle, { color: colors.text, marginBottom: Spacing.xs }]}>
-                Demander un changement
+                {t('menageDetail.rescheduleTitle')}
               </Text>
               <Text style={{ color: colors.text2, marginBottom: Spacing.sm }}>
-                Date actuelle : {formatDateFr(menage.date_prevue.slice(0, 10), 'long')}
+                {t('menageDetail.currentDate', { date: formatDateFr(menage.date_prevue.slice(0, 10), 'long') })}
               </Text>
               <DatePickerField
-                label="Nouvelle date"
+                label={t('menageDetail.newDate')}
                 value={proposedDate}
                 onChange={setProposedDate}
-                placeholder="Choisir une date"
+                placeholder={t('menageDetail.pickDate')}
               />
               <TimePickerField
-                label="Heure (optionnel)"
+                label={t('menageDetail.timeOptional')}
                 value={proposedTime}
                 onChange={setProposedTime}
                 placeholder="--:--"
@@ -1138,13 +1149,13 @@ export default function MenageDetailScreen() {
                   marginTop: Spacing.md,
                 }}
               >
-                Motif (optionnel)
+                {t('menageDetail.reasonOptional')}
               </Text>
               <TextInput
                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground, height: 80 }]}
                 value={rescheduleReason}
                 onChangeText={setRescheduleReason}
-                placeholder="Imprévu personnel…"
+                placeholder={t('menageDetail.reasonPlaceholder')}
                 placeholderTextColor={colors.placeholder}
                 multiline
               />
@@ -1155,7 +1166,7 @@ export default function MenageDetailScreen() {
               >
                 <Clock size={IconSize.md} color="#FFFFFF" />
                 <Text style={styles.submitText}>
-                  {rescheduleMutation.isPending ? 'Envoi…' : 'Envoyer la demande'}
+                  {rescheduleMutation.isPending ? t('menageDetail.sending') : t('menageDetail.sendRequest')}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -1192,19 +1203,19 @@ export default function MenageDetailScreen() {
           hasDegradation: !!menage.has_degradation,
           note: menage.degradation_note ?? '',
         }}
-        title="Déclaration voyageurs"
-        submitLabel="Enregistrer"
+        title={t('menageDetail.declarationTitle')}
+        submitLabel={t('common.save')}
         requireDegradationPhoto={false}
       />
     </SafeAreaView>
   );
 }
 
-const EDIT_STATUSES: { v: MenageStatus; l: string }[] = [
-  { v: 'a_venir', l: 'À venir' },
-  { v: 'en_cours', l: 'En cours' },
-  { v: 'termine', l: 'Terminé' },
-  { v: 'annule', l: 'Annulé' },
+const EDIT_STATUSES: { v: MenageStatus; l: TranslationKeys }[] = [
+  { v: 'a_venir', l: 'menage.statusUpcoming' },
+  { v: 'en_cours', l: 'menage.statusInProgress' },
+  { v: 'termine', l: 'menage.statusCompleted' },
+  { v: 'annule', l: 'menage.statusCancelled' },
 ];
 
 function parseMoneyInput(s: string): number | null | 'invalid' {
@@ -1271,28 +1282,28 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
   };
 
   const invalid = (field: string) =>
-    void dialog.alert({ title: 'Champ invalide', message: `Valeur invalide pour « ${field} »` });
+    void dialog.alert({ title: tr('menageDetail.invalidFieldTitle'), message: tr('menageDetail.invalidFieldBody', { field }) });
 
   const handleSubmit = async () => {
     if (!datePrevue) {
-      void dialog.alert({ title: 'Date requise', message: 'La date prévue est obligatoire.' });
+      void dialog.alert({ title: tr('menage.errors.dateRequired'), message: tr('menageDetail.dateRequiredBody') });
       return;
     }
     const duree = dureeEstimee.trim() ? parseInt(dureeEstimee, 10) : null;
     if (dureeEstimee.trim() && (duree === null || Number.isNaN(duree) || duree < 0)) {
-      void dialog.alert({ title: 'Durée invalide', message: 'La durée doit être un nombre de minutes positif.' });
+      void dialog.alert({ title: tr('menage.errors.dureeInvalid'), message: tr('menageDetail.durationInvalidBody') });
       return;
     }
     const cPrice = parseMoneyInput(clientPriceHt);
-    if (cPrice === 'invalid') return invalid('Prix client HT');
+    if (cPrice === 'invalid') return invalid(tr('menage.fields.clientPriceHt'));
     const cVat = parseMoneyInput(clientVatRate);
-    if (cVat === 'invalid') return invalid('TVA');
+    if (cVat === 'invalid') return invalid(tr('menage.fields.clientVatRate'));
     const pPrice = parseMoneyInput(providerPrice);
-    if (pPrice === 'invalid') return invalid('Prix prestataire');
+    if (pPrice === 'invalid') return invalid(tr('menage.fields.providerPrice'));
     const lCPrice = parseMoneyInput(laundryClientPriceHt);
-    if (lCPrice === 'invalid') return invalid('Linge — prix client');
+    if (lCPrice === 'invalid') return invalid(tr('menage.fields.laundryClientHt'));
     const lPPrice = parseMoneyInput(laundryProviderPrice);
-    if (lPPrice === 'invalid') return invalid('Linge — prix prestataire');
+    if (lPPrice === 'invalid') return invalid(tr('menage.fields.laundryProvider'));
 
     const body: UpdateMenageInput = {
       date_prevue: datePrevue,
@@ -1321,21 +1332,21 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
       await update.mutateAsync({ id: menage.id, body });
       onClose();
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: tr('common.error'), message: err instanceof Error ? err.message : tr('menageDetail.failed') });
     }
   };
 
   const inputStyle = [styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }];
-  const statuses = menage.status === 'valide' ? [...EDIT_STATUSES, { v: 'valide' as MenageStatus, l: 'Validé' }] : EDIT_STATUSES;
+  const statuses = menage.status === 'valide' ? [...EDIT_STATUSES, { v: 'valide' as MenageStatus, l: 'menage.statusValidated' as TranslationKeys }] : EDIT_STATUSES;
 
   return (
     <KeyboardAwareScroll contentContainerStyle={{ padding: Spacing.lg, gap: Spacing.sm }}>
-      <Text style={[styles.section, { color: colors.text2 }]}>PLANIFICATION</Text>
+      <Text style={[styles.section, { color: colors.text2 }]}>{tr('menage.edit.sectionPlanning').toUpperCase()}</Text>
       <DatePickerField label={tr('menage.fields.datePrevue')} value={datePrevue} onChange={setDatePrevue} />
       <TimePickerField label={tr('menage.fields.horaire')} value={horairePrevu} onChange={setHorairePrevu} />
       <DurationPickerField label={tr('menage.fields.dureeEstimee')} value={dureeEstimee} onChange={setDureeEstimee} />
 
-      <Text style={[styles.section, { color: colors.text2 }]}>STATUT</Text>
+      <Text style={[styles.section, { color: colors.text2 }]}>{tr('menage.edit.sectionStatus').toUpperCase()}</Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
         {statuses.map((s) => {
           const active = status === s.v;
@@ -1352,25 +1363,25 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
                 backgroundColor: active ? colors.primary : colors.surface,
               }}
             >
-              <Text style={{ color: active ? '#FFFFFF' : colors.text, fontSize: FontSize.sm }}>{s.l}</Text>
+              <Text style={{ color: active ? '#FFFFFF' : colors.text, fontSize: FontSize.sm }}>{tr(s.l)}</Text>
             </TouchableOpacity>
           );
         })}
       </View>
       <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={{ color: colors.text, fontSize: FontSize.md, flex: 1 }}>Date verrouillée (sync iCal bloquée)</Text>
+        <Text style={{ color: colors.text, fontSize: FontSize.md, flex: 1 }}>{tr('menageDetail.dateLocked')}</Text>
         <Switch value={dateLocked} onValueChange={setDateLocked} trackColor={{ false: colors.border, true: colors.primary }} />
       </View>
 
-      <Text style={[styles.section, { color: colors.text2 }]}>POINTAGES</Text>
-      <TimePickerField label="Heure d'arrivée" value={arrivalTime} onChange={setArrivalTime} placeholder="--:--" />
-      <TimePickerField label="Heure de départ" value={departureTime} onChange={setDepartureTime} placeholder="--:--" />
+      <Text style={[styles.section, { color: colors.text2 }]}>{tr('menageDetail.sectionPointages').toUpperCase()}</Text>
+      <TimePickerField label={tr('menageDetail.arrivalTime')} value={arrivalTime} onChange={setArrivalTime} placeholder="--:--" />
+      <TimePickerField label={tr('menageDetail.departureTime')} value={departureTime} onChange={setDepartureTime} placeholder="--:--" />
 
-      <Text style={[styles.section, { color: colors.text2 }]}>TARIFS</Text>
+      <Text style={[styles.section, { color: colors.text2 }]}>{tr('menage.edit.sectionPricing').toUpperCase()}</Text>
       <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
         <View style={{ flex: 2 }}>
           <LabeledField label={tr('menage.fields.clientPriceHt')}>
-            <AutoScrollInput style={inputStyle} value={clientPriceHt} onChangeText={setClientPriceHt} placeholder="ex. 80" placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+            <AutoScrollInput style={inputStyle} value={clientPriceHt} onChangeText={setClientPriceHt} placeholder={tr('menageDetail.exampleValue', { value: 80 })} placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
           </LabeledField>
         </View>
         <View style={{ flex: 1 }}>
@@ -1380,10 +1391,10 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
         </View>
       </View>
       <LabeledField label={tr('menage.fields.providerPrice')}>
-        <AutoScrollInput style={inputStyle} value={providerPrice} onChangeText={setProviderPrice} placeholder="ex. 50" placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+        <AutoScrollInput style={inputStyle} value={providerPrice} onChangeText={setProviderPrice} placeholder={tr('menageDetail.exampleValue', { value: 50 })} placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
       </LabeledField>
 
-      <Text style={[styles.section, { color: colors.text2 }]}>LINGE</Text>
+      <Text style={[styles.section, { color: colors.text2 }]}>{tr('menage.edit.sectionLaundry').toUpperCase()}</Text>
       <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <Text style={{ color: colors.text, fontSize: FontSize.md, flex: 1 }}>{tr('menage.fields.laundryIncluded')}</Text>
         <Switch value={laundryIncluded} onValueChange={setLaundryIncluded} trackColor={{ false: colors.border, true: colors.primary }} />
@@ -1392,12 +1403,12 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
         <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
           <View style={{ flex: 1 }}>
             <LabeledField label={tr('menage.fields.laundryClientHt')}>
-              <AutoScrollInput style={inputStyle} value={laundryClientPriceHt} onChangeText={setLaundryClientPriceHt} placeholder="ex. 15" placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+              <AutoScrollInput style={inputStyle} value={laundryClientPriceHt} onChangeText={setLaundryClientPriceHt} placeholder={tr('menageDetail.exampleValue', { value: 15 })} placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
             </LabeledField>
           </View>
           <View style={{ flex: 1 }}>
             <LabeledField label={tr('menage.fields.laundryProvider')}>
-              <AutoScrollInput style={inputStyle} value={laundryProviderPrice} onChangeText={setLaundryProviderPrice} placeholder="ex. 10" placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+              <AutoScrollInput style={inputStyle} value={laundryProviderPrice} onChangeText={setLaundryProviderPrice} placeholder={tr('menageDetail.exampleValue', { value: 10 })} placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
             </LabeledField>
           </View>
         </View>
@@ -1410,11 +1421,11 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
             onPress={applySuggestion}
             style={{ borderWidth: 1, borderColor: colors.primary, borderRadius: Radius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 4 }}
           >
-            <Text style={{ color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semibold }}>Suggérer</Text>
+            <Text style={{ color: colors.primary, fontSize: FontSize.xs, fontWeight: FontWeight.semibold }}>{tr('menageDetail.suggest')}</Text>
           </TouchableOpacity>
         ) : null}
       </View>
-      <LabeledField label="Voyageurs">
+      <LabeledField label={tr('menageDetail.travelers')}>
         <AutoScrollInput style={inputStyle} value={nTravelers} onChangeText={setNTravelers} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.placeholder} />
       </LabeledField>
       <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
@@ -1450,7 +1461,7 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
         <View style={{ flex: 1 }} />
       </View>
 
-      <Text style={[styles.section, { color: colors.text2 }]}>NOTES</Text>
+      <Text style={[styles.section, { color: colors.text2 }]}>{tr('menage.edit.sectionNotes').toUpperCase()}</Text>
       <AutoScrollInput
         style={[...inputStyle, { minHeight: 80, textAlignVertical: 'top' }]}
         value={notes}
@@ -1465,7 +1476,7 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
           style={[styles.submit, { flex: 1, marginTop: 0, backgroundColor: colors.itemBackground }]}
           onPress={onClose}
         >
-          <Text style={[styles.submitText, { color: colors.text }]}>Annuler</Text>
+          <Text style={[styles.submitText, { color: colors.text }]}>{tr('common.cancel')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.submit, { flex: 1, marginTop: 0, backgroundColor: colors.primary }]}
@@ -1473,7 +1484,7 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
           disabled={update.isPending}
         >
           <Save size={IconSize.md} color="#FFFFFF" />
-          <Text style={styles.submitText}>{update.isPending ? 'Enregistrement…' : 'Enregistrer'}</Text>
+          <Text style={styles.submitText}>{update.isPending ? tr('common.saving') : tr('common.save')}</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAwareScroll>
@@ -1498,6 +1509,7 @@ function ConsommablesReleveModal({
   const insets = useSafeAreaInsets();
   const modalStyle = useKeyboardAwareModalStyle({ visible });
   const dialog = useDialog();
+  const { t } = useTranslation();
   const consommables = useMenageConsommables(visible ? menageId : undefined);
   const setReleve = useSetMenageConsommables(menageId);
   const [qty, setQty] = useState<Record<string, string>>({});
@@ -1523,8 +1535,8 @@ function ConsommablesReleveModal({
       const n = parseInt(raw, 10);
       if (raw === '' || Number.isNaN(n) || n < 0) {
         void dialog.alert({
-          title: 'Quantité manquante',
-          message: `Indique la quantité restante pour « ${c.label} » (0 s'il n'en reste plus).`,
+          title: t('menageDetail.qtyMissingTitle'),
+          message: t('menageDetail.qtyMissingBody', { label: c.label }),
         });
         return;
       }
@@ -1535,8 +1547,8 @@ function ConsommablesReleveModal({
       onClose();
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Échec de l’enregistrement',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('common.saveFailed'),
       });
     }
   };
@@ -1546,20 +1558,20 @@ function ConsommablesReleveModal({
       <View style={styles.modalOverlay}>
         <Animated.View style={[styles.consoSheet, { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, Spacing.lg) }, modalStyle]}>
           <View style={styles.consoHeader}>
-            <Text style={[styles.consoTitle, { color: colors.text }]}>Relevé des consommables</Text>
+            <Text style={[styles.consoTitle, { color: colors.text }]}>{t('menageDetail.consumablesReading')}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={8}>
               <X size={22} color={colors.text2} />
             </TouchableOpacity>
           </View>
           <Text style={[styles.consoSub, { color: colors.text2 }]}>
-            Indique la quantité restante de chaque consommable (0 = rupture).
+            {t('menageDetail.consumablesIntro')}
           </Text>
 
           {consommables.isLoading ? (
             <ActivityIndicator color={colors.primary} style={{ marginVertical: Spacing.lg }} />
           ) : lines.length === 0 ? (
             <Text style={{ color: colors.mutedText, paddingVertical: Spacing.md }}>
-              Aucun consommable pour ce logement.
+              {t('menageDetail.noConsumables')}
             </Text>
           ) : (
             <ScrollView style={{ maxHeight: 380, flexShrink: 1 }} keyboardShouldPersistTaps="handled">
@@ -1572,7 +1584,7 @@ function ConsommablesReleveModal({
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: colors.text, fontWeight: FontWeight.semibold }}>{c.label}</Text>
                       <Text style={{ color: colors.text2, fontSize: FontSize.xs }}>
-                        Seuil : {formatQtyUnit(c.seuil_alerte, c.unit)}
+                        {t('menageDetail.threshold', { value: formatQtyUnit(c.seuil_alerte, c.unit) })}
                       </Text>
                     </View>
                     <View style={styles.consoAlertSlot}>
@@ -1608,7 +1620,7 @@ function ConsommablesReleveModal({
               disabled={setReleve.isPending}
             >
               <Text style={styles.actionText}>
-                {setReleve.isPending ? 'Enregistrement…' : 'Enregistrer le relevé'}
+                {setReleve.isPending ? t('common.saving') : t('menageDetail.saveReading')}
               </Text>
             </TouchableOpacity>
           ) : null}
@@ -1641,6 +1653,7 @@ function AccessInfoSection({
   logement: Logement | undefined;
   colors: typeof Colors.light;
 }) {
+  const { t, tp } = useTranslation();
   // Codes d'accès du logement (boîte à clés, portail…). Lisibles par le presta
   // affecté même s'il n'est pas membre du logement. `key_safe_code` (legacy,
   // joint au ménage) sert de repli tant que la liste n'a pas répondu.
@@ -1669,7 +1682,7 @@ function AccessInfoSection({
           onPress={() => openMaps(addressQuery)}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel={`Ouvrir l'itinéraire vers ${addressText}`}
+          accessibilityLabel={t('menageDetail.openRouteTo', { address: addressText })}
         >
           <MapPin size={IconSize.sm} color={colors.primary} />
           <Text style={[styles.accessValue, { color: colors.primary, flex: 1 }]}>{addressText}</Text>
@@ -1686,25 +1699,25 @@ function AccessInfoSection({
         : legacyCode ? (
             <View style={styles.accessRow}>
               <KeyRound size={IconSize.sm} color={colors.primary} />
-              <Text style={[styles.accessLabel, { color: colors.text2 }]}>Boîte à clés</Text>
+              <Text style={[styles.accessLabel, { color: colors.text2 }]}>{t('menageDetail.keySafe')}</Text>
               <Text style={[styles.accessValue, { color: colors.text }]}>{legacyCode}</Text>
             </View>
           ) : null}
       {nights ? (
         <View style={styles.accessRow}>
           <Moon size={IconSize.sm} color={colors.text2} />
-          <Text style={[styles.accessLabel, { color: colors.text2 }]}>Séjour</Text>
+          <Text style={[styles.accessLabel, { color: colors.text2 }]}>{t('menageDetail.stay')}</Text>
           <Text style={[styles.accessValue, { color: colors.text }]}>
-            {nights} nuit{nights > 1 ? 's' : ''}
+            {tp('menageDetail.nights', nights)}
           </Text>
         </View>
       ) : null}
       {checkin ? (
         <View style={styles.accessRow}>
           <CalendarClock size={IconSize.sm} color={sameDay ? colors.statusEnCours : colors.text2} />
-          <Text style={[styles.accessLabel, { color: colors.text2 }]}>Prochain check-in</Text>
+          <Text style={[styles.accessLabel, { color: colors.text2 }]}>{t('menageDetail.nextCheckIn')}</Text>
           <Text style={[styles.accessValue, { color: sameDay ? colors.statusEnCours : colors.text }]}>
-            {formatDateFr(checkin, 'dayShort')}{sameDay ? ' · jour même' : ''}
+            {formatDateFr(checkin, 'dayShort')}{sameDay ? ` · ${t('menageDetail.sameDay')}` : ''}
           </Text>
         </View>
       ) : null}
@@ -1723,6 +1736,7 @@ function PointageSection({
   menage: Menage;
   colors: typeof Colors.light;
 }) {
+  const { t } = useTranslation();
   const fmt = (iso: string | null) => (iso ? formatDateFr(iso, 'time') : null);
   const arrived = fmt(menage.arrived_at);
   const departed = fmt(menage.departed_at);
@@ -1735,7 +1749,12 @@ function PointageSection({
     if (mins > 0) {
       const h = Math.floor(mins / 60);
       const m = mins % 60;
-      duration = h > 0 ? `${h} h${m ? ` ${m}` : ''}` : `${m} min`;
+      duration =
+        h > 0
+          ? m
+            ? t('menageDetail.durationHoursMin', { h, m })
+            : t('menageDetail.durationHours', { h })
+          : t('menageDetail.durationMin', { m });
     }
   }
   return (
@@ -1746,9 +1765,9 @@ function PointageSection({
             <LogIn size={IconSize.sm} color={colors.statusValide} />
           </View>
           <View>
-            <Text style={[styles.pointageLabel, { color: colors.text2 }]}>Arrivée</Text>
+            <Text style={[styles.pointageLabel, { color: colors.text2 }]}>{t('pointage.arrival')}</Text>
             <Text style={[styles.pointageValue, { color: arrived ? colors.text : colors.mutedText }]}>
-              {arrived ?? 'Non pointée'}
+              {arrived ?? t('pointage.notClockedInF')}
             </Text>
           </View>
         </View>
@@ -1758,9 +1777,9 @@ function PointageSection({
             <LogOut size={IconSize.sm} color={colors.red} />
           </View>
           <View>
-            <Text style={[styles.pointageLabel, { color: colors.text2 }]}>Départ</Text>
+            <Text style={[styles.pointageLabel, { color: colors.text2 }]}>{t('pointage.departure')}</Text>
             <Text style={[styles.pointageValue, { color: departed ? colors.text : colors.mutedText }]}>
-              {departed ?? 'Non pointé'}
+              {departed ?? t('menage.statusNotClockedIn')}
             </Text>
           </View>
         </View>
@@ -1769,7 +1788,7 @@ function PointageSection({
         <View style={[styles.pointageDurationRow, { borderTopColor: colors.border }]}>
           <Clock size={13} color={colors.text2} />
           <Text style={[styles.pointageDurationText, { color: colors.text2 }]}>
-            Durée sur place · {duration}
+            {t('pointage.onSiteDuration', { duration })}
           </Text>
         </View>
       ) : null}
@@ -1792,12 +1811,13 @@ function DeclarationSection({
   onEdit: () => void;
   colors: typeof Colors.light;
 }) {
+  const { t } = useTranslation();
   const rating = menage.traveler_rating ?? 0;
   return (
     <View style={[styles.accessCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.accessRow}>
         <Star size={IconSize.sm} color="#F5A623" />
-        <Text style={[styles.accessLabel, { color: colors.text2 }]}>Note voyageurs</Text>
+        <Text style={[styles.accessLabel, { color: colors.text2 }]}>{t('report.travelerRating')}</Text>
         {rating ? (
           <View style={{ flexDirection: 'row', gap: 2 }}>
             {[1, 2, 3, 4, 5].map((n) => (
@@ -1810,18 +1830,18 @@ function DeclarationSection({
             ))}
           </View>
         ) : (
-          <Text style={[styles.accessValue, { color: colors.mutedText }]}>Non renseignée</Text>
+          <Text style={[styles.accessValue, { color: colors.mutedText }]}>{t('report.notProvided')}</Text>
         )}
       </View>
       {menage.has_degradation ? (
         <View style={styles.accessRow}>
           <AlertTriangle size={IconSize.sm} color={colors.red} />
-          <Text style={[styles.accessLabel, { color: colors.text2 }]}>Dégradation</Text>
+          <Text style={[styles.accessLabel, { color: colors.text2 }]}>{t('report.degradation')}</Text>
           <Text
             style={[styles.accessValue, { color: colors.red, flex: 1, textAlign: 'right' }]}
             numberOfLines={2}
           >
-            {menage.degradation_note || 'Signalée'}
+            {menage.degradation_note || t('report.reported')}
           </Text>
         </View>
       ) : null}
@@ -1833,7 +1853,7 @@ function DeclarationSection({
         >
           <Pencil size={14} color={colors.primary} />
           <Text style={{ color: colors.primary, fontSize: FontSize.sm, fontWeight: FontWeight.semibold }}>
-            Modifier la déclaration
+            {t('report.editDeclaration')}
           </Text>
         </TouchableOpacity>
       ) : null}
@@ -1871,13 +1891,13 @@ function BedsSection({
     <View style={{ paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm }}>
       <View style={{ marginBottom: Spacing.sm }}>
         <Text style={{ color: colors.text2, fontSize: FontSize.xs, fontWeight: FontWeight.semibold, letterSpacing: 0.5 }}>
-          LITS À FAIRE
+          {t('menageDetail.bedsToMake').toUpperCase()}
         </Text>
       </View>
 
       {/* Voyageurs */}
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm, gap: Spacing.sm }}>
-        <Text style={{ color: colors.text2, fontSize: FontSize.sm }}>Voyageurs :</Text>
+        <Text style={{ color: colors.text2, fontSize: FontSize.sm }}>{t('menageDetail.travelersLabel')}</Text>
         <Text style={{ color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}>
           {menage.n_travelers ?? '—'}
         </Text>
@@ -1919,6 +1939,7 @@ function PointageProofSection({
   logement: Logement | undefined;
   colors: typeof Colors.light;
 }) {
+  const { t } = useTranslation();
   const [lightbox, setLightbox] = useState<ProofView | null>(null);
   const logLat = logement?.latitude != null ? Number(logement.latitude) : null;
   const logLng = logement?.longitude != null ? Number(logement.longitude) : null;
@@ -1967,12 +1988,12 @@ function PointageProofSection({
               }}
             >
               {tooFar ? '⚠ ' : '✓ '}
-              {formatDistance(proof.distance)} du logement
+              {t('pointage.distanceFromProperty', { distance: formatDistance(proof.distance) })}
             </Text>
           </View>
         ) : (
           <Text style={{ color: colors.mutedText, fontSize: FontSize.xs, marginTop: 4 }}>
-            Distance indisponible
+            {t('pointage.distanceUnavailable')}
           </Text>
         )}
       </View>
@@ -1981,10 +2002,10 @@ function PointageProofSection({
 
   return (
     <View style={proofStyles.wrap}>
-      <Text style={[proofStyles.title, { color: colors.text2 }]}>PREUVE DE PRÉSENCE</Text>
+      <Text style={[proofStyles.title, { color: colors.text2 }]}>{t('pointage.proofTitle').toUpperCase()}</Text>
       <View style={proofStyles.row}>
-        {renderProof(buildProof('Arrivée', menage.arrival_photo_url, menage.arrival_lat, menage.arrival_lng, menage.arrived_at))}
-        {renderProof(buildProof('Départ', menage.departure_photo_url, menage.departure_lat, menage.departure_lng, menage.departed_at))}
+        {renderProof(buildProof(t('pointage.arrival'), menage.arrival_photo_url, menage.arrival_lat, menage.arrival_lng, menage.arrived_at))}
+        {renderProof(buildProof(t('pointage.departure'), menage.departure_photo_url, menage.departure_lat, menage.departure_lng, menage.departed_at))}
       </View>
 
       <PhotoLightbox
@@ -2005,8 +2026,10 @@ function PointageProofSection({
             >
               <MapPin size={IconSize.sm} color="#FFFFFF" />
               <Text style={proofStyles.mapBtnText}>
-                Voir sur la carte
-                {lightbox.distance != null ? ` · ${formatDistance(lightbox.distance)} du logement` : ''}
+                {t('pointage.viewOnMap')}
+                {lightbox.distance != null
+                  ? ` · ${t('pointage.distanceFromProperty', { distance: formatDistance(lightbox.distance) })}`
+                  : ''}
               </Text>
             </TouchableOpacity>
           ) : null
@@ -2030,6 +2053,7 @@ function ResponsesSection({
   colors: typeof Colors.light;
 }) {
   const dialog = useDialog();
+  const { t } = useTranslation();
   const responses = useMenageResponses(menageId);
   const assigned = useMenagePrestataires(menageId);
   const setPrestas = useSetMenagePrestataires(menageId);
@@ -2047,9 +2071,9 @@ function ResponsesSection({
     // (Retirer ne demande rien — on ne veut pas friction sur l'annulation.)
     if (!isCurrentlyAssigned && kind === 'absent') {
       const ok = await dialog.confirm({
-        title: 'Affecter quand même ?',
-        message: 'Ce prestataire a voté indisponible. Souhaites-tu l\'affecter malgré tout ?',
-        confirmLabel: 'Affecter',
+        title: t('menageDetail.assignAnywayTitle'),
+        message: t('menageDetail.assignAnywayBody'),
+        confirmLabel: t('menageDetail.assign'),
       });
       if (!ok) return;
     }
@@ -2060,27 +2084,26 @@ function ResponsesSection({
       await setPrestas.mutateAsync(next);
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Échec',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('menageDetail.failed'),
       });
     }
   };
 
   const flipStatus = async (userId: string, currentStatus: 'present' | 'absent') => {
     const next = currentStatus === 'present' ? 'absent' : 'present';
-    const label = next === 'present' ? 'disponible' : 'indisponible';
     const ok = await dialog.confirm({
-      title: `Marquer ${label} ?`,
-      message: 'Cette action change la réponse du prestataire à sa place.',
-      confirmLabel: 'Confirmer',
+      title: next === 'present' ? t('menageDetail.markAvailableTitle') : t('menageDetail.markUnavailableTitle'),
+      message: t('menageDetail.flipBody'),
+      confirmLabel: t('common.confirm'),
     });
     if (!ok) return;
     try {
       await flipResponse.mutateAsync({ userId, status: next });
     } catch (err) {
       void dialog.alert({
-        title: 'Erreur',
-        message: err instanceof Error ? err.message : 'Échec',
+        title: t('common.error'),
+        message: err instanceof Error ? err.message : t('menageDetail.failed'),
       });
     }
   };
@@ -2127,7 +2150,7 @@ function ResponsesSection({
           onPress={() => flipStatus(r.user_id, kind)}
           disabled={flipResponse.isPending}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          accessibilityLabel={isPresent ? 'Marquer indisponible' : 'Marquer disponible'}
+          accessibilityLabel={isPresent ? t('menageDetail.markUnavailable') : t('menageDetail.markAvailable')}
         >
           <RefreshCw size={16} color={colors.text2} />
         </TouchableOpacity>
@@ -2148,7 +2171,7 @@ function ResponsesSection({
               fontWeight: FontWeight.semibold,
             }}
           >
-            {isAssigned ? 'Retirer' : 'Affecter'}
+            {isAssigned ? t('common.remove') : t('menageDetail.assign')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -2157,12 +2180,12 @@ function ResponsesSection({
 
   return (
     <View style={responsesStyles.wrap}>
-      <Text style={[responsesStyles.title, { color: colors.text2 }]}>RÉPONSES PRESTATAIRES</Text>
+      <Text style={[responsesStyles.title, { color: colors.text2 }]}>{t('menageDetail.providerResponses').toUpperCase()}</Text>
 
       {presents.length > 0 ? (
         <View style={{ gap: Spacing.xs }}>
           <Text style={[responsesStyles.subLabel, { color: GREEN }]}>
-            Disponibles ({presents.length})
+            {t('menageDetail.availableCount', { count: presents.length })}
           </Text>
           {presents.map((p) => renderRow(p, 'present'))}
         </View>
@@ -2171,7 +2194,7 @@ function ResponsesSection({
       {absents.length > 0 ? (
         <View style={{ gap: Spacing.xs, marginTop: presents.length > 0 ? Spacing.sm : 0 }}>
           <Text style={[responsesStyles.subLabel, { color: RED }]}>
-            Indisponibles ({absents.length})
+            {t('menageDetail.unavailableCount', { count: absents.length })}
           </Text>
           {absents.map((a) => renderRow(a, 'absent'))}
         </View>
@@ -2185,155 +2208,6 @@ function ResponsesSection({
  * ménage. Le 1er coché devient le référent (`menage.prestataire_user_id`).
  * Synchronise via PUT /menages/:id/prestataires (full-replace).
  */
-function AssignPrestataireModal({
-  visible,
-  menageId,
-  onClose,
-}: {
-  visible: boolean;
-  menageId: string;
-  onClose: () => void;
-}) {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme];
-  const dialog = useDialog();
-  const eligible = useEligiblePrestataires(visible ? menageId : undefined);
-  const current = useMenagePrestataires(visible ? menageId : undefined);
-  const setPrestas = useSetMenagePrestataires(menageId);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-
-  // Quand la modal s'ouvre OU quand la data current arrive, on resync l'état
-  // local sur la liste actuelle (1er = référent, suit l'ordre serveur).
-  useEffect(() => {
-    if (!visible) return;
-    if (!current.data) return;
-    setSelectedIds(current.data.map((c) => c.user_id));
-  }, [visible, current.data]);
-
-  const toggle = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-    );
-  };
-
-  const handleSave = async () => {
-    try {
-      await setPrestas.mutateAsync(selectedIds);
-      onClose();
-    } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
-    }
-  };
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={assignStyles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[assignStyles.modal, { backgroundColor: colors.surface }, Shadow.lg]}>
-          <Text style={[assignStyles.title, { color: colors.text }]}>Affecter des prestataires</Text>
-
-          {eligible.isLoading ? (
-            <Text style={{ color: colors.mutedText, padding: Spacing.lg }}>Chargement…</Text>
-          ) : (eligible.data ?? []).length === 0 ? (
-            <Text style={{ color: colors.mutedText, padding: Spacing.lg }}>
-              Aucun prestataire dans ce logement. Ajoute d&apos;abord un membre prestataire au logement.
-            </Text>
-          ) : (
-            <>
-              <ScrollView style={{ maxHeight: 360 }}>
-                {(eligible.data ?? []).map((p) => {
-                  const checked = selectedIds.includes(p.id);
-                  const isPrimary = checked && selectedIds[0] === p.id;
-                  return (
-                    <TouchableOpacity
-                      key={p.id}
-                      style={[
-                        assignStyles.row,
-                        {
-                          borderColor: colors.border,
-                          backgroundColor: checked ? colors.primary + '15' : 'transparent',
-                        },
-                      ]}
-                      onPress={() => toggle(p.id)}
-                    >
-                      <View
-                        style={[
-                          assignStyles.checkbox,
-                          checked
-                            ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                            : { borderColor: colors.border },
-                        ]}
-                      >
-                        {checked ? <CheckCircle2 size={14} color="#FFFFFF" /> : null}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={{ color: colors.text, fontSize: FontSize.md, fontWeight: FontWeight.semibold }}
-                        >
-                          {p.first_name} {p.last_name}
-                        </Text>
-                        {p.email ? (
-                          <Text style={{ color: colors.mutedText, fontSize: FontSize.sm }}>{p.email}</Text>
-                        ) : null}
-                      </View>
-                      {!p.is_member ? (
-                        <View style={[assignStyles.primaryPill, { backgroundColor: colors.statusEnCours + '25' }]}>
-                          <Text style={{ color: colors.statusEnCours, fontSize: FontSize.xs, fontWeight: FontWeight.semibold }}>
-                            Ponctuel
-                          </Text>
-                        </View>
-                      ) : null}
-                      {isPrimary ? (
-                        <View
-                          style={[
-                            assignStyles.primaryPill,
-                            { backgroundColor: colors.primary + '20' },
-                          ]}
-                        >
-                          <Text
-                            style={{
-                              color: colors.primary,
-                              fontSize: FontSize.xs,
-                              fontWeight: FontWeight.semibold,
-                            }}
-                          >
-                            Référent
-                          </Text>
-                        </View>
-                      ) : null}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-              <Text style={[assignStyles.hint, { color: colors.mutedText }]}>
-                Le 1er coché est le référent. Les prestataires « Ponctuel » ne sont pas membres du
-                logement : ils ne reçoivent que ce ménage (remplacement).
-              </Text>
-              <View style={assignStyles.actions}>
-                <TouchableOpacity
-                  style={[assignStyles.btn, { backgroundColor: colors.itemBackground }]}
-                  onPress={onClose}
-                >
-                  <Text style={{ color: colors.text, fontWeight: FontWeight.medium }}>Annuler</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[assignStyles.btn, { backgroundColor: colors.primary }]}
-                  onPress={handleSave}
-                  disabled={setPrestas.isPending}
-                >
-                  <Text style={{ color: '#FFFFFF', fontWeight: FontWeight.semibold }}>
-                    {setPrestas.isPending ? '…' : 'Enregistrer'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 const proofStyles = StyleSheet.create({
   wrap: { marginHorizontal: Spacing.md, marginBottom: Spacing.sm, gap: Spacing.sm },
   title: { fontSize: FontSize.xs, fontWeight: FontWeight.bold, letterSpacing: 0.5 },
@@ -2404,41 +2278,6 @@ const responsesStyles = StyleSheet.create({
   },
 });
 
-const assignStyles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)' },
-  modal: { width: '90%', maxWidth: 400, borderRadius: Radius.xl, padding: Spacing.lg },
-  title: { fontSize: FontSize.lg, fontWeight: FontWeight.semibold, marginBottom: Spacing.md },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    padding: Spacing.md,
-    borderRadius: Radius.md,
-    borderBottomWidth: 1,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: Radius.sm,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryPill: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.pill,
-  },
-  hint: { fontSize: FontSize.xs, paddingTop: Spacing.sm, paddingHorizontal: Spacing.xs },
-  actions: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
-  btn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
-    borderRadius: Radius.md,
-  },
-});
 
 const styles = StyleSheet.create({
   container: { flex: 1 },

@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { LazyImage, useLazyScrollHandler } from '@/components/LazyImage';
 import ImageView from 'react-native-image-viewing';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useLogementPhotos } from '@/api/hooks/usePhotos';
 import { useLogementRooms } from '@/api/hooks/useLogementRooms';
+import { useTranslation } from '@/contexts/I18nContext';
 
 /**
  * Photos de référence du logement sur le détail d'une prestation : à quoi
@@ -24,6 +26,8 @@ const THUMB = 96;
 const LogementReferencePhotos: React.FC<Props> = ({ logementId }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
+  const onLazyScroll = useLazyScrollHandler();
+  const { t } = useTranslation();
   const photos = useLogementPhotos(logementId);
   const rooms = useLogementRooms(logementId);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -45,9 +49,9 @@ const LogementReferencePhotos: React.FC<Props> = ({ logementId }) => {
       if (list?.length) result.push({ id: r.id, label: r.name, photos: list });
     }
     const orphans = byRoom.get('__none__');
-    if (orphans?.length) result.push({ id: '__none__', label: 'Logement', photos: orphans });
+    if (orphans?.length) result.push({ id: '__none__', label: t('refPhotos.propertyGroup'), photos: orphans });
     return result;
-  }, [all, rooms.data]);
+  }, [all, rooms.data, t]);
 
   // Ordre à plat = ordre d'affichage, pour que la visionneuse ouvre la bonne photo.
   const flat = useMemo(() => groups.flatMap((g) => g.photos), [groups]);
@@ -57,28 +61,33 @@ const LogementReferencePhotos: React.FC<Props> = ({ logementId }) => {
 
   return (
     <View style={styles.wrap}>
-      <Text style={[styles.title, { color: colors.text2 }]}>PHOTOS DU LOGEMENT</Text>
-      <Text style={[styles.subtitle, { color: colors.mutedText }]}>
-        À quoi le logement doit ressembler une fois le ménage terminé.
-      </Text>
+      <Text style={[styles.title, { color: colors.text2 }]}>{t('refPhotos.title').toUpperCase()}</Text>
+      <Text style={[styles.subtitle, { color: colors.mutedText }]}>{t('refPhotos.subtitle')}</Text>
 
       {groups.map((group) => (
         <View key={group.id} style={{ gap: Spacing.xs }}>
           <Text style={[styles.roomLabel, { color: colors.text }]}>
             {group.label} · {group.photos.length}
           </Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.row}
+            onScroll={onLazyScroll}
+            scrollEventThrottle={100}
+          >
             {group.photos.map((p) => (
               <TouchableOpacity
                 key={p.id}
                 onPress={() => setViewerIndex(flat.findIndex((f) => f.id === p.id))}
                 activeOpacity={0.8}
                 accessibilityRole="image"
-                accessibilityLabel={`Photo de référence — ${group.label}`}
+                accessibilityLabel={t('refPhotos.a11y', { room: group.label })}
               >
-                <Image
+                <LazyImage
                   source={{ uri: p.thumbnail_url || p.url }}
                   style={[styles.thumb, { backgroundColor: colors.itemBackground }]}
+                  placeholderColor={colors.itemBackground}
                 />
               </TouchableOpacity>
             ))}

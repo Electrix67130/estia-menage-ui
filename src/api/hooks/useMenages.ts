@@ -3,7 +3,9 @@ import { apiFetch } from '../client';
 import { createCrudHooks } from './useCrud';
 import { menagesApi } from '../services';
 import type {
+  EligiblePrestataire,
   Menage,
+  MenageAvailability,
   MenageStatus,
   PrestationType,
   PaginatedResponse,
@@ -53,6 +55,8 @@ interface ListParams extends PaginationParams {
   /** Avec `closed: true` : inclut aussi les non clôturées dont la date est
    *  antérieure (les « oubliées » de l'Historique). */
   stale_before?: string;
+  /** Admin : filtre sur les votes Présent/Absent des prestataires. */
+  availability?: MenageAvailability;
 }
 
 export function useMenages(params?: ListParams) {
@@ -64,12 +68,14 @@ export function useMenages(params?: ListParams) {
   if (params?.prestataire_user_id) query.set('prestataire_user_id', params.prestataire_user_id);
   if (params?.logement_id) query.set('logement_id', params.logement_id);
   if (params?.validated !== undefined) query.set('validated', String(params.validated));
+  if (params?.unassigned !== undefined) query.set('unassigned', String(params.unassigned));
   if (params?.closed !== undefined) query.set('closed', String(params.closed));
   if (params?.manager) query.set('manager', params.manager);
   if (params?.assigned) query.set('assigned', params.assigned);
   if (params?.from) query.set('from', params.from);
   if (params?.to) query.set('to', params.to);
   if (params?.stale_before) query.set('stale_before', params.stale_before);
+  if (params?.availability) query.set('availability', params.availability);
   if (params?.orderBy) query.set('orderBy', params.orderBy);
   if (params?.order) query.set('order', params.order);
   const qs = query.toString();
@@ -102,9 +108,7 @@ export function useEligiblePrestataires(menageId: string | undefined) {
   return useQuery({
     queryKey: ['menage-eligible-prestataires', menageId],
     queryFn: () =>
-      apiFetch<{ data: Array<{ id: string; first_name: string; last_name: string; email: string; avatar_url: string | null; is_member: boolean }> }>(
-        `/menages/${menageId}/eligible-prestataires`,
-      ).then((r) => r.data),
+      apiFetch<{ data: EligiblePrestataire[] }>(`/menages/${menageId}/eligible-prestataires`).then((r) => r.data),
     enabled: !!menageId,
   });
 }

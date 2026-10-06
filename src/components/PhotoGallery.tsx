@@ -17,6 +17,8 @@ import { getSignedFileUrl } from '@/api/fileAccess';
 import type { Photo } from '@/api/types';
 import { formatDateFr } from '@/lib/date-fr';
 import { useDialog } from '@/contexts/DialogContext';
+import { LazyImage } from '@/components/LazyImage';
+import { useTranslation } from '@/contexts/I18nContext';
 
 const COLUMN_COUNT = 3;
 /**
@@ -52,6 +54,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const dialog = useDialog();
+  const { t } = useTranslation();
 
   const menagePhotos = usePhotos(menageId);
   // En mode multi-rooms, on fetch toutes les photos du logement (sans filter
@@ -88,18 +91,18 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
       if (useCamera) {
         const camPerm = await ImagePicker.requestCameraPermissionsAsync();
         if (!camPerm.granted) {
-          void dialog.alert({ title: 'Caméra refusée', message: 'Autorise la caméra dans les réglages.' });
+          void dialog.alert({ title: t('urgence.cameraDenied'), message: t('urgence.cameraDeniedBody') });
           return;
         }
         const libPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!libPerm.granted) {
-          void dialog.alert({ title: 'Galerie refusée', message: 'Autorise l\'accès aux photos dans les réglages.' });
+          void dialog.alert({ title: t('urgence.galleryDenied'), message: t('urgence.galleryDeniedBody') });
           return;
         }
       } else {
         const libPerm = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (!libPerm.granted) {
-          void dialog.alert({ title: 'Galerie refusée', message: 'Autorise l\'accès aux photos dans les réglages.' });
+          void dialog.alert({ title: t('urgence.galleryDenied'), message: t('urgence.galleryDeniedBody') });
           return;
         }
       }
@@ -157,19 +160,19 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
 
       if (failed > 0) {
         void dialog.alert({
-          title: 'Envoi incomplet',
+          title: t('photos.uploadIncomplete'),
           message:
             failed === assets.length
-              ? 'Aucune photo n’a pu être envoyée. Vérifie ta connexion.'
-              : `${assets.length - failed} photo(s) envoyée(s), ${failed} en échec.`,
+              ? t('photos.uploadNoneSent')
+              : t('photos.uploadPartial', { sent: assets.length - failed, failed }),
         });
       }
     } catch (err) {
-      void dialog.alert({ title: 'Erreur', message: err instanceof Error ? err.message : 'Échec' });
+      void dialog.alert({ title: t('common.error'), message: err instanceof Error ? err.message : t('checklist.failed') });
     } finally {
       setUploading(null);
     }
-  }, [menageId, logementId, logementRoomId, selectedSectionId, qc, dialog]);
+  }, [menageId, logementId, logementRoomId, selectedSectionId, qc, dialog, t]);
 
   /**
    * Entrée d'upload : en mode multi-rooms, on ouvre d'abord la modal "quelle
@@ -201,9 +204,9 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
           delayLongPress={200}
           activeOpacity={0.8}
           accessibilityRole="image"
-          accessibilityLabel={item.caption || 'Photo de menage'}
+          accessibilityLabel={item.caption || t('photos.itemA11y')}
         >
-          <Image source={{ uri: item.thumbnail_url || item.url }} style={styles.photoImage} />
+          <LazyImage source={{ uri: item.thumbnail_url || item.url }} style={styles.photoImage} placeholderColor={colors.itemBackground} />
           {/* Horodatage de prise, incrusté en bas de la vignette */}
           <View style={styles.timeBadge}>
             <Text style={styles.timeBadgeText} numberOfLines={1}>
@@ -216,7 +219,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
             style={styles.deleteIcon}
             onPress={() => handleDelete(item.id)}
             accessibilityRole="button"
-            accessibilityLabel="Supprimer la photo"
+            accessibilityLabel={t('photos.deletePhotoA11y')}
           >
             <View style={styles.deleteIconBg}>
               <Trash2 size={14} color="#FFFFFF" />
@@ -225,7 +228,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
         )}
       </View>
     ),
-    [colors, handleDelete],
+    [colors, handleDelete, readonly, t],
   );
 
   // Sélecteur de pièce (mode ménage uniquement) : « Toutes » + une chip par section.
@@ -235,7 +238,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.chipsRow}
     >
-      {[{ id: null as string | null, label: 'Toutes', icon: '' }, ...sections.map((s) => ({
+      {[{ id: null as string | null, label: t('photos.all'), icon: '' }, ...sections.map((s) => ({
         id: s.id as string | null,
         label: s.section_label,
         icon: SECTION_ICONS[s.section_type] || '•',
@@ -250,7 +253,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
             ]}
             onPress={() => setSelectedSectionId(chip.id)}
             accessibilityRole="button"
-            accessibilityLabel={`Filtrer : ${chip.label}`}
+            accessibilityLabel={t('photos.filterA11y', { label: chip.label })}
           >
             <Text style={[styles.chipText, { color: active ? '#FFFFFF' : colors.text }]}>
               {chip.icon ? `${chip.icon} ` : ''}{chip.label}
@@ -272,20 +275,20 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
               onPress={() => handleAdd(true)}
               disabled={!!uploading}
               accessibilityRole="button"
-              accessibilityLabel="Prendre une photo"
+              accessibilityLabel={t('photos.takeA11y')}
             >
               <Camera size={IconSize.md} color="#FFFFFF" />
-              <Text style={styles.actionText}>Caméra</Text>
+              <Text style={styles.actionText}>{t('photos.camera')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.primary, opacity: uploading ? 0.5 : 1 }]}
               onPress={() => handleAdd(false)}
               disabled={!!uploading}
               accessibilityRole="button"
-              accessibilityLabel="Choisir une ou plusieurs photos"
+              accessibilityLabel={t('photos.pickA11y')}
             >
               <ImagePlus size={IconSize.md} color="#FFFFFF" />
-              <Text style={styles.actionText}>Galerie</Text>
+              <Text style={styles.actionText}>{t('photos.gallery')}</Text>
             </TouchableOpacity>
           </View>
           {uploading ? (
@@ -298,8 +301,8 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
               <ActivityIndicator size="small" color={colors.primary} />
               <Text style={{ color: colors.text2, fontSize: FontSize.sm, fontWeight: FontWeight.medium }}>
                 {uploading.total > 1
-                  ? `Envoi des photos ${uploading.done}/${uploading.total}…`
-                  : 'Envoi de la photo…'}
+                  ? t('photos.uploadingMany', { done: uploading.done, total: uploading.total })
+                  : t('photos.uploadingOne')}
               </Text>
             </View>
           ) : null}
@@ -330,10 +333,10 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
         photos: bySection.get(s.id)!,
       }));
     if (bySection.has('__none__')) {
-      result.push({ id: '__none__', label: 'Non classées', icon: '📷', photos: bySection.get('__none__')! });
+      result.push({ id: '__none__', label: t('photos.unclassified'), icon: '📷', photos: bySection.get('__none__')! });
     }
     return result;
-  }, [menageId, sections, allPhotos]);
+  }, [menageId, sections, allPhotos, t]);
 
   const grouped = !!menageId && selectedSectionId === null && groups.length > 0;
 
@@ -375,7 +378,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
             style={styles.closeIcon}
             onPress={() => setSelectedPhoto(null)}
             accessibilityRole="button"
-            accessibilityLabel="Fermer"
+            accessibilityLabel={t('common.close')}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
             <X size={IconSize.lg} color={colors.text} />
@@ -388,7 +391,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
               setFullscreenIndex(idx >= 0 ? idx : 0);
             }}
             accessibilityRole="image"
-            accessibilityLabel="Agrandir la photo"
+            accessibilityLabel={t('photos.enlargeA11y')}
           >
             <Image source={{ uri: selectedPhoto.url }} style={styles.fullImage} resizeMode="contain" />
           </TouchableOpacity>
@@ -414,19 +417,19 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
                 } catch { /* silent */ }
               }}
               accessibilityRole="button"
-              accessibilityLabel="Partager ou télécharger la photo"
+              accessibilityLabel={t('photos.shareA11y')}
             >
               <Share2 size={IconSize.md} color="#FFFFFF" />
-              <Text style={styles.detailBtnText}>Partager</Text>
+              <Text style={styles.detailBtnText}>{t('photos.share')}</Text>
             </TouchableOpacity>
             {!readonly && <TouchableOpacity
               style={[styles.detailBtn, { backgroundColor: colors.red }]}
               onPress={() => handleDelete(selectedPhoto.id)}
               accessibilityRole="button"
-              accessibilityLabel="Supprimer la photo"
+              accessibilityLabel={t('photos.deletePhotoA11y')}
             >
               <Trash2 size={IconSize.md} color="#FFFFFF" />
-              <Text style={styles.detailBtnText}>Supprimer</Text>
+              <Text style={styles.detailBtnText}>{t('common.delete')}</Text>
             </TouchableOpacity>}
           </View>
         </View>
@@ -464,10 +467,10 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
             <View style={[roomPickerStyles.handleBar, { backgroundColor: colors.border }]} />
           </View>
           <Text style={[roomPickerStyles.title, { color: colors.text }]}>
-            À quelle pièce ?
+            {t('photos.roomPickerTitle')}
           </Text>
           <Text style={[roomPickerStyles.subtitle, { color: colors.text2 }]}>
-            La photo sera attachée à la pièce choisie.
+            {t('photos.roomPickerHint')}
           </Text>
           {rooms.map((r) => (
             <TouchableOpacity
@@ -496,7 +499,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
             onPress={() => setRoomPickerOpen(null)}
           >
             <Text style={{ color: colors.text2, fontSize: FontSize.md, fontWeight: FontWeight.medium }}>
-              Annuler
+              {t('common.cancel')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -512,7 +515,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
         {items.length === 0 ? (
           !isLoading ? (
             <Text style={[styles.empty, { color: colors.mutedText }]}>
-              Aucune photo. Utilisez la caméra ou la galerie.
+              {t('photos.empty')}
             </Text>
           ) : null
         ) : grouped ? (
@@ -544,7 +547,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} colors={[colors.primary]} />}
           ListEmptyComponent={
             !isLoading ? (
-              <Text style={[styles.empty, { color: colors.mutedText }]}>Aucune photo. Utilisez la caméra ou la galerie.</Text>
+              <Text style={[styles.empty, { color: colors.mutedText }]}>{t('photos.empty')}</Text>
             ) : null
           }
         />
@@ -561,7 +564,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} colors={[colors.primary]} />}
           ListEmptyComponent={
             !isLoading ? (
-              <Text style={[styles.empty, { color: colors.mutedText }]}>Aucune photo. Utilisez la caméra ou la galerie.</Text>
+              <Text style={[styles.empty, { color: colors.mutedText }]}>{t('photos.empty')}</Text>
             ) : null
           }
         />

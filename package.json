@@ -12,7 +12,7 @@
     "lint": "expo lint",
     "postinstall": "cp node_modules/react-native-image-viewing/dist/components/ImageItem/ImageItem.ios.js node_modules/react-native-image-viewing/dist/components/ImageItem/ImageItem.js 2>/dev/null; cp node_modules/react-native-image-viewing/dist/components/ImageItem/ImageItem.ios.d.ts node_modules/react-native-image-viewing/dist/components/ImageItem/ImageItem.d.ts 2>/dev/null; true",
     "ota:check": "node scripts/check-ota-safe.mjs",
-    "ota": "node scripts/check-ota-safe.mjs && eas update --branch production --environment production"
+    "ota": "node scripts/check-ota-safe.mjs && npx eas-cli update --branch production --environment production"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

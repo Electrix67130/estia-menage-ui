@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, Pressable, FlatList, StyleShee
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
-import { Send, Trash2, Pencil, X } from 'lucide-react-native';
+import { Send, Trash2, Pencil, X, Flag } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Comment } from '@/api/types';
 import { formatDateFr } from '@/lib/date-fr';
 import { useTranslation } from '@/contexts/I18nContext';
+import ReportCommentSheet from '@/components/ReportCommentSheet';
 
 type CommentWithAuthor = Comment & { first_name: string; last_name: string; avatar_url?: string };
 
@@ -65,6 +66,8 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
   const [selectedComment, setSelectedComment] = useState<CommentWithAuthor | null>(null);
   const [editText, setEditText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
+  // Commentaire d'un autre utilisateur en cours de signalement (App Store 1.2).
+  const [reportingComment, setReportingComment] = useState<CommentWithAuthor | null>(null);
   const animatedEditModalStyle = useKeyboardAwareModalStyle({ visible: isEditing });
 
   // Montée déterministe et fluide : on réduit la hauteur du bloc par le bas de la
@@ -120,6 +123,12 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
     setSelectedComment(null);
   }, [selectedComment, deleteMutation]);
 
+  const handleStartReport = useCallback(() => {
+    if (!selectedComment) return;
+    setReportingComment(selectedComment);
+    setSelectedComment(null);
+  }, [selectedComment]);
+
   const handleStartEdit = useCallback(() => {
     if (!selectedComment) return;
     setEditText(selectedComment.content);
@@ -139,6 +148,8 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
   const renderItem = useCallback(
     ({ item }: { item: CommentWithAuthor }) => {
       const isOwn = item.author_id === user?.id;
+      // Appui long : modifier/supprimer ses propres messages, signaler ceux des autres.
+      const canLongPress = !readonly;
       const isUnread =
         !isOwn &&
         readThreshold !== undefined &&
@@ -146,9 +157,9 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
           new Date(item.created_at).getTime() > new Date(readThreshold).getTime());
       return (
         <TouchableOpacity
-          activeOpacity={isOwn ? 0.7 : 1}
+          activeOpacity={canLongPress ? 0.7 : 1}
           onPress={() => Keyboard.dismiss()}
-          onLongPress={() => (isOwn && !readonly) ? setSelectedComment(item) : undefined}
+          onLongPress={canLongPress ? () => setSelectedComment(item) : undefined}
           delayLongPress={300}
           style={[styles.bubble, { backgroundColor: isOwn ? colors.primary + '15' : colors.itemBackground }]}
         >
@@ -245,20 +256,41 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
                 </Text>
                 <View style={[styles.separator, { backgroundColor: colors.border }]} />
 
-                <TouchableOpacity style={styles.actionRow} onPress={handleStartEdit}>
-                  <Pencil size={IconSize.lg} color={colors.primary} />
-                  <Text style={[styles.actionLabel, { color: colors.text }]}>{t('common.edit')}</Text>
-                </TouchableOpacity>
+                {selectedComment.author_id === user?.id ? (
+                  <>
+                    <TouchableOpacity style={styles.actionRow} onPress={handleStartEdit} accessibilityRole="button">
+                      <Pencil size={IconSize.lg} color={colors.primary} />
+                      <Text style={[styles.actionLabel, { color: colors.text }]}>{t('common.edit')}</Text>
+                    </TouchableOpacity>
 
-                <TouchableOpacity style={styles.actionRow} onPress={handleDelete}>
-                  <Trash2 size={IconSize.lg} color={colors.red} />
-                  <Text style={[styles.actionLabel, { color: colors.red }]}>{t('common.delete')}</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionRow} onPress={handleDelete} accessibilityRole="button">
+                      <Trash2 size={IconSize.lg} color={colors.red} />
+                      <Text style={[styles.actionLabel, { color: colors.red }]}>{t('common.delete')}</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  // Commentaire d'un autre : seule action possible, le signaler.
+                  <TouchableOpacity style={styles.actionRow} onPress={handleStartReport} accessibilityRole="button">
+                    <Flag size={IconSize.lg} color={colors.red} />
+                    <Text style={[styles.actionLabel, { color: colors.red }]}>{t('comments.report')}</Text>
+                  </TouchableOpacity>
+                )}
               </>
             )}
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Signalement d'un commentaire d'un autre utilisateur */}
+      {reportingComment ? (
+        <ReportCommentSheet
+          visible
+          commentId={reportingComment.id}
+          commentContent={reportingComment.content}
+          screen="menage.comments"
+          onClose={() => setReportingComment(null)}
+        />
+      ) : null}
 
       {/* Edit modal */}
       <Modal visible={isEditing} transparent animationType="slide">

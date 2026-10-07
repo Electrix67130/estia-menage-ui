@@ -12,14 +12,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as Updates from 'expo-updates';
-import { ArrowLeft, Bug, Lightbulb, MessageSquare, Send } from 'lucide-react-native';
+import { ArrowLeft, Bug, Flag, Lightbulb, MessageSquare, Send } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useTranslation } from '@/contexts/I18nContext';
 import type { TranslationKeys } from '@/i18n/translations';
 import { ApiError } from '@/api/client';
+import { feedbackContext } from '@/lib/feedbackContext';
 import {
   useMyFeedbacks,
   useCreateFeedback,
@@ -65,11 +65,7 @@ export default function SupportScreen() {
         type,
         subject: subject.trim(),
         message: message.trim(),
-        platform: 'mobile',
-        // La version installee : savoir si un correctif est bien arrive chez
-        // l'utilisateur evite de chercher un bug deja corrige.
-        app_version: Updates.runtimeVersion ?? undefined,
-        locale,
+        ...feedbackContext(locale, 'support'),
       });
       setSubject('');
       setMessage('');
@@ -195,6 +191,8 @@ export default function SupportScreen() {
                   <View style={styles.cardHeader}>
                     {f.type === 'bug' ? (
                       <Bug size={IconSize.sm} color={colors.mutedText} />
+                    ) : f.type === 'report' ? (
+                      <Flag size={IconSize.sm} color={colors.red} />
                     ) : (
                       <Lightbulb size={IconSize.sm} color={colors.mutedText} />
                     )}
@@ -204,6 +202,13 @@ export default function SupportScreen() {
                   </View>
 
                   <View style={styles.cardMeta}>
+                    {/* Un signalement de contenu n'est ni un bug ni une idée :
+                        le badge le distingue dans l'historique. */}
+                    {f.type === 'report' ? (
+                      <View style={[styles.typeBadge, { backgroundColor: colors.red + '15' }]}>
+                        <Text style={[styles.typeBadgeText, { color: colors.red }]}>{t('support.typeReport')}</Text>
+                      </View>
+                    ) : null}
                     <Text style={[styles.status, { color: statusColor(f.status) }]}>{t(STATUS_KEY[f.status])}</Text>
                     {f.response ? (
                       <View style={styles.answeredRow}>
@@ -301,6 +306,8 @@ const styles = StyleSheet.create({
   cardTitle: { flex: 1, fontSize: FontSize.base, fontWeight: FontWeight.medium },
   cardMeta: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginTop: Spacing.xs },
   status: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
+  typeBadge: { paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: Radius.sm },
+  typeBadgeText: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
   answeredRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   answered: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
   cardMessage: { fontSize: FontSize.base, lineHeight: 20, marginTop: Spacing.md },

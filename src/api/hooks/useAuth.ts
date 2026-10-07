@@ -93,6 +93,19 @@ export function useUpdatePassword() {
   });
 }
 
+/**
+ * Suppression définitive du compte (App Store 5.1.1). L'API répond 204 et
+ * coupe toutes les sessions : l'appelant doit ensuite oublier la session
+ * locale (`forgetSession` de l'AuthContext) sans passer par `/auth/logout`,
+ * qui répondrait 401.
+ */
+export function useDeleteAccount() {
+  return useMutation({
+    mutationFn: (password: string) =>
+      apiFetch<void>('/auth/account', { method: 'DELETE', body: { password } }),
+  });
+}
+
 export function useLogout() {
   const queryClient = useQueryClient();
   return useMutation({

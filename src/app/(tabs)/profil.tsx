@@ -13,7 +13,7 @@ import {
   Switch} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
-import { LogOut, User, Sun, Moon, Smartphone, Save, Mail, Phone, Building2, Check, Globe, Lock, KeyRound, X, Camera, Plus, ArrowRightLeft, Bell, FileText, ChevronRight, ExternalLink, Wallet, Search, MapPin, Receipt, Archive, MessageSquare } from 'lucide-react-native';
+import { LogOut, User, Sun, Moon, Smartphone, Save, Mail, Phone, Building2, Check, Globe, Lock, KeyRound, X, Camera, Plus, ArrowRightLeft, Bell, FileText, ChevronRight, ExternalLink, Wallet, Search, MapPin, Receipt, Archive, MessageSquare, Trash2 } from 'lucide-react-native';
 import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { DASHBOARD_CREATE_ORG_URL } from '@/constants/Urls';
@@ -488,6 +488,19 @@ export default function ProfilScreen() {
                   <Text style={[styles.securityBtnText, { color: colors.text }]}>
                     {t('profile.changePassword')}
                   </Text>
+                </TouchableOpacity>
+                {/* Suppression de compte depuis l'app — exigée par l'App Store (5.1.1). */}
+                <TouchableOpacity
+                  style={[styles.securityBtn, { borderColor: colors.red, marginTop: Spacing.sm }]}
+                  onPress={() => router.push('/delete-account' as never)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('profile.deleteAccount')}
+                >
+                  <Trash2 size={IconSize.md} color={colors.red} />
+                  <Text style={[styles.securityBtnText, { color: colors.red }]}>
+                    {t('profile.deleteAccount')}
+                  </Text>
+                  <ChevronRight size={IconSize.sm} color={colors.red} />
                 </TouchableOpacity>
               </View>
 

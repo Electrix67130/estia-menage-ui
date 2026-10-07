@@ -13,6 +13,12 @@ interface AuthContextValue {
   login: (input: LoginInput) => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   logout: () => Promise<void>;
+  /**
+   * Oublie la session locale sans appeler l'API (tokens, cache mémoire et
+   * disque). À utiliser quand le serveur a déjà coupé la session — après la
+   * suppression du compte, `/auth/logout` répondrait 401.
+   */
+  forgetSession: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -72,6 +78,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setHasToken(false);
   }, [logoutMutation, queryClient]);
 
+  const forgetSession = useCallback(async () => {
+    await clearTokens();
+    queryClient.clear();
+    await clearPersistedCache();
+    setHasToken(false);
+  }, [queryClient]);
+
   const isLoading = !tokenChecked || (hasToken && meLoading && !meFailed);
 
   return (
@@ -83,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         register,
         logout,
+        forgetSession,
       }}
     >
       {children}

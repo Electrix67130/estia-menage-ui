@@ -2,7 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../client';
 import type { PaginatedResponse } from '../types';
 
-export type FeedbackType = 'bug' | 'suggestion';
+/** `report` = signalement d'un contenu publié par un autre utilisateur (App Store 1.2). */
+export type FeedbackType = 'bug' | 'suggestion' | 'report';
+/** Contenu généré par un utilisateur pouvant être signalé. */
+export type FeedbackTargetType = 'comment' | 'photo';
 export type FeedbackStatus = 'new' | 'in_progress' | 'resolved' | 'declined';
 
 export interface Feedback {
@@ -29,6 +32,9 @@ export interface CreateFeedbackInput {
   app_version?: string;
   screen?: string;
   locale?: string;
+  /** Requis quand `type === 'report'` : ce qui est signalé. */
+  target_type?: FeedbackTargetType;
+  target_id?: string;
 }
 
 /** Ses propres signalements, avec les reponses recues. */

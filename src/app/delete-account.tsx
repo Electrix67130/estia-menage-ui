@@ -128,7 +128,7 @@ export default function DeleteAccountScreen() {
           {error ? <Text style={[styles.error, { color: colors.red }]}>{error}</Text> : null}
 
           <TouchableOpacity
-            style={[styles.submit, { backgroundColor: canSubmit ? colors.red : colors.border }]}
+            style={[styles.submit, { backgroundColor: colors.red, opacity: canSubmit ? 1 : 0.45 }]}
             onPress={submit}
             disabled={!canSubmit}
             accessibilityRole="button"
@@ -140,7 +140,9 @@ export default function DeleteAccountScreen() {
             ) : (
               <>
                 <Trash2 size={IconSize.sm} color="#FFFFFF" />
-                <Text style={styles.submitText}>{t('deleteAccount.submit')}</Text>
+                <Text style={styles.submitText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                  {t('deleteAccount.submit')}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -186,14 +188,18 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   error: { fontSize: FontSize.sm, marginBottom: Spacing.sm },
+  // Même gabarit que le bouton de connexion ; le libellé est long (« Supprimer
+  // définitivement mon compte », plus long encore en allemand), donc une seule
+  // ligne qui se réduit au besoin plutôt qu'un retour à la ligne dans le bouton.
   submit: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,
-    height: 48,
+    height: 50,
+    paddingHorizontal: Spacing.lg,
     borderRadius: Radius.md,
-    marginTop: Spacing.sm,
+    marginTop: Spacing.lg,
   },
-  submitText: { color: '#FFFFFF', fontSize: FontSize.lg, fontWeight: FontWeight.semibold },
+  submitText: { color: '#FFFFFF', fontSize: FontSize.base, fontWeight: FontWeight.semibold, flexShrink: 1 },
 });

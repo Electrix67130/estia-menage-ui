@@ -162,7 +162,12 @@ function DialogModal({
                 onPress={() => onResolve(false)}
                 accessibilityRole="button"
               >
-                <Text style={{ color: colors.text, fontSize: FontSize.base, fontWeight: FontWeight.medium }}>
+                <Text
+                  style={{ color: colors.text, fontSize: FontSize.base, fontWeight: FontWeight.medium, textAlign: 'center' }}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
                   {cancelLabel}
                 </Text>
               </TouchableOpacity>
@@ -175,7 +180,12 @@ function DialogModal({
               onPress={() => onResolve(true)}
               accessibilityRole="button"
             >
-              <Text style={{ color: '#FFFFFF', fontSize: FontSize.base, fontWeight: FontWeight.semibold }}>
+              <Text
+                style={{ color: '#FFFFFF', fontSize: FontSize.base, fontWeight: FontWeight.semibold, textAlign: 'center' }}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
                 {confirmLabel}
               </Text>
             </TouchableOpacity>

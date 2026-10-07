@@ -56,7 +56,7 @@ export default function DeleteAccountScreen() {
     const ok = await dialog.confirm({
       title: t('deleteAccount.confirmTitle'),
       message: t('deleteAccount.confirmMessage'),
-      confirmLabel: t('deleteAccount.submit'),
+      confirmLabel: t('deleteAccount.confirmShort'),
       destructive: true,
     });
     if (!ok) return;

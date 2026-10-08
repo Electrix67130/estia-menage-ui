@@ -6,6 +6,7 @@ import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/const
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useCitySearch, CitySuggestion } from '@/hooks/useCitySearch';
 import { useAddressSearch, AddressSuggestion } from '@/hooks/useAddressSearch';
+import { countryFlag } from '@/lib/address-search';
 import { useKeyboardScroll } from './KeyboardAwareScroll';
 import { useTranslation } from '@/contexts/I18nContext';
 
@@ -31,18 +32,18 @@ const CityAutocomplete: React.FC<Props> = ({
   const { t } = useTranslation();
   const [cityFocused, setCityFocused] = useState(false);
   const [addressFocused, setAddressFocused] = useState(false);
-  const [selectedCityCode, setSelectedCityCode] = useState('');
+  const [selectedCity, setSelectedCity] = useState<CitySuggestion | null>(null);
 
   const { suggestions: citySuggestions, isLoading: cityLoading } = useCitySearch(city);
-  const { suggestions: addressSuggestions, isLoading: addressLoading } = useAddressSearch(address, selectedCityCode);
+  const { suggestions: addressSuggestions, isLoading: addressLoading } = useAddressSearch(address, selectedCity);
 
   const showCitySuggestions = cityFocused && citySuggestions.length > 0 && city.length >= 2;
-  const showAddressSuggestions = addressFocused && addressSuggestions.length > 0 && address.length >= 3 && !!selectedCityCode;
+  const showAddressSuggestions = addressFocused && addressSuggestions.length > 0 && address.length >= 3 && !!selectedCity;
 
   const handleCitySelect = useCallback(
     (item: CitySuggestion) => {
       onSelect(item.name, item.postalCode, item.latitude, item.longitude);
-      setSelectedCityCode(item.cityCode);
+      setSelectedCity(item);
       setCityFocused(false);
     },
     [onSelect],
@@ -50,10 +51,14 @@ const CityAutocomplete: React.FC<Props> = ({
 
   const handleAddressSelect = useCallback(
     (item: AddressSuggestion) => {
+      // Suisse / Luxembourg : le code postal dépend de la rue, il n'est connu qu'ici.
+      if (item.postalCode && item.postalCode !== postalCode) {
+        onSelect(city, item.postalCode, item.latitude, item.longitude);
+      }
       onAddressSelect(item.name, item.latitude, item.longitude);
       setAddressFocused(false);
     },
-    [onAddressSelect],
+    [onAddressSelect, onSelect, city, postalCode],
   );
 
   return (
@@ -67,7 +72,10 @@ const CityAutocomplete: React.FC<Props> = ({
             placeholder="Nancy"
             placeholderTextColor={colors.placeholder}
             value={city}
-            onChangeText={onCityChange}
+            onChangeText={(text) => {
+              onCityChange(text);
+              if (selectedCity) setSelectedCity(null);
+            }}
             onFocus={(e) => {
               setCityFocused(true);
               ks?.scrollToInput((e.nativeEvent as unknown as { target: number }).target, DROPDOWN_CLEARANCE);
@@ -103,7 +111,7 @@ const CityAutocomplete: React.FC<Props> = ({
               <View style={styles.suggestionText}>
                 <Text style={[styles.suggestionMain, { color: colors.text }]}>{item.name}</Text>
                 <Text style={[styles.suggestionSub, { color: colors.mutedText }]}>
-                  {item.postalCode} — {item.department}
+                  {[countryFlag(item.country), item.postalCode, item.department].filter(Boolean).join(' · ')}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -112,7 +120,7 @@ const CityAutocomplete: React.FC<Props> = ({
       )}
 
       {/* Row 2: Address (shown after city is selected) */}
-      {!!postalCode && (
+      {(!!postalCode || !!selectedCity) && (
         <View style={{ zIndex: 10 }}>
           <Text style={[styles.label, { color: colors.text }]}>{t('menage.address')}</Text>
           <TextInput

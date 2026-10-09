@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Pressable, FlatList, StyleSheet, Modal, Keyboard, Platform, RefreshControl, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import Reanimated, { useAnimatedStyle } from 'react-native-reanimated';
@@ -7,13 +7,22 @@ import { Send, Trash2, Pencil, X, Flag } from 'lucide-react-native';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
-import { useComments, useCreateComment, useUpdateComment, useDeleteComment } from '@/api/hooks/useComments';
+import { useComments, useCreateComment, useUpdateComment, useDeleteComment, useMentionable } from '@/api/hooks/useComments';
 import { useUnreadCounts, useMarkTabViewed } from '@/api/hooks/useMenageViews';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Comment } from '@/api/types';
 import { formatDateFr } from '@/lib/date-fr';
 import { useTranslation } from '@/contexts/I18nContext';
 import ReportCommentSheet from '@/components/ReportCommentSheet';
+import {
+  activeMentionQuery,
+  filterMentionCandidates,
+  insertMention,
+  mentionedIdsInText,
+  mentionName,
+  splitMentions,
+  type MentionCandidate,
+} from '@/lib/mentions';
 
 type CommentWithAuthor = Comment & { first_name: string; last_name: string; avatar_url?: string };
 
@@ -63,6 +72,12 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
   }, [isGeneralThread, unreadCounts.data, menageId]);
 
   const [text, setText] = useState('');
+  // Position du curseur : la liste « @ » se base sur ce qui est tapé juste avant.
+  const [cursor, setCursor] = useState(0);
+  const mentionableQuery = useMentionable(readonly ? undefined : menageId);
+  const mentionable = useMemo(() => mentionableQuery.data ?? [], [mentionableQuery.data]);
+  const activeMention = activeMentionQuery(text, Math.min(cursor, text.length));
+  const mentionSuggestions = activeMention ? filterMentionCandidates(mentionable, activeMention.query) : [];
   const [selectedComment, setSelectedComment] = useState<CommentWithAuthor | null>(null);
   const [editText, setEditText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -110,12 +125,28 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
   const handleSend = useCallback(async () => {
     if (!text.trim()) return;
     const section_id = sectionFilter && sectionFilter !== 'general' ? sectionFilter : null;
-    await createMutation.mutateAsync({ menage_id: menageId, section_id, content: text.trim() });
+    await createMutation.mutateAsync({
+      menage_id: menageId,
+      section_id,
+      content: text.trim(),
+      mentioned_user_ids: mentionedIdsInText(text, mentionable),
+    });
     setText('');
+    setCursor(0);
     // Envoi : on force le scroll pour que l'utilisateur voie son message.
     isNearBottomRef.current = true;
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 200);
-  }, [text, menageId, sectionFilter, createMutation]);
+  }, [text, menageId, sectionFilter, createMutation, mentionable]);
+
+  const handlePickMention = useCallback(
+    (candidate: MentionCandidate) => {
+      if (!activeMention) return;
+      const next = insertMention(text, activeMention.start, Math.min(cursor, text.length), candidate);
+      setText(next.text);
+      setCursor(next.cursor);
+    },
+    [text, cursor, activeMention],
+  );
 
   const handleDelete = useCallback(() => {
     if (!selectedComment) return;
@@ -137,11 +168,15 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
 
   const handleSaveEdit = useCallback(async () => {
     if (!selectedComment || !editText.trim()) return;
-    await updateMutation.mutateAsync({ id: selectedComment.id, content: editText.trim() });
+    await updateMutation.mutateAsync({
+      id: selectedComment.id,
+      content: editText.trim(),
+      mentioned_user_ids: mentionedIdsInText(editText, mentionable),
+    });
     setIsEditing(false);
     setSelectedComment(null);
     setEditText('');
-  }, [selectedComment, editText, updateMutation]);
+  }, [selectedComment, editText, updateMutation, mentionable]);
 
   const formatTime = (date: string) => formatDateFr(date, 'dayShortTime');
 
@@ -177,7 +212,17 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
             </View>
             <Text style={[styles.time, { color: colors.mutedText }]}>{formatTime(item.created_at)}</Text>
           </View>
-          <Text style={[styles.content, { color: colors.text }]}>{item.content}</Text>
+          <Text style={[styles.content, { color: colors.text }]}>
+            {splitMentions(item.content, item.mentions).map((segment, i) =>
+              segment.mention ? (
+                <Text key={i} style={[styles.mention, { color: colors.primary }]}>
+                  {segment.text}
+                </Text>
+              ) : (
+                segment.text
+              ),
+            )}
+          </Text>
         </TouchableOpacity>
       );
     },
@@ -221,6 +266,32 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
           />
         </Pressable>
 
+        {!readonly && mentionSuggestions.length > 0 && (
+          <View
+            style={[styles.mentionList, { backgroundColor: colors.surface, borderTopColor: colors.border }]}
+            accessibilityLabel={t('comments.mention')}
+          >
+            {mentionSuggestions.map((candidate) => (
+              <TouchableOpacity
+                key={candidate.id}
+                style={styles.mentionRow}
+                onPress={() => handlePickMention(candidate)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('comments.mention')} ${mentionName(candidate)}`}
+              >
+                <View style={[styles.mentionAvatar, { backgroundColor: colors.primary + '20' }]}>
+                  <Text style={[styles.mentionInitials, { color: colors.primary }]}>
+                    {`${candidate.first_name.charAt(0)}${candidate.last_name.charAt(0)}`.toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={[styles.mentionRowName, { color: colors.text }]} numberOfLines={1}>
+                  {mentionName(candidate)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         {!readonly && <View style={[styles.inputRow, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
           <TextInput
             style={[styles.input, { backgroundColor: colors.itemBackground, color: colors.text, borderColor: colors.border }]}
@@ -228,6 +299,7 @@ const CommentThread: React.FC<Props> = ({ menageId, sectionFilter, readonly, lis
             placeholderTextColor={colors.placeholder}
             value={text}
             onChangeText={setText}
+            onSelectionChange={(e) => setCursor(e.nativeEvent.selection.start)}
             onFocus={onInputFocus}
             onBlur={onInputBlur}
             multiline
@@ -339,6 +411,18 @@ const styles = StyleSheet.create({
   author: { fontSize: FontSize.sm, fontWeight: FontWeight.semibold },
   time: { fontSize: FontSize.xs },
   content: { fontSize: FontSize.base, lineHeight: 20 },
+  mention: { fontWeight: FontWeight.semibold },
+  mentionList: { borderTopWidth: 1, paddingVertical: Spacing.xs },
+  mentionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+  },
+  mentionAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  mentionInitials: { fontSize: FontSize.xs, fontWeight: FontWeight.semibold },
+  mentionRowName: { flex: 1, fontSize: FontSize.base },
   empty: { fontSize: FontSize.base, textAlign: 'center', paddingTop: Spacing.xxxl },
   inputRow: {
     flexDirection: 'row',

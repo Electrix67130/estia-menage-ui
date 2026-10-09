@@ -1,3 +1,4 @@
+import type { MentionRef } from '@/lib/mentions';
 import { translate } from '@/i18n/runtime';
 
 // --------------- Pagination ---------------
@@ -543,6 +544,8 @@ export interface Comment {
   content: string;
   created_at: string;
   updated_at: string;
+  /** Personnes mentionnées (« @Prénom Nom »), pour le surlignage. */
+  mentions?: MentionRef[];
 }
 
 export interface CreateCommentInput {

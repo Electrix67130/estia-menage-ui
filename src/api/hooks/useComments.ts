@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch } from '../client';
 import type { Comment, PaginatedResponse } from '../types';
+import type { MentionCandidate } from '@/lib/mentions';
 
 export function useComments(menageId?: string, sectionFilter?: string | 'general') {
   return useQuery({
@@ -19,10 +20,25 @@ export function useComments(menageId?: string, sectionFilter?: string | 'general
   });
 }
 
+/** Personnes qu'on peut mentionner (« @ ») sur une prestation. */
+export function useMentionable(menageId?: string) {
+  return useQuery({
+    queryKey: ['comments-mentionable', menageId],
+    queryFn: () => apiFetch<MentionCandidate[]>(`/comments/mentionable?menage_id=${menageId}`),
+    enabled: !!menageId,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useCreateComment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (body: { menage_id: string; section_id?: string | null; content: string }) =>
+    mutationFn: (body: {
+      menage_id: string;
+      section_id?: string | null;
+      content: string;
+      mentioned_user_ids?: string[];
+    }) =>
       apiFetch<Comment>('/comments', { method: 'POST', body }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['comments', variables.menage_id] });
@@ -33,8 +49,8 @@ export function useCreateComment() {
 export function useUpdateComment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, content }: { id: string; content: string }) =>
-      apiFetch<Comment>(`/comments/${id}`, { method: 'PATCH', body: { content } }),
+    mutationFn: ({ id, content, mentioned_user_ids }: { id: string; content: string; mentioned_user_ids?: string[] }) =>
+      apiFetch<Comment>(`/comments/${id}`, { method: 'PATCH', body: { content, mentioned_user_ids } }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['comments'] });
     },

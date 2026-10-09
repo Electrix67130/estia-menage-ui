@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useMemo } from 'react';
 import { View, Text, Image, TouchableOpacity, FlatList, StyleSheet, Dimensions, RefreshControl, Modal, ScrollView, ActivityIndicator } from 'react-native';
-import { Camera, ImagePlus, Trash2, Share2, X } from 'lucide-react-native';
+import { Camera, ImagePlus, Trash2, Share2, X, Flag } from 'lucide-react-native';
 import ImageView from 'react-native-image-viewing';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/Colors';
@@ -19,6 +19,8 @@ import { formatDateFr } from '@/lib/date-fr';
 import { useDialog } from '@/contexts/DialogContext';
 import { LazyImage } from '@/components/LazyImage';
 import { useTranslation } from '@/contexts/I18nContext';
+import { useAuth } from '@/contexts/AuthContext';
+import ReportSheet, { type ReportTargetRef } from '@/components/ReportSheet';
 
 const COLUMN_COUNT = 3;
 /**
@@ -84,6 +86,9 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<(Photo & { first_name: string; last_name: string }) | null>(null);
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
+  // Photo d'un autre utilisateur en cours de signalement (App Store 1.2).
+  const [reportTarget, setReportTarget] = useState<ReportTargetRef | null>(null);
+  const { user } = useAuth();
 
   const pickImage = useCallback(async (useCamera: boolean, roomIdOverride?: string) => {
     try {
@@ -432,7 +437,26 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
               <Text style={styles.detailBtnText}>{t('common.delete')}</Text>
             </TouchableOpacity>}
           </View>
+          {selectedPhoto.uploaded_by !== user?.id ? (
+            <TouchableOpacity
+              style={[styles.reportBtn, { borderColor: colors.border }]}
+              onPress={() =>
+                setReportTarget({
+                  type: 'photo',
+                  id: selectedPhoto.id,
+                  label: selectedPhoto.caption || `${selectedPhoto.first_name} ${selectedPhoto.last_name}`,
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={t('moderation.reportPhotoTitle')}
+            >
+              <Flag size={IconSize.sm} color={colors.red} />
+              <Text style={[styles.reportBtnText, { color: colors.red }]}>{t('comments.report')}</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
+
+        <ReportSheet target={reportTarget} onClose={() => setReportTarget(null)} />
 
         {/* Fullscreen zoom viewer */}
         <ImageView
@@ -688,6 +712,18 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
   },
   detailBtnText: { color: '#FFFFFF', fontSize: FontSize.base, fontWeight: FontWeight.medium },
+  reportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+  },
+  reportBtnText: { fontSize: FontSize.sm, fontWeight: FontWeight.medium },
 
   // Fullscreen viewer footer
   viewerFooter: {

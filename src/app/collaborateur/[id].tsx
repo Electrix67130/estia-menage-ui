@@ -11,7 +11,9 @@ import {
 import { useDialog } from '@/contexts/DialogContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Mail, Phone, Building2, Check, CalendarClock } from 'lucide-react-native';
+import { ArrowLeft, Mail, Phone, Building2, Check, CalendarClock, Flag, Ban } from 'lucide-react-native';
+import { useBlocks, useBlockUser, useUnblockUser } from '@/api/hooks/useBlocks';
+import ReportSheet, { type ReportTargetRef } from '@/components/ReportSheet';
 import { useUser, useUpdateUserRole } from '@/api/hooks/useUser';
 import { useAuth } from '@/contexts/AuthContext';
 import { Colors } from '@/constants/Colors';
@@ -38,6 +40,12 @@ export default function CollaborateurDetailScreen() {
   const dialog = useDialog();
   const { t } = useTranslation();
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+  // Signaler / bloquer ce membre (App Store 1.2).
+  const [reportTarget, setReportTarget] = useState<ReportTargetRef | null>(null);
+  const { data: blocked } = useBlocks();
+  const blockUser = useBlockUser();
+  const unblockUser = useUnblockUser();
+  const isBlocked = !!blocked?.some((b) => b.user_id === id);
   const labelForRole = (r: UserRole): string => {
     const key = ROLES.find((opt) => opt.value === r)?.labelKey;
     return key ? t(key) : r;
@@ -51,6 +59,22 @@ export default function CollaborateurDetailScreen() {
   const isMe = me?.id === id;
   const canChangeRole = isAdmin && !isMe;
   const roleChanged = selectedRole !== null && user && selectedRole !== user.role;
+
+  const handleToggleBlock = async () => {
+    if (!user) return;
+    if (isBlocked) {
+      unblockUser.mutate(user.id);
+      return;
+    }
+    const name = `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() || user.email;
+    const ok = await dialog.confirm({
+      title: t('block.confirmTitle', { name }),
+      message: t('block.confirmBody'),
+      confirmLabel: t('block.action'),
+      destructive: true,
+    });
+    if (ok) blockUser.mutate(user.id);
+  };
 
   const handleSaveRole = async () => {
     if (!selectedRole || !user || !roleChanged) return;
@@ -228,7 +252,41 @@ export default function CollaborateurDetailScreen() {
         ) : null}
 
         {isAdmin && user && !isMe ? <PrestataireActivity userId={user.id} /> : null}
+
+        {!isMe ? (
+          <View style={styles.moderation}>
+            <TouchableOpacity
+              style={[styles.moderationBtn, { borderColor: colors.border }]}
+              onPress={() =>
+                setReportTarget({
+                  type: 'user',
+                  id: user.id,
+                  label: `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() || user.email,
+                })
+              }
+              accessibilityRole="button"
+            >
+              <Flag size={IconSize.sm} color={colors.red} />
+              <Text style={[styles.moderationText, { color: colors.red }]}>{t('moderation.reportUserTitle')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.moderationBtn, { borderColor: colors.border }]}
+              onPress={handleToggleBlock}
+              disabled={blockUser.isPending || unblockUser.isPending}
+              accessibilityRole="button"
+            >
+              <Ban size={IconSize.sm} color={colors.text2} />
+              <Text style={[styles.moderationText, { color: colors.text }]}>
+                {isBlocked
+                  ? t('block.unblock')
+                  : t('block.actionNamed', { name: `${user.first_name ?? ''} ${user.last_name ?? ''}`.trim() || user.email })}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </ScrollView>
+
+      <ReportSheet target={reportTarget} onClose={() => setReportTarget(null)} />
     </SafeAreaView>
   );
 }
@@ -389,6 +447,17 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   backBtn: { padding: Spacing.xs },
+  moderation: { gap: Spacing.sm, marginTop: Spacing.xl },
+  moderationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+  },
+  moderationText: { fontSize: FontSize.base, fontWeight: FontWeight.medium },
   title: { fontSize: FontSize.xl, fontWeight: FontWeight.bold },
   scroll: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.xxxl, gap: Spacing.md },
   identityRow: {

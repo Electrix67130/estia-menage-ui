@@ -6,79 +6,69 @@ import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Lay
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { useTranslation } from '@/contexts/I18nContext';
 import { useDialog } from '@/contexts/DialogContext';
-import { useCreateFeedback } from '@/api/hooks/useFeedback';
-import { feedbackContext } from '@/lib/feedbackContext';
+import { useCreateReport, REPORT_REASONS, type ReportReason, type ReportTarget } from '@/api/hooks/useReports';
 import type { TranslationKeys } from '@/i18n/translations';
 
-/** Motifs proposés — table explicite pour que le typage vérifie chaque clé. */
-export type ReportReason = 'inappropriate' | 'harassment' | 'spam' | 'other';
-const REASONS: { key: ReportReason; label: TranslationKeys }[] = [
-  { key: 'inappropriate', label: 'comments.report.reason.inappropriate' },
-  { key: 'harassment', label: 'comments.report.reason.harassment' },
-  { key: 'spam', label: 'comments.report.reason.spam' },
-  { key: 'other', label: 'comments.report.reason.other' },
-];
-
-/** Longueur de l'extrait du commentaire repris dans le message par défaut. */
-export const EXCERPT_LENGTH = 30;
-
-/** Les 30 premiers caractères du commentaire, « … » si tronqué. */
-export function commentExcerpt(content: string): string {
-  const trimmed = content.trim();
-  return trimmed.length > EXCERPT_LENGTH ? `${trimmed.slice(0, EXCERPT_LENGTH)}…` : trimmed;
+export interface ReportTargetRef {
+  type: ReportTarget;
+  id: string;
+  /** Ce qu'on signale, rappelé en haut de la feuille. */
+  label: string;
 }
 
+/** Libellés des motifs — table explicite pour que le typage vérifie chaque clé. */
+const REASON_KEYS: Record<ReportReason, TranslationKeys> = {
+  inappropriate: 'comments.report.reason.inappropriate',
+  harassment: 'comments.report.reason.harassment',
+  off_topic: 'comments.report.reason.spam',
+  other: 'comments.report.reason.other',
+};
+
+const TITLE_KEYS: Record<ReportTarget, TranslationKeys> = {
+  comment: 'comments.report.title',
+  photo: 'moderation.reportPhotoTitle',
+  user: 'moderation.reportUserTitle',
+};
+
 interface Props {
-  visible: boolean;
-  commentId: string;
-  commentContent: string;
+  /** null = feuille fermée. */
+  target: ReportTargetRef | null;
   onClose: () => void;
-  /** Écran d'origine, joint au contexte technique du signalement. */
-  screen?: string;
 }
 
 /**
- * Feuille de signalement d'un commentaire d'un autre utilisateur (App Store
- * 1.2). Envoie un `feedback` de type `report` : les admins de l'org reçoivent
- * une push « Contenu signalé » et traitent depuis le dashboard.
+ * Feuille de signalement (reprise de Buildr), commune aux messages, photos et
+ * membres (App Store 1.2). Le signalement part aux administrateurs de
+ * l'organisation, jamais à la personne visée : la feuille le dit, pour que
+ * personne n'hésite par crainte d'une confrontation.
  */
-const ReportCommentSheet: React.FC<Props> = ({ visible, commentId, commentContent, onClose, screen }) => {
+const ReportSheet: React.FC<Props> = ({ target, onClose }) => {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const dialog = useDialog();
-  const create = useCreateFeedback();
+  const create = useCreateReport();
 
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState('');
   const [error, setError] = useState('');
 
-  const reset = () => {
+  const close = () => {
     setReason(null);
     setDetails('');
     setError('');
-  };
-
-  const close = () => {
-    reset();
     onClose();
   };
 
   const submit = async () => {
-    if (!reason) return;
+    if (!target || !reason) return;
     setError('');
-    const label = REASONS.find((r) => r.key === reason)?.label ?? 'comments.report.reason.other';
-    const precisions = details.trim();
     try {
       await create.mutateAsync({
-        type: 'report',
-        subject: t(label),
-        // Sans précisions, l'extrait du commentaire donne quand même un
-        // message lisible (et ≥ 10 caractères, borne du schéma API).
-        message: precisions || t('comments.report.fallbackMessage', { excerpt: commentExcerpt(commentContent) }),
-        target_type: 'comment',
-        target_id: commentId,
-        ...feedbackContext(locale, screen),
+        target_type: target.type,
+        target_id: target.id,
+        reason,
+        comment: details.trim() || undefined,
       });
       close();
       await dialog.alert({ title: t('comments.report.sentTitle'), message: t('comments.report.sentMessage') });
@@ -87,15 +77,19 @@ const ReportCommentSheet: React.FC<Props> = ({ visible, commentId, commentConten
     }
   };
 
+  const canSubmit = !!reason && !create.isPending;
+
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close}>
+    <Modal visible={!!target} transparent animationType="slide" onRequestClose={close}>
       <Pressable style={styles.overlay} onPress={close}>
         {/* Pressable « bouclier » : capte le tap pour qu'il n'atteigne pas l'overlay (qui ferme). */}
         <Pressable style={[styles.sheet, { backgroundColor: colors.surface }]} onPress={() => undefined}>
           <View style={styles.header}>
             <View style={styles.titleRow}>
               <Flag size={IconSize.md} color={colors.red} />
-              <Text style={[styles.title, { color: colors.text }]}>{t('comments.report.title')}</Text>
+              <Text style={[styles.title, { color: colors.text }]}>
+                {t(TITLE_KEYS[target?.type ?? 'comment'])}
+              </Text>
             </View>
             <TouchableOpacity
               onPress={close}
@@ -107,29 +101,31 @@ const ReportCommentSheet: React.FC<Props> = ({ visible, commentId, commentConten
             </TouchableOpacity>
           </View>
 
-          <Text style={[styles.preview, { color: colors.mutedText }]} numberOfLines={2}>
-            {commentContent}
-          </Text>
+          {target?.label ? (
+            <Text style={[styles.preview, { color: colors.mutedText }]} numberOfLines={2}>
+              {target.label}
+            </Text>
+          ) : null}
 
           <Text style={[styles.label, { color: colors.text }]}>{t('comments.report.reasonLabel')}</Text>
-          {REASONS.map((r) => {
-            const selected = reason === r.key;
+          {REPORT_REASONS.map((r) => {
+            const selected = reason === r;
             return (
               <TouchableOpacity
-                key={r.key}
+                key={r}
                 style={[
                   styles.reasonRow,
                   { backgroundColor: colors.itemBackground, borderColor: selected ? colors.primary : colors.border },
                 ]}
-                onPress={() => setReason(r.key)}
+                onPress={() => setReason(r)}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: selected }}
-                accessibilityLabel={t(r.label)}
+                accessibilityLabel={t(REASON_KEYS[r])}
               >
                 <View style={[styles.radioOuter, { borderColor: selected ? colors.primary : colors.mutedText }]}>
                   {selected ? <View style={[styles.radioInner, { backgroundColor: colors.primary }]} /> : null}
                 </View>
-                <Text style={[styles.reasonText, { color: colors.text }]}>{t(r.label)}</Text>
+                <Text style={[styles.reasonText, { color: colors.text }]}>{t(REASON_KEYS[r])}</Text>
               </TouchableOpacity>
             );
           })}
@@ -147,14 +143,16 @@ const ReportCommentSheet: React.FC<Props> = ({ visible, commentId, commentConten
             accessibilityLabel={t('comments.report.detailsLabel')}
           />
 
+          <Text style={[styles.hint, { color: colors.mutedText }]}>{t('moderation.reportHint')}</Text>
+
           {error ? <Text style={[styles.error, { color: colors.red }]}>{error}</Text> : null}
 
           <TouchableOpacity
             style={[styles.submit, { backgroundColor: reason ? colors.red : colors.border }]}
             onPress={submit}
-            disabled={!reason || create.isPending}
+            disabled={!canSubmit}
             accessibilityRole="button"
-            accessibilityState={{ disabled: !reason || create.isPending }}
+            accessibilityState={{ disabled: !canSubmit }}
             accessibilityLabel={t('comments.report.submit')}
           >
             {create.isPending ? (
@@ -203,9 +201,10 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     fontSize: FontSize.base,
   },
+  hint: { fontSize: FontSize.xs, lineHeight: 16, marginTop: Spacing.sm },
   error: { fontSize: FontSize.sm, marginTop: Spacing.sm },
   submit: { height: 48, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center', marginTop: Spacing.lg },
   submitText: { color: '#FFFFFF', fontSize: FontSize.lg, fontWeight: FontWeight.semibold },
 });
 
-export default ReportCommentSheet;
+export default ReportSheet;

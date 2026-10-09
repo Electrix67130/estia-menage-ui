@@ -1,4 +1,5 @@
 import type { MentionRef } from '@/lib/mentions';
+import type { ReactionEmoji } from '@/constants/reactions';
 import { translate } from '@/i18n/runtime';
 
 // --------------- Pagination ---------------
@@ -542,16 +543,38 @@ export interface Comment {
   section_id: string | null;
   author_id: string;
   content: string;
+  /** Message auquel celui-ci répond. */
+  reply_to_id?: string | null;
   created_at: string;
   updated_at: string;
   /** Personnes mentionnées (« @Prénom Nom »), pour le surlignage. */
   mentions?: MentionRef[];
+  /** Le message cité ; null s'il a été supprimé ou si son auteur est bloqué. */
+  reply_to?: CommentReplyPreview | null;
+  reactions?: CommentReaction[];
+}
+
+/** Le message cité, tel qu'affiché au-dessus d'une réponse. */
+export interface CommentReplyPreview {
+  id: string;
+  content: string;
+  author_id: string;
+  first_name: string;
+  last_name: string;
+}
+
+/** Une réaction agrégée : combien de personnes, et si j'en suis. */
+export interface CommentReaction {
+  emoji: ReactionEmoji;
+  count: number;
+  mine: boolean;
 }
 
 export interface CreateCommentInput {
   menage_id: string;
   section_id?: string | null;
   content: string;
+  reply_to_id?: string | null;
 }
 
 export interface UpdateCommentInput {

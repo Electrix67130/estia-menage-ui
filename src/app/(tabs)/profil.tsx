@@ -41,6 +41,7 @@ import { useColorScheme } from '@/hooks/useColorScheme';
 import { formatDateFr } from '@/lib/date-fr';
 import AutoScrollInput from '@/components/AutoScrollInput';
 import { useDialog } from '@/contexts/DialogContext';
+import BlockedUsersSection from '@/components/BlockedUsersSection';
 
 const THEME_OPTIONS: { mode: ThemeMode; key: 'profile.themeLight' | 'profile.themeDark' | 'profile.themeSystem'; icon: typeof Sun }[] = [
   { mode: 'light', key: 'profile.themeLight', icon: Sun },
@@ -503,6 +504,8 @@ export default function ProfilScreen() {
                   <ChevronRight size={IconSize.sm} color={colors.red} />
                 </TouchableOpacity>
               </View>
+
+              <BlockedUsersSection />
 
               {/* Mes organisations */}
               <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('profile.orgsSection')}</Text>

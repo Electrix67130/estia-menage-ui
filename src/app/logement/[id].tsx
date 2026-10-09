@@ -31,6 +31,7 @@ import { useKeyboardAwareModalStyle } from '@/hooks/useKeyboardAwareModalStyle';
 import CheckTemplateEditor from '@/components/CheckTemplateEditor';
 import KeyboardAwareScroll from '@/components/KeyboardAwareScroll';
 import LogementMembersSection from '@/components/LogementMembersSection';
+import LogementNotificationSection from '@/components/LogementNotificationSection';
 import LogementInfoForm from '@/components/LogementInfoForm';
 import LogementClientSection from '@/components/LogementClientSection';
 import LogementExternalCalendarsSection from '@/components/LogementExternalCalendarsSection';
@@ -303,6 +304,8 @@ export default function LogementDetailScreen() {
         ) : null}
 
         {isAdmin ? <LogementInfoForm logementId={logement.id} /> : null}
+
+        {!logement.archived_at ? <LogementNotificationSection logementId={logement.id} /> : null}
 
         <Text style={[styles.section, { color: colors.text2 }]}>{t('logement.rooms.section').toUpperCase()}</Text>
         <RoomsSection

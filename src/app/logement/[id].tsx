@@ -60,6 +60,7 @@ import {
   useSetConsommableStock,
   type ConsommableLine,
 } from '@/api/hooks/useConsommables';
+import { withoutLeadingZeros } from '@/lib/numberInput';
 
 /** Types de pièce sélectionnables (piscine/jacuzzi gérés via les équipements du logement). */
 const ROOM_KINDS: { value: RoomKind; labelKey: TranslationKeys }[] = [
@@ -882,10 +883,10 @@ function ConsommableEditModal({
           <TextInput
             style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={seuil}
-            onChangeText={setSeuil}
+            onChangeText={withoutLeadingZeros(setSeuil)}
             placeholder="1"
             placeholderTextColor={colors.placeholder}
-            keyboardType="number-pad"
+            keyboardType="number-pad" selectTextOnFocus
           />
 
           {item ? (
@@ -894,10 +895,10 @@ function ConsommableEditModal({
               <TextInput
                 style={[styles.modalInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
                 value={qty}
-                onChangeText={setQty}
+                onChangeText={withoutLeadingZeros(setQty)}
                 placeholder={item.qty === null ? t('consommables.initStock') : '0'}
                 placeholderTextColor={colors.placeholder}
-                keyboardType="number-pad"
+                keyboardType="number-pad" selectTextOnFocus
               />
             </>
           ) : null}

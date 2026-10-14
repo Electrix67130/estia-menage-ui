@@ -16,6 +16,7 @@ import LabeledField from '@/components/LabeledField';
 import ClientPickerSheet from '@/components/ClientPickerSheet';
 import CreateClientModal from '@/components/CreateClientModal';
 import SectionCard from '@/components/SectionCard';
+import { withoutLeadingZeros } from '@/lib/numberInput';
 
 function RoomCounter({ label, value, onChange }: { label: string; value: number; onChange: (n: number) => void }) {
   const colorScheme = useColorScheme();
@@ -248,10 +249,10 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={surfaceM2}
-            onChangeText={setSurfaceM2}
+            onChangeText={withoutLeadingZeros(setSurfaceM2)}
             placeholder={t('logementForm.example', { value: 65 })}
             placeholderTextColor={colors.placeholder}
-            keyboardType="number-pad"
+            keyboardType="number-pad" selectTextOnFocus
           />
         </LabeledField>
 
@@ -314,30 +315,30 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={defaultClientPriceHt}
-            onChangeText={setDefaultClientPriceHt}
+            onChangeText={withoutLeadingZeros(setDefaultClientPriceHt)}
             placeholder={t('logementForm.example', { value: 80 })}
             placeholderTextColor={colors.placeholder}
-            keyboardType="decimal-pad"
+            keyboardType="decimal-pad" selectTextOnFocus
           />
         </LabeledField>
         <LabeledField label={t('logementForm.vatRate')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={defaultClientVatRate}
-            onChangeText={setDefaultClientVatRate}
+            onChangeText={withoutLeadingZeros(setDefaultClientVatRate)}
             placeholder="20"
             placeholderTextColor={colors.placeholder}
-            keyboardType="decimal-pad"
+            keyboardType="decimal-pad" selectTextOnFocus
           />
         </LabeledField>
         <LabeledField label={t('menage.fields.providerPrice')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
             value={defaultProviderPrice}
-            onChangeText={setDefaultProviderPrice}
+            onChangeText={withoutLeadingZeros(setDefaultProviderPrice)}
             placeholder={t('logementForm.example', { value: 50 })}
             placeholderTextColor={colors.placeholder}
-            keyboardType="decimal-pad"
+            keyboardType="decimal-pad" selectTextOnFocus
           />
         </LabeledField>
         <View style={[styles.switchRow, { backgroundColor: colors.itemBackground, borderColor: colors.border }]}>
@@ -354,20 +355,20 @@ export default function LogementInfoForm({ logementId }: { logementId: string })
               <AutoScrollInput
                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
                 value={defaultLaundryClientPriceHt}
-                onChangeText={setDefaultLaundryClientPriceHt}
+                onChangeText={withoutLeadingZeros(setDefaultLaundryClientPriceHt)}
                 placeholder={t('logementForm.example', { value: 15 })}
                 placeholderTextColor={colors.placeholder}
-                keyboardType="decimal-pad"
+                keyboardType="decimal-pad" selectTextOnFocus
               />
             </LabeledField>
             <LabeledField label={t('logementForm.laundryProvider')}>
               <AutoScrollInput
                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
                 value={defaultLaundryProviderPrice}
-                onChangeText={setDefaultLaundryProviderPrice}
+                onChangeText={withoutLeadingZeros(setDefaultLaundryProviderPrice)}
                 placeholder={t('logementForm.example', { value: 10 })}
                 placeholderTextColor={colors.placeholder}
-                keyboardType="decimal-pad"
+                keyboardType="decimal-pad" selectTextOnFocus
               />
             </LabeledField>
           </>

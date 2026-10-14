@@ -20,6 +20,7 @@ import DatePickerField from '@/components/DatePickerField';
 import TimePickerField from '@/components/TimePickerField';
 import DurationPickerField from '@/components/DurationPickerField';
 import LabeledField from '@/components/LabeledField';
+import { withoutLeadingZeros } from '@/lib/numberInput';
 
 export default function CreateMenageScreen() {
   const colorScheme = useColorScheme();
@@ -251,10 +252,10 @@ export default function CreateMenageScreen() {
                   <AutoScrollInput
                     style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                     value={clientPriceHt}
-                    onChangeText={setClientPriceHt}
+                    onChangeText={withoutLeadingZeros(setClientPriceHt)}
                     placeholder={t('menageCreate.example', { value: 80 })}
                     placeholderTextColor={colors.placeholder}
-                    keyboardType="decimal-pad"
+                    keyboardType="decimal-pad" selectTextOnFocus
                   />
                 </LabeledField>
               </View>
@@ -263,10 +264,10 @@ export default function CreateMenageScreen() {
                   <AutoScrollInput
                     style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                     value={clientVatRate}
-                    onChangeText={setClientVatRate}
+                    onChangeText={withoutLeadingZeros(setClientVatRate)}
                     placeholder="20"
                     placeholderTextColor={colors.placeholder}
-                    keyboardType="decimal-pad"
+                    keyboardType="decimal-pad" selectTextOnFocus
                   />
                 </LabeledField>
               </View>
@@ -275,10 +276,10 @@ export default function CreateMenageScreen() {
               <AutoScrollInput
                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={providerPrice}
-                onChangeText={setProviderPrice}
+                onChangeText={withoutLeadingZeros(setProviderPrice)}
                 placeholder={t('menageCreate.example', { value: 50 })}
                 placeholderTextColor={colors.placeholder}
-                keyboardType="decimal-pad"
+                keyboardType="decimal-pad" selectTextOnFocus
               />
             </LabeledField>
 
@@ -300,10 +301,10 @@ export default function CreateMenageScreen() {
                         <AutoScrollInput
                           style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                           value={laundryClientPriceHt}
-                          onChangeText={setLaundryClientPriceHt}
+                          onChangeText={withoutLeadingZeros(setLaundryClientPriceHt)}
                           placeholder={t('menageCreate.example', { value: 15 })}
                           placeholderTextColor={colors.placeholder}
-                          keyboardType="decimal-pad"
+                          keyboardType="decimal-pad" selectTextOnFocus
                         />
                       </LabeledField>
                     </View>
@@ -312,10 +313,10 @@ export default function CreateMenageScreen() {
                         <AutoScrollInput
                           style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                           value={laundryProviderPrice}
-                          onChangeText={setLaundryProviderPrice}
+                          onChangeText={withoutLeadingZeros(setLaundryProviderPrice)}
                           placeholder={t('menageCreate.example', { value: 10 })}
                           placeholderTextColor={colors.placeholder}
-                          keyboardType="decimal-pad"
+                          keyboardType="decimal-pad" selectTextOnFocus
                         />
                       </LabeledField>
                     </View>

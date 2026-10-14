@@ -31,6 +31,7 @@ import {
   type LogementEquipement,
   type EquipementCategory,
 } from '@/api/hooks/useLogementEquipements';
+import { withoutLeadingZeros } from '@/lib/numberInput';
 
 /**
  * Section « Équipements » de la page logement : inventaire du bien (appareil à
@@ -338,8 +339,8 @@ function EquipementEditModal({
                 { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground },
               ]}
               value={quantity}
-              onChangeText={setQuantity}
-              keyboardType="number-pad"
+              onChangeText={withoutLeadingZeros(setQuantity)}
+              keyboardType="number-pad" selectTextOnFocus
               placeholder="1"
               placeholderTextColor={colors.placeholder}
             />

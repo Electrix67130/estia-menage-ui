@@ -88,6 +88,7 @@ import { openMaps } from '@/lib/contact-links';
 import { formatQtyUnit, unitForQty } from '@/lib/unit-fr';
 import { useDialog } from '@/contexts/DialogContext';
 import TimePickerField from '@/components/TimePickerField';
+import { withoutLeadingZeros } from '@/lib/numberInput';
 import DurationPickerField from '@/components/DurationPickerField';
 import LabeledField from '@/components/LabeledField';
 import AutoScrollInput from '@/components/AutoScrollInput';
@@ -1076,10 +1077,10 @@ export default function MenageDetailScreen() {
                       <TextInput
                         style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.itemBackground }]}
                         value={overridePrice}
-                        onChangeText={setOverridePrice}
+                        onChangeText={withoutLeadingZeros(setOverridePrice)}
                         placeholder={String(menage.prix_prevu ?? '')}
                         placeholderTextColor={colors.placeholder}
-                        keyboardType="decimal-pad"
+                        keyboardType="decimal-pad" selectTextOnFocus
                       />
                     </View>
                   </View>
@@ -1381,17 +1382,17 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
       <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
         <View style={{ flex: 2 }}>
           <LabeledField label={tr('menage.fields.clientPriceHt')}>
-            <AutoScrollInput style={inputStyle} value={clientPriceHt} onChangeText={setClientPriceHt} placeholder={tr('menageDetail.exampleValue', { value: 80 })} placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+            <AutoScrollInput style={inputStyle} value={clientPriceHt} onChangeText={withoutLeadingZeros(setClientPriceHt)} placeholder={tr('menageDetail.exampleValue', { value: 80 })} placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" selectTextOnFocus />
           </LabeledField>
         </View>
         <View style={{ flex: 1 }}>
           <LabeledField label={tr('menage.fields.clientVatRate')}>
-            <AutoScrollInput style={inputStyle} value={clientVatRate} onChangeText={setClientVatRate} placeholder="20" placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+            <AutoScrollInput style={inputStyle} value={clientVatRate} onChangeText={withoutLeadingZeros(setClientVatRate)} placeholder="20" placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" selectTextOnFocus />
           </LabeledField>
         </View>
       </View>
       <LabeledField label={tr('menage.fields.providerPrice')}>
-        <AutoScrollInput style={inputStyle} value={providerPrice} onChangeText={setProviderPrice} placeholder={tr('menageDetail.exampleValue', { value: 50 })} placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+        <AutoScrollInput style={inputStyle} value={providerPrice} onChangeText={withoutLeadingZeros(setProviderPrice)} placeholder={tr('menageDetail.exampleValue', { value: 50 })} placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" selectTextOnFocus />
       </LabeledField>
 
       <Text style={[styles.section, { color: colors.text2 }]}>{tr('menage.edit.sectionLaundry').toUpperCase()}</Text>
@@ -1403,12 +1404,12 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
         <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
           <View style={{ flex: 1 }}>
             <LabeledField label={tr('menage.fields.laundryClientHt')}>
-              <AutoScrollInput style={inputStyle} value={laundryClientPriceHt} onChangeText={setLaundryClientPriceHt} placeholder={tr('menageDetail.exampleValue', { value: 15 })} placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+              <AutoScrollInput style={inputStyle} value={laundryClientPriceHt} onChangeText={withoutLeadingZeros(setLaundryClientPriceHt)} placeholder={tr('menageDetail.exampleValue', { value: 15 })} placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" selectTextOnFocus />
             </LabeledField>
           </View>
           <View style={{ flex: 1 }}>
             <LabeledField label={tr('menage.fields.laundryProvider')}>
-              <AutoScrollInput style={inputStyle} value={laundryProviderPrice} onChangeText={setLaundryProviderPrice} placeholder={tr('menageDetail.exampleValue', { value: 10 })} placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" />
+              <AutoScrollInput style={inputStyle} value={laundryProviderPrice} onChangeText={withoutLeadingZeros(setLaundryProviderPrice)} placeholder={tr('menageDetail.exampleValue', { value: 10 })} placeholderTextColor={colors.placeholder} keyboardType="decimal-pad" selectTextOnFocus />
             </LabeledField>
           </View>
         </View>
@@ -1426,36 +1427,36 @@ function MenageEditForm({ menage, onClose }: { menage: Menage; onClose: () => vo
         ) : null}
       </View>
       <LabeledField label={tr('menageDetail.travelers')}>
-        <AutoScrollInput style={inputStyle} value={nTravelers} onChangeText={setNTravelers} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.placeholder} />
+        <AutoScrollInput style={inputStyle} value={nTravelers} onChangeText={withoutLeadingZeros(setNTravelers)} keyboardType="number-pad" selectTextOnFocus placeholder="0" placeholderTextColor={colors.placeholder} />
       </LabeledField>
       <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
         <View style={{ flex: 1 }}>
           <LabeledField label={tr('beds.simple')}>
-            <AutoScrollInput style={inputStyle} value={nLitSimple} onChangeText={setNLitSimple} keyboardType="number-pad" />
+            <AutoScrollInput style={inputStyle} value={nLitSimple} onChangeText={withoutLeadingZeros(setNLitSimple)} keyboardType="number-pad" selectTextOnFocus />
           </LabeledField>
         </View>
         <View style={{ flex: 1 }}>
           <LabeledField label={tr('beds.double')}>
-            <AutoScrollInput style={inputStyle} value={nLitDouble} onChangeText={setNLitDouble} keyboardType="number-pad" />
+            <AutoScrollInput style={inputStyle} value={nLitDouble} onChangeText={withoutLeadingZeros(setNLitDouble)} keyboardType="number-pad" selectTextOnFocus />
           </LabeledField>
         </View>
       </View>
       <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
         <View style={{ flex: 1 }}>
           <LabeledField label={tr('beds.sofa')}>
-            <AutoScrollInput style={inputStyle} value={nCanapeLit} onChangeText={setNCanapeLit} keyboardType="number-pad" />
+            <AutoScrollInput style={inputStyle} value={nCanapeLit} onChangeText={withoutLeadingZeros(setNCanapeLit)} keyboardType="number-pad" selectTextOnFocus />
           </LabeledField>
         </View>
         <View style={{ flex: 1 }}>
           <LabeledField label={tr('beds.extra')}>
-            <AutoScrollInput style={inputStyle} value={nLitAppoint} onChangeText={setNLitAppoint} keyboardType="number-pad" />
+            <AutoScrollInput style={inputStyle} value={nLitAppoint} onChangeText={withoutLeadingZeros(setNLitAppoint)} keyboardType="number-pad" selectTextOnFocus />
           </LabeledField>
         </View>
       </View>
       <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
         <View style={{ flex: 1 }}>
           <LabeledField label={tr('beds.crib')}>
-            <AutoScrollInput style={inputStyle} value={nLitParapluie} onChangeText={setNLitParapluie} keyboardType="number-pad" />
+            <AutoScrollInput style={inputStyle} value={nLitParapluie} onChangeText={withoutLeadingZeros(setNLitParapluie)} keyboardType="number-pad" selectTextOnFocus />
           </LabeledField>
         </View>
         <View style={{ flex: 1 }} />
@@ -1595,11 +1596,11 @@ function ConsommablesReleveModal({
                         styles.consoInput,
                         { color: colors.text, borderColor: low ? colors.red : colors.border },
                       ]}
-                      keyboardType="number-pad"
+                      keyboardType="number-pad" selectTextOnFocus
                       value={val}
-                      onChangeText={(t) =>
+                      onChangeText={withoutLeadingZeros((t) =>
                         setQty((prev) => ({ ...prev, [c.logement_consommable_id]: t.replace(/[^0-9]/g, '') }))
-                      }
+                      )}
                       placeholder="0"
                       placeholderTextColor={colors.mutedText}
                     />

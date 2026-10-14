@@ -22,6 +22,7 @@ import LabeledField from '@/components/LabeledField';
 import ClientPickerSheet from '@/components/ClientPickerSheet';
 import { User as UserIcon, ChevronRight } from 'lucide-react-native';
 import { Plus } from 'lucide-react-native';
+import { withoutLeadingZeros } from '@/lib/numberInput';
 
 interface RoomCounterProps {
   label: string;
@@ -217,10 +218,10 @@ export default function CreateLogementScreen() {
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={surfaceM2}
-            onChangeText={setSurfaceM2}
+            onChangeText={withoutLeadingZeros(setSurfaceM2)}
             placeholder={t('logementForm.example', { value: 65 })}
             placeholderTextColor={colors.placeholder}
-            keyboardType="number-pad"
+            keyboardType="number-pad" selectTextOnFocus
           />
         </LabeledField>
 
@@ -391,30 +392,30 @@ export default function CreateLogementScreen() {
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={defClientPrice}
-            onChangeText={setDefClientPrice}
+            onChangeText={withoutLeadingZeros(setDefClientPrice)}
             placeholder={t('logementForm.example', { value: 80 })}
             placeholderTextColor={colors.placeholder}
-            keyboardType="decimal-pad"
+            keyboardType="decimal-pad" selectTextOnFocus
           />
         </LabeledField>
         <LabeledField label={t('menage.fields.clientVatRate')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={defClientVat}
-            onChangeText={setDefClientVat}
+            onChangeText={withoutLeadingZeros(setDefClientVat)}
             placeholder="20"
             placeholderTextColor={colors.placeholder}
-            keyboardType="decimal-pad"
+            keyboardType="decimal-pad" selectTextOnFocus
           />
         </LabeledField>
         <LabeledField label={t('menage.fields.providerPrice')}>
           <AutoScrollInput
             style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
             value={defProviderPrice}
-            onChangeText={setDefProviderPrice}
+            onChangeText={withoutLeadingZeros(setDefProviderPrice)}
             placeholder={t('logementForm.example', { value: 50 })}
             placeholderTextColor={colors.placeholder}
-            keyboardType="decimal-pad"
+            keyboardType="decimal-pad" selectTextOnFocus
           />
         </LabeledField>
         <View style={[styles.switchRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -431,20 +432,20 @@ export default function CreateLogementScreen() {
               <AutoScrollInput
                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={defLaundryClient}
-                onChangeText={setDefLaundryClient}
+                onChangeText={withoutLeadingZeros(setDefLaundryClient)}
                 placeholder={t('logementForm.example', { value: 15 })}
                 placeholderTextColor={colors.placeholder}
-                keyboardType="decimal-pad"
+                keyboardType="decimal-pad" selectTextOnFocus
               />
             </LabeledField>
             <LabeledField label={t('logementForm.laundryProvider')}>
               <AutoScrollInput
                 style={[styles.input, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
                 value={defLaundryProvider}
-                onChangeText={setDefLaundryProvider}
+                onChangeText={withoutLeadingZeros(setDefLaundryProvider)}
                 placeholder={t('logementForm.example', { value: 10 })}
                 placeholderTextColor={colors.placeholder}
-                keyboardType="decimal-pad"
+                keyboardType="decimal-pad" selectTextOnFocus
               />
             </LabeledField>
           </>

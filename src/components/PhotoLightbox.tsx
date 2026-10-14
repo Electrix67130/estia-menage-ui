@@ -1,8 +1,9 @@
 import React, { ReactNode } from 'react';
-import { Modal, View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { X } from 'lucide-react-native';
 import { Spacing, Radius, FontSize, FontWeight, IconSize } from '@/constants/Layout';
 import { useTranslation } from '@/contexts/I18nContext';
+import CachedImage from '@/components/CachedImage';
 
 /**
  * Lightbox photo standardisée : utilisée partout dans l'app pour ouvrir une image
@@ -46,7 +47,7 @@ export default function PhotoLightbox({
           </TouchableOpacity>
         </View>
         {photoUrl ? (
-          <Image source={{ uri: photoUrl }} style={styles.image} resizeMode="contain" />
+          <CachedImage uri={photoUrl} style={styles.image} contentFit="contain" />
         ) : null}
         {footer ? <View style={styles.footer}>{footer}</View> : null}
       </View>

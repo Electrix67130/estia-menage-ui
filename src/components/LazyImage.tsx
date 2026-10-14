@@ -1,9 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import type { ImageContentFit } from 'expo-image';
+import CachedImage from '@/components/CachedImage';
 import {
   Dimensions,
-  Image,
   View,
-  type ImageProps,
   type ImageStyle,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -27,8 +27,9 @@ import {
  * Sans `LazyLoadScope` parent, `LazyImage` charge immédiatement : aucun risque
  * de vignette qui n'apparaît jamais là où personne n'a branché le scope.
  *
- * 100 % JS → livrable en OTA. Le cache disque persistant (expo-image) est
- * prévu pour la 1.0.1 (build natif).
+ * Une fois demandée, l'image passe par `CachedImage` (expo-image, cache disque
+ * indexé sur le nom de fichier) : revue le lendemain ou hors ligne, elle ne
+ * repart pas du réseau.
  */
 
 /** Distance (px) avant le bord du viewport à partir de laquelle on charge. */
@@ -80,17 +81,19 @@ export function useLazyScrollHandler(): (e: NativeSyntheticEvent<NativeScrollEve
   }, [scope]);
 }
 
-interface LazyImageProps extends Omit<ImageProps, 'style'> {
+interface LazyImageProps {
+  uri: string | null | undefined;
   style?: StyleProp<ImageStyle>;
+  contentFit?: ImageContentFit;
   /** Couleur du bloc affiché tant que l'image n'est pas demandée. */
   placeholderColor?: string;
 }
 
 /**
- * Remplace `Image` à l'identique (mêmes props) ; le `style` donne la taille du
- * placeholder, donc la mise en page ne bouge pas quand l'image arrive.
+ * Le `style` donne la taille du placeholder, donc la mise en page ne bouge pas
+ * quand l'image arrive.
  */
-export const LazyImage: React.FC<LazyImageProps> = ({ style, placeholderColor, ...imageProps }) => {
+export const LazyImage: React.FC<LazyImageProps> = ({ uri, style, contentFit, placeholderColor }) => {
   const scope = useContext(LazyLoadContext);
   const [visible, setVisible] = useState(scope === null);
   const ref = useRef<View>(null);
@@ -113,7 +116,7 @@ export const LazyImage: React.FC<LazyImageProps> = ({ style, placeholderColor, .
     return scope.subscribe(check);
   }, [visible, scope, check]);
 
-  if (visible) return <Image style={style} {...imageProps} />;
+  if (visible) return <CachedImage uri={uri} style={style} contentFit={contentFit} />;
 
   return (
     <View

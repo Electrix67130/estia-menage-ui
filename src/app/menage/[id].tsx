@@ -1,18 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  Modal,
-  TextInput,
-  ScrollView,
-  Image,
-  Linking,
-  Switch,
-  LayoutAnimation,
-  Pressable} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, TextInput, ScrollView, Linking, Switch, LayoutAnimation, Pressable } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -102,6 +89,7 @@ import ArrivalDeclarationModal, { type ArrivalDeclaration } from '@/components/A
 import { uploadFile } from '@/api/upload';
 import { optimizeImage } from '@/utils/optimizeImage';
 import { haversineMeters, formatDistance, POINTAGE_DISTANCE_WARN_M } from '@/lib/geo-distance';
+import CachedImage from '@/components/CachedImage';
 import { prestationTypeColorKey } from '@/api/types';
 import type { TranslationKeys } from '@/i18n/translations';
 import type { Menage, Logement, MenageStatus, UpdateMenageInput, Photo } from '@/api/types';
@@ -139,9 +127,9 @@ function ReportPhotoGrid({ photos, colors }: { photos: Photo[]; colors: (typeof 
   return (
     <View style={styles.recapGrid}>
       {photos.map((p) => (
-        <Image
+        <CachedImage
           key={p.id}
-          source={{ uri: p.thumbnail_url ?? p.url }}
+          uri={p.thumbnail_url ?? p.url}
           style={[styles.recapThumb, { borderColor: colors.border }]}
         />
       ))}
@@ -1972,7 +1960,7 @@ function PointageProofSection({
           {proof.at ? ` · ${formatDateFr(proof.at, 'time')}` : ''}
         </Text>
         <TouchableOpacity activeOpacity={0.85} onPress={() => setLightbox(proof)}>
-          <Image source={{ uri: proof.photoUrl }} style={[proofStyles.photo, { borderColor: colors.border }]} />
+          <CachedImage uri={proof.photoUrl} style={[proofStyles.photo, { borderColor: colors.border }]} />
         </TouchableOpacity>
         {proof.distance != null ? (
           <View

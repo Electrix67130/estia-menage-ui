@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   Switch} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image } from 'react-native';
 import { LogOut, User, Sun, Moon, Smartphone, Save, Mail, Phone, Building2, Check, Globe, Lock, KeyRound, X, Camera, Plus, ArrowRightLeft, Bell, FileText, ChevronRight, ExternalLink, Wallet, Search, MapPin, Receipt, Archive, MessageSquare, Trash2, Star } from 'lucide-react-native';
 import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -43,6 +42,7 @@ import AutoScrollInput from '@/components/AutoScrollInput';
 import { useDialog } from '@/contexts/DialogContext';
 import BlockedUsersSection from '@/components/BlockedUsersSection';
 import { openStoreReviewPage, storeReviewUrl } from '@/lib/storeReview';
+import CachedImage from '@/components/CachedImage';
 
 const THEME_OPTIONS: { mode: ThemeMode; key: 'profile.themeLight' | 'profile.themeDark' | 'profile.themeSystem'; icon: typeof Sun }[] = [
   { mode: 'light', key: 'profile.themeLight', icon: Sun },
@@ -247,8 +247,8 @@ export default function ProfilScreen() {
                 <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.7}>
                   <View style={[styles.avatar, { backgroundColor: colors.primary + '20' }]}>
                     {user.avatar_url ? (
-                      <Image
-                        source={{ uri: user.avatar_thumbnail_url ?? user.avatar_url }}
+                      <CachedImage
+                        uri={user.avatar_thumbnail_url ?? user.avatar_url}
                         style={styles.avatarImage}
                       />
                     ) : (

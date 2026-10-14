@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, RefreshControl, ActivityIndicator, Pressable, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal, TextInput, RefreshControl, ActivityIndicator, Pressable } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSwipeToClose } from '@/hooks/useSwipeToClose';
@@ -21,6 +21,7 @@ import { useRouter } from 'expo-router';
 import { useDialog } from '@/contexts/DialogContext';
 import { useTranslation } from '@/contexts/I18nContext';
 import type { TranslationKeys } from '@/i18n/translations';
+import CachedImage from '@/components/CachedImage';
 
 const ROLE_COLORS: Record<string, string> = {
   admin: '#2563EB',
@@ -269,7 +270,7 @@ export default function CollaborateursScreen() {
                 >
                   <View style={[styles.avatar, { backgroundColor: roleColor + '20' }]}>
                     {item.avatar_url ? (
-                      <Image source={{ uri: item.avatar_url }} style={styles.avatarImage} />
+                      <CachedImage uri={item.avatar_url} style={styles.avatarImage} />
                     ) : (
                       <Text style={[styles.avatarText, { color: roleColor }]}>
                         {item.first_name[0]}

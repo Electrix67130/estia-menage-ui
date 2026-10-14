@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useMemo } from 'react';
-import { View, Text, Image, TouchableOpacity, FlatList, StyleSheet, Dimensions, RefreshControl, Modal, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, Dimensions, RefreshControl, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import { Camera, ImagePlus, Trash2, Share2, X, Flag } from 'lucide-react-native';
 import ImageView from 'react-native-image-viewing';
 import PhotoViewerHeader from '@/components/PhotoViewerHeader';
@@ -22,6 +22,7 @@ import { LazyImage } from '@/components/LazyImage';
 import { useTranslation } from '@/contexts/I18nContext';
 import { useAuth } from '@/contexts/AuthContext';
 import ReportSheet, { type ReportTargetRef } from '@/components/ReportSheet';
+import CachedImage from '@/components/CachedImage';
 
 const COLUMN_COUNT = 3;
 /**
@@ -212,7 +213,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
           accessibilityRole="image"
           accessibilityLabel={item.caption || t('photos.itemA11y')}
         >
-          <LazyImage source={{ uri: item.thumbnail_url || item.url }} style={styles.photoImage} placeholderColor={colors.itemBackground} />
+          <LazyImage uri={item.thumbnail_url || item.url} style={styles.photoImage} placeholderColor={colors.itemBackground} />
           {/* Horodatage de prise, incrusté en bas de la vignette */}
           <View style={styles.timeBadge}>
             <Text style={styles.timeBadgeText} numberOfLines={1}>
@@ -399,7 +400,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
             accessibilityRole="image"
             accessibilityLabel={t('photos.enlargeA11y')}
           >
-            <Image source={{ uri: selectedPhoto.url }} style={styles.fullImage} resizeMode="contain" />
+            <CachedImage uri={selectedPhoto.url} style={styles.fullImage} contentFit="contain" />
           </TouchableOpacity>
           <View style={[styles.photoInfo, { backgroundColor: colors.surface }, Shadow.md]}>
             <Text style={[styles.photoAuthor, { color: colors.text }]}>

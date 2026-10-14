@@ -12,6 +12,7 @@ import { useDialog } from '@/contexts/DialogContext';
 import { useTranslation } from '@/contexts/I18nContext';
 import AppHeader from '@/components/AppHeader';
 import type { Logement } from '@/api/types';
+import CachedImage from '@/components/CachedImage';
 
 export default function LogementsScreen() {
   const colorScheme = useColorScheme();
@@ -65,8 +66,8 @@ export default function LogementsScreen() {
       activeOpacity={0.7}
     >
       {item.cover_photo_url ? (
-        <Image
-          source={{ uri: item.cover_photo_thumbnail_url ?? item.cover_photo_url }}
+        <CachedImage
+          uri={item.cover_photo_thumbnail_url ?? item.cover_photo_url}
           style={[styles.cover, { borderColor: colors.border }]}
         />
       ) : (

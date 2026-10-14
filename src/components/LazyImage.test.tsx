@@ -1,5 +1,6 @@
 import React from 'react';
-import { Image, ScrollView, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { ScrollView, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Image } from 'expo-image';
 import { describe, expect, it } from '@jest/globals';
 import { act, render } from '@testing-library/react-native';
 import { LazyImage, LazyLoadScope, useLazyScrollHandler } from './LazyImage';
@@ -9,7 +10,9 @@ interface Measurable {
   measureInWindow: (cb: MeasureCb) => void;
 }
 
-const src = { uri: 'https://example.test/photo.jpg' };
+const uri = 'https://example.test/photo.jpg';
+/** Ce que reçoit expo-image : l'URL et sa clé de cache (l'URL sans query, hors `/files`). */
+const src = { uri, cacheKey: uri };
 const style = { width: 100, height: 100 };
 const scrollEvent = {} as NativeSyntheticEvent<NativeScrollEvent>;
 
@@ -37,7 +40,7 @@ function measureAs(utils: ReturnType<typeof render>, x: number, y: number, w: nu
 
 describe('LazyImage — sans scope', () => {
   it('charge l’image immédiatement (aucun risque de vignette fantôme)', () => {
-    const utils = render(<LazyImage source={src} style={style} />);
+    const utils = render(<LazyImage uri={uri} style={style} />);
     expect(utils.UNSAFE_getByType(Image).props.source).toEqual(src);
     expect(utils.UNSAFE_queryAllByProps({ accessibilityElementsHidden: true })).toHaveLength(0);
   });
@@ -47,7 +50,7 @@ describe('LazyImage — dans un LazyLoadScope', () => {
   it('placeholder (taille du style, couleur optionnelle) tant que rien n’est mesuré', () => {
     const utils = render(
       <LazyLoadScope>
-        <LazyImage source={src} style={style} placeholderColor="#EEE" />
+        <LazyImage uri={uri} style={style} placeholderColor="#EEE" />
       </LazyLoadScope>,
     );
     expect(utils.UNSAFE_queryByType(Image)).toBeNull();
@@ -59,7 +62,7 @@ describe('LazyImage — dans un LazyLoadScope', () => {
   it('monte l’Image dès que le layout la mesure dans le viewport', () => {
     const utils = render(
       <LazyLoadScope>
-        <LazyImage source={src} style={style} />
+        <LazyImage uri={uri} style={style} />
       </LazyLoadScope>,
     );
     measureAs(utils, 0, 200, 100, 100);
@@ -70,7 +73,7 @@ describe('LazyImage — dans un LazyLoadScope', () => {
     const utils = render(
       <LazyLoadScope>
         <ScopedScroll>
-          <LazyImage source={src} style={style} />
+          <LazyImage uri={uri} style={style} />
         </ScopedScroll>
       </LazyLoadScope>,
     );
@@ -90,7 +93,7 @@ describe('LazyImage — dans un LazyLoadScope', () => {
   it('ignore une mesure 0×0 (pas encore posée sur Android)', () => {
     const utils = render(
       <LazyLoadScope>
-        <LazyImage source={src} style={style} />
+        <LazyImage uri={uri} style={style} />
       </LazyLoadScope>,
     );
     measureAs(utils, 0, 0, 0, 0);

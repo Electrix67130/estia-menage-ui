@@ -1,13 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Image,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useDialog } from '@/contexts/DialogContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -23,6 +15,7 @@ import { openPhone, openEmail } from '@/lib/contact-links';
 import { useTranslation } from '@/contexts/I18nContext';
 import type { TranslationKeys } from '@/i18n/translations';
 import type { UserRole } from '@/api/types';
+import CachedImage from '@/components/CachedImage';
 
 const ROLES: { value: UserRole; labelKey: TranslationKeys }[] = [
   { value: 'admin', labelKey: 'common.admin' },
@@ -148,7 +141,7 @@ export default function CollaborateurDetailScreen() {
         <View style={styles.identityRow}>
           <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
             {user.avatar_url ? (
-              <Image source={{ uri: user.avatar_url }} style={styles.avatarImage} />
+              <CachedImage uri={user.avatar_url} style={styles.avatarImage} />
             ) : (
               <Text style={styles.avatarText}>
                 {(user.first_name?.[0] ?? '') + (user.last_name?.[0] ?? '')}

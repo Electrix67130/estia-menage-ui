@@ -1,15 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  Image,
-  Modal,
-  Pressable,
-  TextInput,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Modal, Pressable, TextInput } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useDialog } from '@/contexts/DialogContext';
@@ -62,6 +52,7 @@ import {
   type ConsommableLine,
 } from '@/api/hooks/useConsommables';
 import { withoutLeadingZeros } from '@/lib/numberInput';
+import CachedImage from '@/components/CachedImage';
 
 /** Types de pièce sélectionnables (piscine/jacuzzi gérés via les équipements du logement). */
 const ROOM_KINDS: { value: RoomKind; labelKey: TranslationKeys }[] = [
@@ -262,7 +253,7 @@ export default function LogementDetailScreen() {
             activeOpacity={isAdmin ? 0.7 : 1}
           >
             {logement.cover_photo_url ? (
-              <Image source={{ uri: logement.cover_photo_url }} style={styles.coverImage} resizeMode="cover" />
+              <CachedImage uri={logement.cover_photo_url} style={styles.coverImage} contentFit="cover" />
             ) : (
               <View style={styles.coverPlaceholder}>
                 <Camera size={IconSize.xl} color={colors.text2} />
@@ -451,7 +442,7 @@ function RoomsSection({
                 activeOpacity={onPress ? 0.7 : 1}
               >
                 {thumb ? (
-                  <Image source={{ uri: thumb }} style={styles.roomThumb} resizeMode="cover" />
+                  <CachedImage uri={thumb} style={styles.roomThumb} contentFit="cover" />
                 ) : (
                   <View style={[styles.roomThumb, styles.roomThumbPlaceholder, { backgroundColor: colors.itemBackground }]}>
                     <DoorOpen size={IconSize.lg} color={colors.text2} />
@@ -659,7 +650,7 @@ function RoomEditModal({
             activeOpacity={0.7}
           >
             {photoUrl ? (
-              <Image source={{ uri: photoUrl }} style={styles.coverPreview} resizeMode="cover" />
+              <CachedImage uri={photoUrl} style={styles.coverPreview} contentFit="cover" />
             ) : (
               <View style={styles.coverPickerPlaceholder}>
                 <ImageIcon size={IconSize.lg} color={colors.text2} />

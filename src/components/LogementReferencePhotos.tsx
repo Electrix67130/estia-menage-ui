@@ -86,7 +86,7 @@ const LogementReferencePhotos: React.FC<Props> = ({ logementId }) => {
                 accessibilityLabel={t('refPhotos.a11y', { room: group.label })}
               >
                 <LazyImage
-                  source={{ uri: p.thumbnail_url || p.url }}
+                  uri={p.thumbnail_url || p.url}
                   style={[styles.thumb, { backgroundColor: colors.itemBackground }]}
                   placeholderColor={colors.itemBackground}
                 />

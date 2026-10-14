@@ -19,6 +19,7 @@ import { initOnlineManager } from '@/lib/network';
 import { initPointageQueue } from '@/lib/pointageQueue';
 import { persister, PERSIST_BUSTER } from '@/lib/persist';
 import OfflineBanner from '@/components/OfflineBanner';
+import { markFirstSeen } from '@/lib/storeReview';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -72,6 +73,11 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
   // Notifications push : enregistrement du token une fois authentifié.
   usePushRegistration(isAuthenticated);
+
+  // Demande de note : l'ancienneté se compte à partir de la première connexion.
+  useEffect(() => {
+    if (isAuthenticated) void markFirstSeen();
+  }, [isAuthenticated]);
 
   // Au tap sur une notification → ouvrir le ménage concerné.
   useEffect(() => {

@@ -14,6 +14,7 @@ import type {
   UpdateMenageInput,
   ValidateReportInput,
 } from '../types';
+import { recordSuccess } from '@/lib/storeReview';
 
 export const menageHooks = createCrudHooks<Menage, CreateMenageInput, UpdateMenageInput>(
   'menages',
@@ -189,7 +190,11 @@ export function useDeparture() {
         method: 'POST',
         body: { photo_url, lat, lng, departed_at },
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['menages'] }),
+    onSuccess: () => {
+      // Une prestation terminée : bon moment pour demander une note (au 5e départ).
+      void recordSuccess('departure');
+      return qc.invalidateQueries({ queryKey: ['menages'] });
+    },
   });
 }
 
@@ -210,7 +215,10 @@ export function useValidateReport() {
         method: 'POST',
         body: { price } as ValidateReportInput,
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['menages'] }),
+    onSuccess: () => {
+      void recordSuccess('validation');
+      return qc.invalidateQueries({ queryKey: ['menages'] });
+    },
   });
 }
 

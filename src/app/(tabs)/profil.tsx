@@ -13,7 +13,7 @@ import {
   Switch} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'react-native';
-import { LogOut, User, Sun, Moon, Smartphone, Save, Mail, Phone, Building2, Check, Globe, Lock, KeyRound, X, Camera, Plus, ArrowRightLeft, Bell, FileText, ChevronRight, ExternalLink, Wallet, Search, MapPin, Receipt, Archive, MessageSquare, Trash2 } from 'lucide-react-native';
+import { LogOut, User, Sun, Moon, Smartphone, Save, Mail, Phone, Building2, Check, Globe, Lock, KeyRound, X, Camera, Plus, ArrowRightLeft, Bell, FileText, ChevronRight, ExternalLink, Wallet, Search, MapPin, Receipt, Archive, MessageSquare, Trash2, Star } from 'lucide-react-native';
 import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { DASHBOARD_CREATE_ORG_URL } from '@/constants/Urls';
@@ -42,6 +42,7 @@ import { formatDateFr } from '@/lib/date-fr';
 import AutoScrollInput from '@/components/AutoScrollInput';
 import { useDialog } from '@/contexts/DialogContext';
 import BlockedUsersSection from '@/components/BlockedUsersSection';
+import { openStoreReviewPage, storeReviewUrl } from '@/lib/storeReview';
 
 const THEME_OPTIONS: { mode: ThemeMode; key: 'profile.themeLight' | 'profile.themeDark' | 'profile.themeSystem'; icon: typeof Sun }[] = [
   { mode: 'light', key: 'profile.themeLight', icon: Sun },
@@ -609,6 +610,24 @@ export default function ProfilScreen() {
                 </View>
                 <ChevronRight size={IconSize.sm} color={colors.mutedText} />
               </TouchableOpacity>
+
+              {/* Noter l'app : lien permanent, c'est la personne qui choisit (iOS
+                  seulement tant que l'app n'est pas sur le Play Store). */}
+              {storeReviewUrl() ? (
+                <TouchableOpacity
+                  style={[styles.settingsCard, styles.legalRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  onPress={() => void openStoreReviewPage()}
+                  accessibilityRole="link"
+                  accessibilityLabel={t('profile.rateApp')}
+                >
+                  <Star size={IconSize.md} color={colors.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.legalRowTitle, { color: colors.text }]}>{t('profile.rateApp')}</Text>
+                    <Text style={[styles.hint, { color: colors.mutedText }]}>{t('profile.rateAppHint')}</Text>
+                  </View>
+                  <ChevronRight size={IconSize.sm} color={colors.mutedText} />
+                </TouchableOpacity>
+              ) : null}
 
               {/* Réglages */}
               <Text style={[styles.sectionTitle, { color: colors.text2 }]}>{t('profile.settingsSection')}</Text>

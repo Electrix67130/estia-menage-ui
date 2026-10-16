@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "224315233985",
+    "project_id": "estia-clean-connect",
+    "storage_bucket": "estia-clean-connect.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:224315233985:android:dd4f848541c54d6e4be640",
+        "android_client_info": {
+          "package_name": "fr.estiacleanconnect.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDpIFzV8p9EBN6PZWcN-iphuXM3KBLHu3o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

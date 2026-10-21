@@ -29,8 +29,10 @@ export interface MyUpcomingMenage {
   status: 'a_venir' | 'en_cours' | 'termine' | 'valide' | 'annule';
   /** Type de prestation : ménage (défaut), check-in ou check-out. */
   prestation_type: 'menage' | 'check_in' | 'check_out';
-  /** Calculé côté API : jour passé + aucun pointage + statut a_venir. */
+  /** Calculé côté API : jour passé et prestation pas terminée (tout type). */
   needs_attention?: boolean;
+  /** Ce qui manque quand `needs_attention` : l'arrivée ou le départ (en cours oublié). */
+  attention_reason?: 'arrival' | 'departure' | null;
   my_response: MenageResponseStatus | null;
   is_assigned: boolean;
   assigned_to_someone: boolean;

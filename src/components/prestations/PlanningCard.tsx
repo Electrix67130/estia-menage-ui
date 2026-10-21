@@ -182,7 +182,7 @@ const PlanningCard: React.FC<Props> = ({
               {late ? (
                 <View style={[styles.pill, { backgroundColor: colors.red + '20' }]}>
                   <AlertTriangle size={11} color={colors.red} />
-                  <Text style={[styles.pillText, { color: colors.red }]}>{t('menage.statusNotClockedIn')}</Text>
+                  <Text style={[styles.pillText, { color: colors.red }]}>{t(menage.attention_reason === 'departure' ? 'menage.statusNotClockedOut' : 'menage.statusNotClockedIn')}</Text>
                 </View>
               ) : menage.status === 'en_cours' ? (
                 <View style={[styles.pill, { backgroundColor: colors.statusEnCours + '20' }]}>

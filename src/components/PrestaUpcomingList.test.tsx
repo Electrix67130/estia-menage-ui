@@ -158,6 +158,23 @@ describe('Liste presta — « À traiter »', () => {
     expect(queryByText('Logement ok')).toBeNull();
   });
 
+  it('une prestation d’hier restée en cours remonte, avec le bandeau « départ »', () => {
+    const forgotten = item({
+      id: 'out',
+      date_prevue: yesterday,
+      status: 'en_cours',
+      is_assigned: true,
+      assigned_to_someone: true,
+      needs_attention: true,
+      attention_reason: 'departure',
+    });
+    const { getByText, getByLabelText, queryByText } = setup([answered, forgotten]);
+    fireEvent.press(getByLabelText(`${translate('prestations.segTodo')} (1)`));
+    expect(getByText(translate('todo.late_one'))).toBeTruthy();
+    expect(getByText(translate('prestations.lateClockOut'))).toBeTruthy();
+    expect(queryByText(translate('menage.statusInProgress'))).toBeNull();
+  });
+
   it('tout est à jour → message dédié', () => {
     const { getByText, getByLabelText } = setup([answered]);
     fireEvent.press(getByLabelText(translate('prestations.segTodo')));

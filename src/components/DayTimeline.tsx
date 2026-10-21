@@ -85,7 +85,7 @@ export function AgendaRow({
             accessibilityLabel={t('timeline.pastDayNotClockedIn')}
           >
             <AlertTriangle size={11} color={colors.red} />
-            <Text style={[styles.badgeLateText, { color: colors.red }]}>{t('menage.statusNotClockedIn')}</Text>
+            <Text style={[styles.badgeLateText, { color: colors.red }]}>{t(m.attention_reason === 'departure' ? 'menage.statusNotClockedOut' : 'menage.statusNotClockedIn')}</Text>
           </View>
         ) : null}
       </View>

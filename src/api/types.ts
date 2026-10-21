@@ -314,8 +314,10 @@ export interface Menage {
   logement_color?: string | null;
   /** True s'il existe au moins une demande de report `pending` sur ce ménage. */
   has_pending_reschedule?: boolean;
-  /** Calculé côté API : jour passé + aucun pointage + statut a_venir. */
+  /** Calculé côté API : jour passé et prestation pas terminée (tout type). */
   needs_attention?: boolean;
+  /** Ce qui manque quand `needs_attention` : l'arrivée ou le départ (en cours oublié). */
+  attention_reason?: 'arrival' | 'departure' | null;
   /** Votes des prestataires sur une prestation non affectée (GET /menages) :
    *  nb de « présent », nb d'« absent », et nb de membres `prestataire` du
    *  logement (= qui peut répondre). Alimentent le badge « Qui est dispo ? ». */

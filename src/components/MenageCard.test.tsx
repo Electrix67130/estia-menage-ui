@@ -35,6 +35,14 @@ describe('MenageCard — carte de liste', () => {
     expect(queryByText(translate('menage.statusUpcoming'))).toBeNull();
   });
 
+  it('« Départ non pointé » pour une prestation passée restée en cours', () => {
+    const { getByText, queryByText } = renderWithProviders(
+      <MenageCard menage={makeMenage({ needs_attention: true, attention_reason: 'departure', status: 'en_cours' })} onPress={noop} />,
+    );
+    expect(getByText(translate('menage.statusNotClockedOut'))).toBeTruthy();
+    expect(queryByText(translate('menage.statusNotClockedIn'))).toBeNull();
+  });
+
   it('prix prévu, et prix validé s’il diffère', () => {
     const a = renderWithProviders(<MenageCard menage={makeMenage({ prix_prevu: 60 })} onPress={noop} />);
     expect(a.getByText(/60 €/)).toBeTruthy();

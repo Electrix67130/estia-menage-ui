@@ -97,7 +97,7 @@ const MenageCard: React.FC<Props> = ({ menage, onPress, onLongPress, selected, u
                   accessibilityLabel={t('menageCard.lateA11y')}
                 >
                   <AlertTriangle size={11} color={colors.red} />
-                  <Text style={[styles.lateBadgeText, { color: colors.red }]}>{t('menage.statusNotClockedIn')}</Text>
+                  <Text style={[styles.lateBadgeText, { color: colors.red }]}>{t(menage.attention_reason === 'departure' ? 'menage.statusNotClockedOut' : 'menage.statusNotClockedIn')}</Text>
                 </View>
               ) : null}
               {menage.has_pending_reschedule ? (

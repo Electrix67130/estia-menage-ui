@@ -60,12 +60,12 @@ export default function PrestaUpcomingList() {
   const sections = useMemo<Section[]>(() => {
     const all = list.data ?? [];
     if (view === 'planning') return groupByDay(all, todayYmd);
-    // À traiter : à répondre (vote ouvert, pas encore de réponse) + non pointées
-    // (affecté, jour passé sans pointage).
+    // À traiter : à répondre (vote ouvert, pas encore de réponse) + en retard
+    // (affecté, jour passé et pas terminée : arrivée ou départ non pointé).
     const toAnswer = all.filter(
       (m) => m.status === 'a_venir' && !m.assigned_to_someone && !m.my_response && m.date_prevue.slice(0, 10) >= todayYmd,
     );
-    const late = all.filter((m) => m.status === 'a_venir' && m.is_assigned && m.date_prevue.slice(0, 10) < todayYmd);
+    const late = all.filter((m) => m.is_assigned && !!m.needs_attention);
     const out: Section[] = [];
     if (toAnswer.length)
       out.push({ key: 'answer', title: t('prestations.toAnswer'), isToday: false, color: colors.primary, data: toAnswer.slice().sort((a, b) => a.date_prevue.localeCompare(b.date_prevue)) });
@@ -80,7 +80,7 @@ export default function PrestaUpcomingList() {
     const all = list.data ?? [];
     return (
       all.filter((m) => m.status === 'a_venir' && !m.assigned_to_someone && !m.my_response && m.date_prevue.slice(0, 10) >= todayYmd).length +
-      all.filter((m) => m.status === 'a_venir' && m.is_assigned && m.date_prevue.slice(0, 10) < todayYmd).length
+      all.filter((m) => m.is_assigned && !!m.needs_attention).length
     );
   }, [list.data, todayYmd]);
 
@@ -249,7 +249,7 @@ export default function PrestaUpcomingList() {
                       accessibilityLabel={t('menageCard.lateA11y')}
                     >
                       <AlertTriangle size={12} color={colors.red} />
-                      <Text style={[styles.lateBadgeText, { color: colors.red }]}>{t('menage.statusNotClockedIn')}</Text>
+                      <Text style={[styles.lateBadgeText, { color: colors.red }]}>{t(item.attention_reason === 'departure' ? 'menage.statusNotClockedOut' : 'menage.statusNotClockedIn')}</Text>
                     </View>
                   ) : null}
                   {duration ? (
@@ -405,6 +405,11 @@ function WorkflowStatus({
     color = colors.statusTermine;
     label = who ? t('prestations.doneBy', { who }) : t('menage.statusCompleted');
     Icon = CheckCircle2;
+  } else if (item.status === 'en_cours' && item.attention_reason === 'departure') {
+    // Arrivée pointée un jour passé, départ jamais pointé.
+    color = colors.red;
+    label = t('prestations.lateClockOut');
+    Icon = AlertTriangle;
   } else if (item.status === 'en_cours') {
     color = colors.statusEnCours;
     label = t('menage.statusInProgress');

@@ -521,7 +521,7 @@ function AdminMenagesScreen() {
       if (section.key === 'validate') {
         note = m.departed_at ? t('todo.doneAt', { date: formatDateFr(m.departed_at, 'dayShortTime') }) : t('todo.reportSubmitted');
       } else if (section.key === 'late') {
-        note = t('todo.lateNote');
+        note = t(m.attention_reason === 'departure' ? 'todo.lateNoteDeparture' : 'todo.lateNote');
       }
       return wrapSelectable(
         m.id,

@@ -142,6 +142,18 @@ describe('PlanningCard — badges « hors de l’ordinaire »', () => {
     expect(queryByText(translate('menage.statusInProgress'))).toBeNull();
   });
 
+  it('« Départ non pointé » quand l’arrivée est pointée mais pas le départ', () => {
+    const { getByText, queryByText } = renderWithProviders(
+      <PlanningCard
+        menage={makeMenage({ needs_attention: true, attention_reason: 'departure', status: 'en_cours' })}
+        onPress={noop}
+      />,
+    );
+    expect(getByText(translate('menage.statusNotClockedOut'))).toBeTruthy();
+    expect(queryByText(translate('menage.statusNotClockedIn'))).toBeNull();
+    expect(queryByText(translate('menage.statusInProgress'))).toBeNull();
+  });
+
   it('« En cours » et « À valider »', () => {
     const a = renderWithProviders(<PlanningCard menage={makeMenage({ status: 'en_cours' })} onPress={noop} />);
     expect(a.getByText(translate('menage.statusInProgress'))).toBeTruthy();

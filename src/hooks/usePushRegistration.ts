@@ -17,9 +17,12 @@ let cachedToken: string | null = null;
 export async function registerPushToken(): Promise<string | null> {
   try {
     if (Platform.OS === 'android') {
+      // HIGH = bandeau en haut de l'écran (DEFAULT = volet seulement, sans bandeau).
+      // Android fige l'importance d'un canal à sa création : un appareil qui a déjà
+      // le canal en DEFAULT le garde jusqu'à réinstallation ou effacement des données.
       await Notifications.setNotificationChannelAsync('default', {
         name: 'Notifications',
-        importance: Notifications.AndroidImportance.DEFAULT,
+        importance: Notifications.AndroidImportance.HIGH,
       });
     }
 

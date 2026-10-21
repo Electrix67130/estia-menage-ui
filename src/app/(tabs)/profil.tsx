@@ -849,7 +849,7 @@ export default function ProfilScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
-  scrollContent: { flexGrow: 1, paddingHorizontal: Spacing.xxl, paddingTop: Spacing.lg, paddingBottom: Spacing.xxxl * 2, gap: Spacing.md },
+  scrollContent: { flexGrow: 1, paddingHorizontal: Spacing.xxl, paddingTop: Spacing.lg, paddingBottom: Spacing.xl, gap: Spacing.md },
   title: { fontSize: FontSize.title, fontWeight: FontWeight.bold },
 
   identityCard: {

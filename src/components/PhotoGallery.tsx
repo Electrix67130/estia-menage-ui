@@ -2,6 +2,7 @@ import React, { useCallback, useState, useMemo } from 'react';
 import { View, Text, Image, TouchableOpacity, FlatList, StyleSheet, Dimensions, RefreshControl, Modal, ScrollView, ActivityIndicator } from 'react-native';
 import { Camera, ImagePlus, Trash2, Share2, X, Flag } from 'lucide-react-native';
 import ImageView from 'react-native-image-viewing';
+import PhotoViewerHeader from '@/components/PhotoViewerHeader';
 import * as ImagePicker from 'expo-image-picker';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight, IconSize, Shadow } from '@/constants/Layout';
@@ -466,6 +467,7 @@ const PhotoGallery: React.FC<Props> = ({ menageId, logementId, logementRoomId, r
           onRequestClose={() => setFullscreenIndex(null)}
           swipeToCloseEnabled
           doubleTapToZoomEnabled
+          HeaderComponent={() => <PhotoViewerHeader onRequestClose={() => setFullscreenIndex(null)} />}
         />
       </View>
     );

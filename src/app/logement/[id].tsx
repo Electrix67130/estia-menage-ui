@@ -39,6 +39,7 @@ import LogementEquipementsSection from '@/components/LogementEquipementsSection'
 import LogementCodesSection from '@/components/LogementCodesSection';
 import LogementOptionsSection from '@/components/LogementOptionsSection';
 import ImageView from 'react-native-image-viewing';
+import PhotoViewerHeader from '@/components/PhotoViewerHeader';
 import { useLogementPhotos } from '@/api/hooks/usePhotos';
 import { openMaps } from '@/lib/contact-links';
 import { formatQtyUnit } from '@/lib/unit-fr';
@@ -490,6 +491,7 @@ function RoomsSection({
         onRequestClose={() => setViewer(null)}
         swipeToCloseEnabled
         doubleTapToZoomEnabled
+        HeaderComponent={() => <PhotoViewerHeader onRequestClose={() => setViewer(null)} />}
       />
     </View>
   );

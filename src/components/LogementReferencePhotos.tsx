@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { LazyImage, useLazyScrollHandler } from '@/components/LazyImage';
 import ImageView from 'react-native-image-viewing';
+import PhotoViewerHeader from '@/components/PhotoViewerHeader';
 import { Colors } from '@/constants/Colors';
 import { Spacing, Radius, FontSize, FontWeight } from '@/constants/Layout';
 import { useColorScheme } from '@/hooks/useColorScheme';
@@ -102,6 +103,7 @@ const LogementReferencePhotos: React.FC<Props> = ({ logementId }) => {
         onRequestClose={() => setViewerIndex(null)}
         swipeToCloseEnabled
         doubleTapToZoomEnabled
+        HeaderComponent={() => <PhotoViewerHeader onRequestClose={() => setViewerIndex(null)} />}
       />
     </View>
   );

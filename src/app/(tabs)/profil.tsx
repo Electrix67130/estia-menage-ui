@@ -218,7 +218,9 @@ export default function ProfilScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <AppHeader />
+      <AppHeader>
+        <Text style={[styles.title, { color: colors.text }]}>{t('profile.title')}</Text>
+      </AppHeader>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
@@ -848,7 +850,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   flex: { flex: 1 },
   scrollContent: { flexGrow: 1, paddingHorizontal: Spacing.xxl, paddingTop: Spacing.lg, paddingBottom: Spacing.xxxl * 2, gap: Spacing.md },
-  title: { fontSize: FontSize.title, fontWeight: FontWeight.bold, marginBottom: Spacing.sm },
+  title: { fontSize: FontSize.title, fontWeight: FontWeight.bold },
 
   identityCard: {
     flexDirection: 'row',
